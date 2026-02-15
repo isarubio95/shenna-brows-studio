@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import logo from "@/assets/logo-shenna.png";
 import { ShoppingBag, User, Menu, X, Shield } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -50,8 +51,8 @@ const Navbar = () => {
       }`}
     >
       <nav className="container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
-        <Link to="/" className="font-playfair text-2xl font-bold tracking-wide text-carbon">
-          Shenna <span className="text-gold">BROWS</span>
+        <Link to="/">
+          <img src={logo} alt="Shenna Brows" className="h-10 lg:h-12 w-auto" />
         </Link>
 
         <ul className="hidden lg:flex items-center gap-8">
