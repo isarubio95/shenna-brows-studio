@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -9,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import ProductEditDialog from "@/components/admin/ProductEditDialog";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -20,12 +21,14 @@ const statusColors: Record<string, string> = {
 const Admin = () => {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
   const [togglingTestimonial, setTogglingTestimonial] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -55,24 +58,15 @@ const Admin = () => {
   if (authLoading) return <main className="min-h-screen bg-cream pt-32 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-gold" /></main>;
   if (!user || !isAdmin) return <Navigate to="/login" replace />;
 
-  const updateProduct = async (id: string, field: string, value: string) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [field]: field === "price" ? parseFloat(value) || 0 : parseInt(value) || 0 } : p))
-    );
+  const refreshProducts = async () => {
+    const { data } = await (supabase as any).from("products").select("*").order("name");
+    setProducts(data || []);
+    queryClient.invalidateQueries({ queryKey: ["products"] });
   };
 
-  const saveProduct = async (product: any) => {
-    setSaving(product.id);
-    const { error } = await (supabase as any)
-      .from("products")
-      .update({ price: product.price, stock: product.stock })
-      .eq("id", product.id);
-    if (error) {
-      toast({ title: "Error al guardar", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Producto actualizado" });
-    }
-    setSaving(null);
+  const openEdit = (product: any) => {
+    setEditingProduct(product);
+    setEditDialogOpen(true);
   };
 
   const toggleFeatured = async (id: string, current: boolean) => {
@@ -139,46 +133,40 @@ const Admin = () => {
         {/* Products */}
         <AnimatedSection delay={0.1}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Editar Productos</h2>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {products.map((p) => (
-              <div key={p.id} className="bg-white rounded-xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex-1">
-                  <h3 className="font-medium text-carbon">{p.name}</h3>
-                  <p className="text-xs text-carbon/40">{p.category}</p>
+              <div key={p.id} className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden group">
+                <div className="aspect-square bg-muted overflow-hidden">
+                  <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
                 </div>
-                <div className="flex gap-4 items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-carbon/50">Precio €</span>
-                    <Input
-                      type="number"
-                      value={p.price}
-                      onChange={(e) => updateProduct(p.id, "price", e.target.value)}
-                      className="w-24 bg-cream/50 border-gold/15 text-sm"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-carbon/50">Stock</span>
-                    <Input
-                      type="number"
-                      value={p.stock}
-                      onChange={(e) => updateProduct(p.id, "stock", e.target.value)}
-                      className="w-20 bg-cream/50 border-gold/15 text-sm"
-                    />
+                <div className="p-4">
+                  <h3 className="font-medium text-carbon">{p.name}</h3>
+                  <p className="text-xs text-carbon/40 mb-1">{p.category}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-carbon font-semibold">€{Number(p.price).toFixed(2)}</span>
+                    <span className="text-xs text-carbon/50">Stock: {p.stock}</span>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={saving === p.id}
-                    onClick={() => saveProduct(p)}
-                    className="border-gold/20 text-gold hover:bg-gold/5"
+                    onClick={() => openEdit(p)}
+                    className="w-full mt-3 border-gold/20 text-gold hover:bg-gold/5"
                   >
-                    {saving === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                    Editar
                   </Button>
                 </div>
               </div>
             ))}
           </div>
         </AnimatedSection>
+
+        <ProductEditDialog
+          product={editingProduct}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onSaved={refreshProducts}
+        />
 
         <div className="mb-12" />
 
