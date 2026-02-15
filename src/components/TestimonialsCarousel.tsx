@@ -39,13 +39,13 @@ const TestimonialsCarousel = () => {
   if (testimonials.length === 0) return null;
 
   return (
-    <section className="py-24 bg-carbon">
+    <section className="py-24 bg-cream">
       <div className="container mx-auto px-6 max-w-4xl">
         <AnimatedSection>
           <p className="text-center text-gold text-xs uppercase tracking-[0.3em] font-medium mb-4">
             Testimonios
           </p>
-          <h2 className="font-playfair text-3xl md:text-4xl font-bold text-cream text-center mb-16">
+          <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon text-center mb-16">
             Lo que dicen nuestras <span className="italic text-gold">clientas</span>
           </h2>
         </AnimatedSection>
@@ -67,7 +67,7 @@ const TestimonialsCarousel = () => {
                         className="text-gold/40 mb-8 rotate-180"
                         strokeWidth={1}
                       />
-                      <blockquote className="font-playfair text-xl md:text-2xl lg:text-3xl italic text-cream/90 leading-relaxed mb-8 max-w-2xl">
+                      <blockquote className="font-playfair text-xl md:text-2xl lg:text-3xl italic text-carbon/90 leading-relaxed mb-8 max-w-2xl">
                         "{t.content}"
                       </blockquote>
                       <div className="flex items-center gap-3">
