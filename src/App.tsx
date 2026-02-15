@@ -31,10 +31,8 @@ const App = () => (
             <CartDrawer />
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/pinzas" element={<ProductPage />} />
-              <Route path="/tijeras" element={<ProductPage />} />
-              <Route path="/gel" element={<ProductPage />} />
               <Route path="/sobre-mi" element={<About />} />
+              <Route path="/checkout" element={<Checkout />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/login" element={<Login />} />
