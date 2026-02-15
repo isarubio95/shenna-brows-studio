@@ -7,6 +7,7 @@ import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { Scissors, Target, Gem } from "lucide-react";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
+import heroBg from "@/assets/hero-bg.jpg";
 
 const benefits = [
   { icon: Gem, title: "Acero inoxidable italiano", desc: "Materiales premium seleccionados por su durabilidad y precisión." },
@@ -28,22 +29,27 @@ const Index = () => {
   return (
     <main>
       {/* Hero */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-cream via-cream to-gold/5">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gold/5 via-transparent to-transparent" />
-        <div className="container mx-auto px-6 py-32 text-center relative z-10">
+      <section
+        className="relative min-h-screen flex items-center overflow-hidden bg-cover bg-center bg-no-repeat bg-fixed"
+        style={{ backgroundImage: `url(${heroBg})` }}
+      >
+        {/* Dark overlay gradient */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
+        
+        <div className="container mx-auto max-w-7xl px-6 py-32 relative z-10">
           <AnimatedSection>
             <p className="text-gold text-sm uppercase tracking-[0.3em] font-medium mb-6">
               Herramientas profesionales de cejas
             </p>
           </AnimatedSection>
           <AnimatedSection delay={0.1}>
-            <h1 className="font-playfair text-5xl md:text-7xl lg:text-8xl font-bold text-carbon leading-[1.1] mb-6">
+            <h1 className="font-playfair text-5xl md:text-7xl lg:text-8xl font-bold text-cream leading-[1.1] mb-6">
               La precisión<br />
               <span className="italic text-gold">que te define</span>
             </h1>
           </AnimatedSection>
           <AnimatedSection delay={0.2}>
-            <p className="text-carbon/60 text-lg md:text-xl max-w-xl mx-auto mb-10 leading-relaxed">
+            <p className="text-white/80 text-lg md:text-xl max-w-xl mb-10 leading-relaxed">
               Herramientas creadas desde la experiencia profesional. Acero italiano, diseño con alma.
             </p>
           </AnimatedSection>
