@@ -1,8 +1,9 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getShippingCost, FREE_SHIPPING_THRESHOLD } from "@/data/products";
 
 const CartDrawer = () => {
   const { items, isOpen, closeCart, removeItem, updateQuantity, totalPrice } = useCart();
@@ -67,13 +68,33 @@ const CartDrawer = () => {
               ))}
             </div>
 
-            <div className="border-t border-gold/10 pt-4 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-carbon/60">Total</span>
-                <span className="text-lg font-playfair font-bold text-carbon">
-                  €{totalPrice.toFixed(2)}
-                </span>
-              </div>
+            <div className="border-t border-gold/10 pt-4 space-y-3">
+              {(() => {
+                const shipping = getShippingCost(totalPrice);
+                const remaining = FREE_SHIPPING_THRESHOLD - totalPrice;
+                return (
+                  <>
+                    {remaining > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-carbon/50">
+                        <Truck size={14} />
+                        <span>Añade €{remaining.toFixed(2)} más para envío gratis</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-sm text-carbon/60">
+                      <span>Envío</span>
+                      <span className={shipping === 0 ? "text-green-600 font-medium" : ""}>
+                        {shipping === 0 ? "GRATIS" : `€${shipping.toFixed(2)}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-carbon/60">Total</span>
+                      <span className="text-lg font-playfair font-bold text-carbon">
+                        €{(totalPrice + shipping).toFixed(2)}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
               <Link to="/checkout" onClick={closeCart}>
                 <Button className="w-full bg-gold hover:bg-gold/90 text-white font-medium tracking-wide">
                   Finalizar Compra
