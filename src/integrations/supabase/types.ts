@@ -232,7 +232,15 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles_public_view: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          full_name: string | null
+          is_featured: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
