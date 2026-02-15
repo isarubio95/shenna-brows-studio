@@ -44,15 +44,21 @@ const Navbar = () => {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
         scrolled
-          ? "bg-cream/80 backdrop-blur-lg shadow-[0_2px_20px_rgba(0,0,0,0.04)]"
+          ? "bg-cream/90 backdrop-blur-lg shadow-sm"
           : "bg-transparent"
       }`}
     >
       <nav className="container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
         <Link to="/">
-          <img src={logo} alt="Shenna Brows" className="h-10 lg:h-12 w-auto" />
+          <img
+            src={logo}
+            alt="Shenna Brows"
+            className={`h-10 lg:h-12 w-auto transition-all duration-300 ${
+              scrolled ? "" : "brightness-[10] contrast-0"
+            }`}
+          />
         </Link>
 
         <ul className="hidden lg:flex items-center gap-8">
@@ -61,7 +67,11 @@ const Navbar = () => {
               <Link
                 to={link.to}
                 className={`text-sm font-medium tracking-wide transition-colors duration-300 hover:text-gold ${
-                  location.pathname === link.to ? "text-gold" : "text-carbon/70"
+                  location.pathname === link.to
+                    ? "text-gold"
+                    : scrolled
+                      ? "text-carbon/70"
+                      : "text-white/90"
                 }`}
               >
                 {link.label}
@@ -72,7 +82,13 @@ const Navbar = () => {
 
         <div className="flex items-center gap-4">
           {isAdmin && (
-            <Link to="/admin" className="hidden lg:block text-carbon/60 hover:text-gold transition-colors" aria-label="Admin">
+            <Link
+              to="/admin"
+              className={`hidden lg:block transition-colors duration-300 hover:text-gold ${
+                scrolled ? "text-carbon/60" : "text-white/80"
+              }`}
+              aria-label="Admin"
+            >
               <Shield size={20} />
             </Link>
           )}
@@ -105,14 +121,22 @@ const Navbar = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link to="/login" className="hidden lg:block text-carbon/60 hover:text-gold transition-colors" aria-label="Mi cuenta">
+            <Link
+              to="/login"
+              className={`hidden lg:block transition-colors duration-300 hover:text-gold ${
+                scrolled ? "text-carbon/60" : "text-white/80"
+              }`}
+              aria-label="Mi cuenta"
+            >
               <User size={20} />
             </Link>
           )}
 
           <button
             onClick={openCart}
-            className="relative text-carbon/60 hover:text-gold transition-colors"
+            className={`relative transition-colors duration-300 hover:text-gold ${
+              scrolled ? "text-carbon/60" : "text-white/80"
+            }`}
             aria-label="Carrito"
           >
             <ShoppingBag size={20} />
@@ -124,7 +148,9 @@ const Navbar = () => {
           </button>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="lg:hidden text-carbon/70 hover:text-gold transition-colors"
+            className={`lg:hidden transition-colors duration-300 hover:text-gold ${
+              scrolled ? "text-carbon/70" : "text-white/90"
+            }`}
             aria-label="Menú"
           >
             {mobileOpen ? <X size={24} /> : <Menu size={24} />}
