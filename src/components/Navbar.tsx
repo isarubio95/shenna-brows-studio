@@ -109,8 +109,8 @@ const Navbar = () => {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex flex-col items-center gap-0.5 text-gold transition-colors focus:outline-none" aria-label="Mi cuenta">
-                  <User size={20} fill="currentColor" />
+                <button className={`flex flex-col items-center gap-0.5 transition-colors focus:outline-none hover:text-gold ${iconColor}`} aria-label="Mi cuenta">
+                  <User size={20} />
                   {firstName && (
                     <span className="hidden lg:block text-[10px] uppercase tracking-widest text-gold/80 font-medium leading-none max-w-[60px] truncate">
                       {firstName}
