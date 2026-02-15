@@ -8,7 +8,7 @@ const Footer = () => (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
         {/* Brand */}
         <div>
-          <img src={logo} alt="Shenna Brows" className="h-12 w-auto mb-4 brightness-0 invert" />
+          <Link to="/"><img src={logo} alt="Shenna Brows" className="h-12 w-auto mb-4 brightness-0 invert" /></Link>
           <p className="text-sm leading-relaxed text-cream/60 max-w-xs">
             Herramientas profesionales de cejas con acero inoxidable italiano. Precisión creada desde la experiencia.
           </p>
