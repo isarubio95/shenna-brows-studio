@@ -10,6 +10,14 @@ export interface Product {
   materials: string;
   shipping_info: string;
   tagline: string;
+  stripe_price_id: string;
+}
+
+export const SHIPPING_COST = 5;
+export const FREE_SHIPPING_THRESHOLD = 50;
+
+export function getShippingCost(subtotal: number): number {
+  return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
 }
 
 export const products: Product[] = [
@@ -25,6 +33,7 @@ export const products: Product[] = [
     materials: "Acero inoxidable italiano 430. Acabado satinado antideslizante. Punta calibrada a mano con cierre hermético.",
     shipping_info: "Envío gratuito en pedidos superiores a €50. Entrega estimada en 3-5 días laborables. Empaque premium de regalo incluido.",
     tagline: "Precisión milimétrica en cada agarre",
+    stripe_price_id: "price_1T16FCHU2ua1cIqbfBUxN6ku",
   },
   {
     id: "2",
@@ -38,6 +47,7 @@ export const products: Product[] = [
     materials: "Acero inoxidable japonés de alta dureza. Hojas micro-serradas. Mangos ergonómicos con revestimiento soft-touch.",
     shipping_info: "Envío gratuito en pedidos superiores a €50. Entrega estimada en 3-5 días laborables. Empaque premium de regalo incluido.",
     tagline: "Corte limpio, forma perfecta",
+    stripe_price_id: "price_1T16FTHU2ua1cIqbvBmeuqgK",
   },
   {
     id: "3",
@@ -51,6 +61,7 @@ export const products: Product[] = [
     materials: "Fórmula vegana y cruelty-free. Ingredientes clave: Aceite de ricino, Vitamina E, Pantenol. Sin parabenos ni sulfatos.",
     shipping_info: "Envío gratuito en pedidos superiores a €50. Entrega estimada en 3-5 días laborables. Empaque premium de regalo incluido.",
     tagline: "Fijación invisible, resultado visible",
+    stripe_price_id: "price_1T16FqHU2ua1cIqbqUxepbBu",
   },
 ];
 
