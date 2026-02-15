@@ -39,7 +39,7 @@ const TestimonialsCarousel = () => {
   if (testimonials.length === 0) return null;
 
   return (
-    <section className="py-24 bg-[hsl(0,0%,10%)]">
+    <section className="py-24 bg-[hsl(0,0%,10%)] border-t border-gold/20 border-b border-b-gold/20">
       <div className="container mx-auto px-6 max-w-4xl">
         <AnimatedSection>
           <p className="text-center text-primary text-xs uppercase tracking-[0.3em] font-medium mb-4">
