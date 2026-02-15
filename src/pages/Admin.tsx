@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Pencil } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
+import { getProductImageUrl } from "@/lib/product-images";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -137,7 +138,7 @@ const Admin = () => {
             {products.map((p) => (
               <div key={p.id} className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden group">
                 <div className="aspect-square bg-muted overflow-hidden">
-                  <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                  <img src={getProductImageUrl(p.image_url, p.slug)} alt={p.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="p-4">
                   <h3 className="font-medium text-carbon">{p.name}</h3>

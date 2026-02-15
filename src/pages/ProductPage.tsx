@@ -6,15 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import AnimatedSection from "@/components/AnimatedSection";
 import { ShoppingBag, ArrowLeft, Loader2 } from "lucide-react";
-import productPinzas from "@/assets/product-pinzas.jpg";
-import productTijeras from "@/assets/product-tijeras.jpg";
-import productGel from "@/assets/product-gel.jpg";
-
-const productImages: Record<string, string> = {
-  pinzas: productPinzas,
-  tijeras: productTijeras,
-  gel: productGel,
-};
+import { getProductImageUrl } from "@/lib/product-images";
 
 const ProductPage = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -84,7 +76,7 @@ const ProductPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
           <AnimatedSection>
             <div className="aspect-square rounded-2xl bg-white overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-              <img src={productImages[product.slug] || product.image_url} alt={product.name} className="w-full h-full object-cover" />
+              <img src={getProductImageUrl(product.image_url, product.slug)} alt={product.name} className="w-full h-full object-cover" />
             </div>
           </AnimatedSection>
 

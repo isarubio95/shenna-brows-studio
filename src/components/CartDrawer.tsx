@@ -4,15 +4,7 @@ import { useCart } from "@/context/CartContext";
 import { Minus, Plus, Trash2, ShoppingBag, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getShippingCost, FREE_SHIPPING_THRESHOLD } from "@/data/products";
-import productPinzas from "@/assets/product-pinzas.jpg";
-import productTijeras from "@/assets/product-tijeras.jpg";
-import productGel from "@/assets/product-gel.jpg";
-
-const productImages: Record<string, string> = {
-  pinzas: productPinzas,
-  tijeras: productTijeras,
-  gel: productGel,
-};
+import { getProductImageUrl } from "@/lib/product-images";
 
 const CartDrawer = () => {
   const { items, isOpen, closeCart, removeItem, updateQuantity, totalPrice } = useCart();
@@ -41,7 +33,7 @@ const CartDrawer = () => {
                 >
                   <div className="w-16 h-16 rounded-md bg-muted flex-shrink-0 overflow-hidden">
                     <img
-                      src={productImages[item.product.slug] || item.product.image_url}
+                      src={getProductImageUrl(item.product.image_url, item.product.slug)}
                       alt={item.product.name}
                       className="w-full h-full object-cover"
                     />
