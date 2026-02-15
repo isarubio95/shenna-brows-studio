@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Instagram, Mail } from "lucide-react";
+import logo from "@/assets/logo-shenna.png";
 
 const Footer = () => (
   <footer className="bg-carbon text-cream/80">
@@ -7,9 +8,7 @@ const Footer = () => (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
         {/* Brand */}
         <div>
-          <h3 className="font-playfair text-2xl font-bold text-cream mb-4">
-            Shenna <span className="text-gold">BROWS</span>
-          </h3>
+          <img src={logo} alt="Shenna Brows" className="h-12 w-auto mb-4 brightness-0 invert" />
           <p className="text-sm leading-relaxed text-cream/60 max-w-xs">
             Herramientas profesionales de cejas con acero inoxidable italiano. Precisión creada desde la experiencia.
           </p>
