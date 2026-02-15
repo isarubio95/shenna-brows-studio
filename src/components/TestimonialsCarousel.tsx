@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AnimatedSection from "@/components/AnimatedSection";
+import paperTexture from "@/assets/paper-texture.avif";
 import {
   Carousel,
   CarouselContent,
@@ -33,14 +34,15 @@ const TestimonialsCarousel = () => {
 
   return (
     <section className="py-24 bg-cream relative overflow-hidden">
-      {/* SVG noise texture overlay — simulates premium cotton paper grain */}
+      {/* Paper texture overlay */}
       <div
-        className="absolute inset-0 opacity-[0.035] pointer-events-none"
+        className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+          backgroundImage: `url(${paperTexture})`,
           backgroundRepeat: "repeat",
-          backgroundSize: "200px 200px",
+          backgroundSize: "cover",
           mixBlendMode: "multiply",
+          opacity: 0.15,
         }}
       />
       <div className="container mx-auto px-6 max-w-4xl relative z-10">
