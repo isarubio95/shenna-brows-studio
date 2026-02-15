@@ -14,6 +14,7 @@ import About from "./pages/About";
 import Checkout from "./pages/Checkout";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
+import Account from "./pages/Account";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import NotFound from "./pages/NotFound";
 
@@ -33,10 +34,10 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/sobre-mi" element={<About />} />
               <Route path="/checkout" element={<Checkout />} />
-              <Route path="/checkout" element={<Checkout />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/login" element={<Login />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/account" element={<Account />} />
               <Route path="/:slug" element={<ProductPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
