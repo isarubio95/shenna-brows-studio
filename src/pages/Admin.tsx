@@ -180,6 +180,8 @@ const Admin = () => {
           </div>
         </AnimatedSection>
 
+        <div className="mb-12" />
+
         {/* Testimonials Management */}
         <AnimatedSection delay={0.15}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Gestión de Testimonios</h2>
