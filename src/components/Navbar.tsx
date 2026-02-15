@@ -52,7 +52,7 @@ const Navbar = () => {
     >
       <nav className="container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
         <Link to="/">
-          <img src={logo} alt="Shenna Brows" className="h-10 lg:h-12 w-auto" />
+          <img src={logo} alt="Shenna Brows" className="h-14 lg:h-16 w-auto" />
         </Link>
 
         <ul className="hidden lg:flex items-center gap-8">
