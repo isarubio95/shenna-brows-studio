@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
-import { products } from "@/data/products";
 import { Scissors, Target, Gem } from "lucide-react";
 import { motion } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const benefits = [
   { icon: Gem, title: "Acero inoxidable italiano", desc: "Materiales premium seleccionados por su durabilidad y precisión." },
@@ -12,6 +14,16 @@ const benefits = [
 ];
 
 const Index = () => {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (supabase as any).from("products").select("*").order("name").then(({ data }: any) => {
+      setProducts(data || []);
+      setLoading(false);
+    });
+  }, []);
+
   return (
     <main>
       {/* Hero */}
@@ -80,32 +92,45 @@ const Index = () => {
             </p>
           </AnimatedSection>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {products.map((product, i) => (
-              <AnimatedSection key={product.id} delay={i * 0.1}>
-                <Link to={`/${product.slug}`}>
-                  <motion.div
-                    whileHover={{ y: -8 }}
-                    transition={{ duration: 0.3 }}
-                    className="group bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-shadow duration-500"
-                  >
-                    <div className="aspect-square bg-muted overflow-hidden">
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div className="p-6">
-                      <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">{product.category}</p>
-                      <h3 className="font-playfair text-xl font-semibold text-carbon mb-1">{product.name}</h3>
-                      <p className="text-sm text-carbon/50 mb-3">{product.tagline}</p>
-                      <p className="text-lg font-semibold text-carbon">€{product.price.toFixed(2)}</p>
-                    </div>
-                  </motion.div>
-                </Link>
-              </AnimatedSection>
-            ))}
+            {loading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl overflow-hidden">
+                  <Skeleton className="aspect-square" />
+                  <div className="p-6 space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                </div>
+              ))
+            ) : (
+              products.map((product, i) => (
+                <AnimatedSection key={product.id} delay={i * 0.1}>
+                  <Link to={`/${product.slug}`}>
+                    <motion.div
+                      whileHover={{ y: -8 }}
+                      transition={{ duration: 0.3 }}
+                      className="group bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-shadow duration-500"
+                    >
+                      <div className="aspect-square bg-muted overflow-hidden">
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="p-6">
+                        <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">{product.category}</p>
+                        <h3 className="font-playfair text-xl font-semibold text-carbon mb-1">{product.name}</h3>
+                        <p className="text-sm text-carbon/50 mb-3">{product.tagline}</p>
+                        <p className="text-lg font-semibold text-carbon">€{Number(product.price).toFixed(2)}</p>
+                      </div>
+                    </motion.div>
+                  </Link>
+                </AnimatedSection>
+              ))
+            )}
           </div>
         </div>
       </section>

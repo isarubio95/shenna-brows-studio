@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ShoppingBag, User, Search, Menu, X } from "lucide-react";
+import { ShoppingBag, User, LogOut, Menu, X, Shield } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 
 const navLinks = [
@@ -16,6 +17,7 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { openCart, totalItems } = useCart();
+  const { user, isAdmin, signOut } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -37,12 +39,10 @@ const Navbar = () => {
       }`}
     >
       <nav className="container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
-        {/* Logo */}
         <Link to="/" className="font-playfair text-2xl font-bold tracking-wide text-carbon">
           Shenna <span className="text-gold">BROWS</span>
         </Link>
 
-        {/* Desktop nav */}
         <ul className="hidden lg:flex items-center gap-8">
           {navLinks.map((link) => (
             <li key={link.to}>
@@ -58,14 +58,21 @@ const Navbar = () => {
           ))}
         </ul>
 
-        {/* Icons */}
         <div className="flex items-center gap-4">
-          <button className="hidden lg:block text-carbon/60 hover:text-gold transition-colors" aria-label="Buscar">
-            <Search size={20} />
-          </button>
-          <Link to="/login" className="hidden lg:block text-carbon/60 hover:text-gold transition-colors" aria-label="Mi cuenta">
-            <User size={20} />
-          </Link>
+          {isAdmin && (
+            <Link to="/admin" className="hidden lg:block text-carbon/60 hover:text-gold transition-colors" aria-label="Admin">
+              <Shield size={20} />
+            </Link>
+          )}
+          {user ? (
+            <button onClick={() => signOut()} className="hidden lg:block text-carbon/60 hover:text-gold transition-colors" aria-label="Cerrar sesión">
+              <LogOut size={20} />
+            </button>
+          ) : (
+            <Link to="/login" className="hidden lg:block text-carbon/60 hover:text-gold transition-colors" aria-label="Mi cuenta">
+              <User size={20} />
+            </Link>
+          )}
           <button
             onClick={openCart}
             className="relative text-carbon/60 hover:text-gold transition-colors"
@@ -88,7 +95,6 @@ const Navbar = () => {
         </div>
       </nav>
 
-      {/* Mobile menu */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
@@ -110,13 +116,19 @@ const Navbar = () => {
                   </Link>
                 </li>
               ))}
-              <li className="flex gap-6 pt-2">
-                <Link to="/login" className="text-carbon/60 hover:text-gold transition-colors">
-                  <User size={20} />
-                </Link>
-                <button className="text-carbon/60 hover:text-gold transition-colors">
-                  <Search size={20} />
-                </button>
+              {isAdmin && (
+                <li><Link to="/admin" className="text-gold font-medium">Admin</Link></li>
+              )}
+              <li>
+                {user ? (
+                  <button onClick={() => signOut()} className="text-carbon/60 hover:text-gold transition-colors">
+                    <LogOut size={20} />
+                  </button>
+                ) : (
+                  <Link to="/login" className="text-carbon/60 hover:text-gold transition-colors">
+                    <User size={20} />
+                  </Link>
+                )}
               </li>
             </ul>
           </motion.div>
