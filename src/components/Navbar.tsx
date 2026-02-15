@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo-shenna.png";
-import { ShoppingBag, User, Menu, Shield } from "lucide-react";
+import {
+  ShoppingBag, User, Menu, Shield,
+  Sparkles, Target, Scissors, Droplet, HeartHandshake,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -19,12 +23,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-const navLinks = [
-  { label: "Inicio", to: "/" },
-  { label: "Pinzas", to: "/pinzas" },
-  { label: "Tijeras", to: "/tijeras" },
-  { label: "Gel", to: "/gel" },
-  { label: "Sobre mí", to: "/sobre-mi" },
+const navLinks: { label: string; to: string; icon: LucideIcon }[] = [
+  { label: "Inicio", to: "/", icon: Sparkles },
+  { label: "Pinzas", to: "/pinzas", icon: Target },
+  { label: "Tijeras", to: "/tijeras", icon: Scissors },
+  { label: "Gel", to: "/gel", icon: Droplet },
+  { label: "Sobre mí", to: "/sobre-mi", icon: HeartHandshake },
 ];
 
 const Navbar = () => {
@@ -89,7 +93,8 @@ const Navbar = () => {
           ))}
         </ul>
 
-        <div className="flex items-center gap-4">
+        {/* Right icons — visible on ALL screen sizes */}
+        <div className="flex items-center gap-3 lg:gap-4">
           {isAdmin && (
             <Link
               to="/admin"
@@ -100,13 +105,14 @@ const Navbar = () => {
             </Link>
           )}
 
+          {/* User icon — visible on mobile + desktop */}
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="hidden lg:flex flex-col items-center gap-0.5 text-gold transition-colors focus:outline-none" aria-label="Mi cuenta">
+                <button className="flex flex-col items-center gap-0.5 text-gold transition-colors focus:outline-none" aria-label="Mi cuenta">
                   <User size={20} fill="currentColor" />
                   {firstName && (
-                    <span className="text-[10px] uppercase tracking-widest text-gold/80 font-medium leading-none max-w-[60px] truncate">
+                    <span className="hidden lg:block text-[10px] uppercase tracking-widest text-gold/80 font-medium leading-none max-w-[60px] truncate">
                       {firstName}
                     </span>
                   )}
@@ -129,13 +135,14 @@ const Navbar = () => {
           ) : (
             <Link
               to="/login"
-              className={`hidden lg:block transition-colors duration-300 hover:text-gold ${iconColor}`}
+              className={`transition-colors duration-300 hover:text-gold ${iconColor}`}
               aria-label="Mi cuenta"
             >
               <User size={20} />
             </Link>
           )}
 
+          {/* Cart — always visible */}
           <button
             onClick={openCart}
             className={`relative transition-colors duration-300 hover:text-gold ${iconColor}`}
@@ -149,6 +156,7 @@ const Navbar = () => {
             )}
           </button>
 
+          {/* Hamburger — mobile only */}
           <button
             onClick={() => setMobileOpen(true)}
             className={`lg:hidden transition-colors duration-300 hover:text-gold ${
@@ -164,53 +172,75 @@ const Navbar = () => {
       {/* Mobile menu — Sheet from right */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="right" className="bg-cream border-l border-gold/10 w-72 flex flex-col">
-          <SheetHeader className="text-right pr-2">
+          <SheetHeader className="text-left pl-1">
             <SheetTitle className="font-playfair text-gold text-lg">Menú</SheetTitle>
           </SheetHeader>
 
-          <ul className="flex flex-col items-end gap-6 mt-8 pr-2">
-            {navLinks.map((link) => (
-              <li key={link.to}>
-                <Link
-                  to={link.to}
-                  onClick={() => setMobileOpen(false)}
-                  className={`text-lg font-medium tracking-wide transition-colors ${
-                    location.pathname === link.to ? "text-gold" : "text-carbon/70 hover:text-gold"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-            {isAdmin && (
-              <li>
-                <Link to="/admin" onClick={() => setMobileOpen(false)} className="text-gold font-medium">
-                  Admin
-                </Link>
-              </li>
-            )}
-            {user ? (
-              <>
-                <li>
-                  <Link to="/account" onClick={() => setMobileOpen(false)} className="text-carbon/70 hover:text-gold transition-colors font-medium">
-                    Mi Cuenta
+          <ul className="flex flex-col mt-6">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = location.pathname === link.to;
+              return (
+                <li key={link.to} className="border-b border-gold/10 last:border-b-0">
+                  <Link
+                    to={link.to}
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex w-full items-center justify-between py-4 px-1 transition-colors ${
+                      isActive
+                        ? "text-gold"
+                        : "text-carbon hover:text-gold"
+                    }`}
+                  >
+                    <span className="font-playfair text-lg tracking-wide">{link.label}</span>
+                    <Icon size={20} className="text-gold/70" />
                   </Link>
                 </li>
-                <li>
-                  <button onClick={() => { signOut(); setMobileOpen(false); }} className="text-carbon/60 hover:text-gold transition-colors text-sm">
-                    Cerrar Sesión
-                  </button>
-                </li>
-              </>
-            ) : (
-              <li>
-                <Link to="/login" onClick={() => setMobileOpen(false)} className="text-carbon/60 hover:text-gold transition-colors flex items-center gap-2">
-                  <User size={18} />
-                  <span>Iniciar Sesión</span>
+              );
+            })}
+
+            {isAdmin && (
+              <li className="border-b border-gold/10">
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex w-full items-center justify-between py-4 px-1 text-gold font-playfair text-lg tracking-wide"
+                >
+                  <span>Admin</span>
+                  <Shield size={20} className="text-gold/70" />
                 </Link>
               </li>
             )}
           </ul>
+
+          {/* Auth section at bottom */}
+          <div className="mt-auto pb-6 pt-4 border-t border-gold/10">
+            {user ? (
+              <div className="flex flex-col gap-3 px-1">
+                <Link
+                  to="/account"
+                  onClick={() => setMobileOpen(false)}
+                  className="text-carbon hover:text-gold transition-colors font-medium text-sm"
+                >
+                  Mi Cuenta
+                </Link>
+                <button
+                  onClick={() => { signOut(); setMobileOpen(false); }}
+                  className="text-left text-carbon/50 hover:text-gold transition-colors text-sm"
+                >
+                  Cerrar Sesión
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 px-1 text-carbon/60 hover:text-gold transition-colors"
+              >
+                <User size={18} />
+                <span className="text-sm">Iniciar Sesión</span>
+              </Link>
+            )}
+          </div>
         </SheetContent>
       </Sheet>
     </header>
