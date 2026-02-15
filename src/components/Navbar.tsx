@@ -55,9 +55,7 @@ const Navbar = () => {
           <img
             src={logo}
             alt="Shenna Brows"
-            className={`h-10 lg:h-12 w-auto transition-all duration-300 ${
-              scrolled ? "" : "brightness-[10] contrast-0"
-            }`}
+            className="h-10 lg:h-12 w-auto"
           />
         </Link>
 
