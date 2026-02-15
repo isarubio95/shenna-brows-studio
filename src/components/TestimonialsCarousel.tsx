@@ -39,8 +39,18 @@ const TestimonialsCarousel = () => {
   if (testimonials.length === 0) return null;
 
   return (
-    <section className="py-24 bg-cream">
-      <div className="container mx-auto px-6 max-w-4xl">
+    <section className="py-24 bg-cream relative overflow-hidden">
+      {/* SVG noise texture overlay — simulates premium cotton paper grain */}
+      <div
+        className="absolute inset-0 opacity-[0.035] pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+          backgroundRepeat: "repeat",
+          backgroundSize: "200px 200px",
+          mixBlendMode: "multiply",
+        }}
+      />
+      <div className="container mx-auto px-6 max-w-4xl relative z-10">
         <AnimatedSection>
           <p className="text-center text-gold text-xs uppercase tracking-[0.3em] font-medium mb-4">
             Testimonios
