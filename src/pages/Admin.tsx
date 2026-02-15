@@ -33,11 +33,20 @@ const Admin = () => {
       const [ordersRes, productsRes, testimonialsRes] = await Promise.all([
         (supabase as any).from("orders").select("*").order("created_at", { ascending: false }).limit(20),
         (supabase as any).from("products").select("*").order("name"),
-        (supabase as any).from("testimonials").select("*, profiles:user_id(full_name)").order("created_at", { ascending: false }),
+        (supabase as any).from("testimonials").select("*").order("created_at", { ascending: false }),
       ]);
       setOrders(ordersRes.data || []);
       setProducts(productsRes.data || []);
-      setTestimonials(testimonialsRes.data || []);
+      // Enrich testimonials with profile names
+      const rawTestimonials = testimonialsRes.data || [];
+      if (rawTestimonials.length > 0) {
+        const userIds = rawTestimonials.map((t: any) => t.user_id);
+        const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", userIds);
+        const profileMap = new Map((profiles || []).map((p) => [p.user_id, p.full_name]));
+        setTestimonials(rawTestimonials.map((t: any) => ({ ...t, author_name: profileMap.get(t.user_id) || "Anónimo" })));
+      } else {
+        setTestimonials([]);
+      }
       setLoading(false);
     };
     fetchData();
@@ -191,7 +200,7 @@ const Admin = () => {
                   {testimonials.map((t) => (
                     <TableRow key={t.id} className="border-b border-gold/5">
                       <TableCell className="text-carbon text-sm font-medium">
-                        {t.profiles?.full_name || "Anónimo"}
+                        {t.author_name || "Anónimo"}
                       </TableCell>
                       <TableCell className="text-carbon/70 text-sm max-w-xs truncate">
                         {t.content}
