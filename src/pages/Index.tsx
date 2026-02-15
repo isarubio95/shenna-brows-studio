@@ -8,15 +8,7 @@ import { Scissors, Target, Gem } from "lucide-react";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import heroBg from "@/assets/hero-bg.jpg";
-import productPinzas from "@/assets/product-pinzas.jpg";
-import productTijeras from "@/assets/product-tijeras.jpg";
-import productGel from "@/assets/product-gel.jpg";
-
-const productImages: Record<string, string> = {
-  pinzas: productPinzas,
-  tijeras: productTijeras,
-  gel: productGel,
-};
+import { getProductImageUrl } from "@/lib/product-images";
 
 const benefits = [
   { icon: Gem, title: "Acero inoxidable italiano", desc: "Materiales premium seleccionados por su durabilidad y precisión." },
@@ -130,7 +122,7 @@ const Index = () => {
                     >
                       <div className="aspect-square bg-muted overflow-hidden">
                         <img
-                          src={productImages[product.slug] || product.image_url}
+                          src={getProductImageUrl(product.image_url, product.slug)}
                           alt={product.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                           loading="lazy"

@@ -1,9 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import productPinzas from "@/assets/product-pinzas.jpg";
-import productTijeras from "@/assets/product-tijeras.jpg";
-import productGel from "@/assets/product-gel.jpg";
+import { getProductImageUrl } from "@/lib/product-images";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,17 +21,6 @@ interface ProductEditDialogProps {
 
 const BUCKET = "product-images";
 const SUPABASE_URL = "https://vanhsuisvxvclxdgutaw.supabase.co";
-
-const localProductImages: Record<string, string> = {
-  pinzas: productPinzas,
-  tijeras: productTijeras,
-  gel: productGel,
-};
-
-const getProductImage = (product: Product) => {
-  if (product.image_url && product.image_url !== "/placeholder.svg") return product.image_url;
-  return localProductImages[product.slug] || product.image_url;
-};
 
 const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEditDialogProps) => {
   const { toast } = useToast();
@@ -143,7 +130,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
     setSaving(false);
   };
 
-  const displayImage = previewUrl || (currentProduct ? getProductImage(currentProduct) : form.image_url);
+  const displayImage = previewUrl || (currentProduct ? getProductImageUrl(currentProduct.image_url, currentProduct.slug) : form.image_url);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
