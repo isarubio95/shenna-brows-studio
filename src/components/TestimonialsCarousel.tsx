@@ -39,14 +39,14 @@ const TestimonialsCarousel = () => {
   if (testimonials.length === 0) return null;
 
   return (
-    <section className="py-24 bg-[hsl(0,0%,10%)]">
+    <section className="py-24 bg-carbon">
       <div className="container mx-auto px-6 max-w-4xl">
         <AnimatedSection>
-          <p className="text-center text-primary text-xs uppercase tracking-[0.3em] font-medium mb-4">
+          <p className="text-center text-gold text-xs uppercase tracking-[0.3em] font-medium mb-4">
             Testimonios
           </p>
-          <h2 className="font-playfair text-3xl md:text-4xl font-bold text-white text-center mb-16">
-            Love from our <span className="italic text-primary">Clients</span>
+          <h2 className="font-playfair text-3xl md:text-4xl font-bold text-cream text-center mb-16">
+            Lo que dicen nuestras <span className="italic text-gold">clientas</span>
           </h2>
         </AnimatedSection>
 
@@ -64,26 +64,26 @@ const TestimonialsCarousel = () => {
                     <div className="flex flex-col items-center text-center px-4 md:px-12 py-8">
                       <Quote
                         size={36}
-                        className="text-primary/40 mb-8 rotate-180"
+                        className="text-gold/40 mb-8 rotate-180"
                         strokeWidth={1}
                       />
-                      <blockquote className="font-playfair text-xl md:text-2xl lg:text-3xl italic text-white/90 leading-relaxed mb-8 max-w-2xl">
+                      <blockquote className="font-playfair text-xl md:text-2xl lg:text-3xl italic text-cream/90 leading-relaxed mb-8 max-w-2xl">
                         "{t.content}"
                       </blockquote>
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-px bg-primary/60" />
-                        <span className="text-primary text-sm tracking-[0.15em] uppercase font-medium">
+                        <div className="w-8 h-px bg-gold/60" />
+                        <span className="text-gold text-sm tracking-[0.15em] uppercase font-medium">
                           {name}
                         </span>
-                        <div className="w-8 h-px bg-primary/60" />
+                        <div className="w-8 h-px bg-gold/60" />
                       </div>
                     </div>
                   </CarouselItem>
                 );
               })}
             </CarouselContent>
-            <CarouselPrevious className="hidden md:flex -left-4 border-primary/20 text-primary hover:bg-primary/10 hover:text-primary bg-transparent" />
-            <CarouselNext className="hidden md:flex -right-4 border-primary/20 text-primary hover:bg-primary/10 hover:text-primary bg-transparent" />
+            <CarouselPrevious className="hidden md:flex -left-4 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-transparent" />
+            <CarouselNext className="hidden md:flex -right-4 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-transparent" />
           </Carousel>
         </AnimatedSection>
       </div>
