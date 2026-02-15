@@ -1,9 +1,17 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { ShoppingBag, User, LogOut, Menu, X, Shield } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ShoppingBag, User, Menu, X, Shield } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navLinks = [
   { label: "Inicio", to: "/" },
@@ -17,8 +25,11 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { openCart, totalItems } = useCart();
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, profile, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const firstName = profile?.full_name?.split(" ")[0] || "";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -64,15 +75,40 @@ const Navbar = () => {
               <Shield size={20} />
             </Link>
           )}
+
+          {/* User icon / dropdown */}
           {user ? (
-            <button onClick={() => signOut()} className="hidden lg:block text-carbon/60 hover:text-gold transition-colors" aria-label="Cerrar sesión">
-              <LogOut size={20} />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="hidden lg:flex flex-col items-center gap-0.5 text-gold transition-colors focus:outline-none" aria-label="Mi cuenta">
+                  <User size={20} fill="currentColor" />
+                  {firstName && (
+                    <span className="text-[10px] uppercase tracking-widest text-gold/80 font-medium leading-none max-w-[60px] truncate">
+                      {firstName}
+                    </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-card border-border z-50">
+                <DropdownMenuLabel className="font-playfair text-sm">
+                  Hola, {firstName || "Cliente"}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/account")} className="cursor-pointer">
+                  Mi Área Privada
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive">
+                  Cerrar Sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <Link to="/login" className="hidden lg:block text-carbon/60 hover:text-gold transition-colors" aria-label="Mi cuenta">
               <User size={20} />
             </Link>
           )}
+
           <button
             onClick={openCart}
             className="relative text-carbon/60 hover:text-gold transition-colors"
@@ -119,17 +155,26 @@ const Navbar = () => {
               {isAdmin && (
                 <li><Link to="/admin" className="text-gold font-medium">Admin</Link></li>
               )}
-              <li>
-                {user ? (
-                  <button onClick={() => signOut()} className="text-carbon/60 hover:text-gold transition-colors">
-                    <LogOut size={20} />
-                  </button>
-                ) : (
+              {user ? (
+                <>
+                  <li>
+                    <Link to="/account" className="text-carbon/70 hover:text-gold transition-colors font-medium">
+                      Mi Cuenta
+                    </Link>
+                  </li>
+                  <li>
+                    <button onClick={() => signOut()} className="text-carbon/60 hover:text-gold transition-colors text-sm">
+                      Cerrar Sesión
+                    </button>
+                  </li>
+                </>
+              ) : (
+                <li>
                   <Link to="/login" className="text-carbon/60 hover:text-gold transition-colors">
                     <User size={20} />
                   </Link>
-                )}
-              </li>
+                </li>
+              )}
             </ul>
           </motion.div>
         )}
