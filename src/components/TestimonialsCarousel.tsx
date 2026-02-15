@@ -18,14 +18,21 @@ const TestimonialsCarousel = () => {
   const { data: testimonials = [] } = useQuery({
     queryKey: ["featured-testimonials"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data: tData, error } = await (supabase as any)
         .from("testimonials")
-        .select("*, profiles:user_id(full_name)")
+        .select("*")
         .eq("is_featured", true)
         .order("created_at", { ascending: false })
         .limit(5);
       if (error) throw error;
-      return data;
+      if (!tData || tData.length === 0) return [];
+      const userIds = tData.map((t: any) => t.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", userIds);
+      const profileMap = new Map((profiles || []).map((p) => [p.user_id, p.full_name]));
+      return tData.map((t: any) => ({ ...t, author_name: profileMap.get(t.user_id) || "Cliente Shenna" }));
     },
   });
 
@@ -51,7 +58,7 @@ const TestimonialsCarousel = () => {
           >
             <CarouselContent>
               {testimonials.map((t: any) => {
-                const name = t.profiles?.full_name || "Cliente Shenna";
+                const name = t.author_name;
                 return (
                   <CarouselItem key={t.id}>
                     <div className="flex flex-col items-center text-center px-4 md:px-12 py-8">
