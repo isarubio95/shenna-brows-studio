@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import AnimatedSection from "@/components/AnimatedSection";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
@@ -21,18 +22,22 @@ const Admin = () => {
   const { toast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [testimonials, setTestimonials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [togglingTestimonial, setTogglingTestimonial] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) return;
     const fetchData = async () => {
-      const [ordersRes, productsRes] = await Promise.all([
+      const [ordersRes, productsRes, testimonialsRes] = await Promise.all([
         (supabase as any).from("orders").select("*").order("created_at", { ascending: false }).limit(20),
         (supabase as any).from("products").select("*").order("name"),
+        (supabase as any).from("testimonials").select("*, profiles:user_id(full_name)").order("created_at", { ascending: false }),
       ]);
       setOrders(ordersRes.data || []);
       setProducts(productsRes.data || []);
+      setTestimonials(testimonialsRes.data || []);
       setLoading(false);
     };
     fetchData();
@@ -59,6 +64,20 @@ const Admin = () => {
       toast({ title: "Producto actualizado" });
     }
     setSaving(null);
+  };
+
+  const toggleFeatured = async (id: string, current: boolean) => {
+    setTogglingTestimonial(id);
+    const { error } = await (supabase as any)
+      .from("testimonials")
+      .update({ is_featured: !current })
+      .eq("id", id);
+    if (!error) {
+      setTestimonials((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, is_featured: !current } : t))
+      );
+    }
+    setTogglingTestimonial(null);
   };
 
   return (
@@ -149,6 +168,49 @@ const Admin = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </AnimatedSection>
+
+        {/* Testimonials Management */}
+        <AnimatedSection delay={0.15}>
+          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Gestión de Testimonios</h2>
+          <div className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
+            {testimonials.length === 0 ? (
+              <div className="p-8 text-center text-carbon/40">No hay testimonios aún</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-gold/10">
+                    <TableHead className="text-carbon/60">Cliente</TableHead>
+                    <TableHead className="text-carbon/60">Comentario</TableHead>
+                    <TableHead className="text-carbon/60">Fecha</TableHead>
+                    <TableHead className="text-carbon/60 text-center">Destacado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {testimonials.map((t) => (
+                    <TableRow key={t.id} className="border-b border-gold/5">
+                      <TableCell className="text-carbon text-sm font-medium">
+                        {t.profiles?.full_name || "Anónimo"}
+                      </TableCell>
+                      <TableCell className="text-carbon/70 text-sm max-w-xs truncate">
+                        {t.content}
+                      </TableCell>
+                      <TableCell className="text-carbon/60 text-sm">
+                        {new Date(t.created_at).toLocaleDateString("es-ES")}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Switch
+                          checked={t.is_featured}
+                          onCheckedChange={() => toggleFeatured(t.id, t.is_featured)}
+                          disabled={togglingTestimonial === t.id}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </AnimatedSection>
       </div>
