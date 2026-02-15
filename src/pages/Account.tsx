@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AnimatedSection from "@/components/AnimatedSection";
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from "@/components/ui/table";
@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Eye, RotateCcw, Package } from "lucide-react";
+import { Loader2, Eye, RotateCcw, Package, MessageSquareQuote, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -33,6 +33,7 @@ const MONTHS = [
 const Account = () => {
   const { user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -41,6 +42,7 @@ const Account = () => {
   const [returnNote, setReturnNote] = useState("");
   const [filterMonth, setFilterMonth] = useState("all");
   const [filterYear, setFilterYear] = useState("all");
+  const [testimonialText, setTestimonialText] = useState("");
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["my-orders", user?.id],
@@ -83,13 +85,44 @@ const Account = () => {
 
   const returnMutation = useMutation({
     mutationFn: async () => {
-      // For now, simulate saving a return request
       await new Promise((r) => setTimeout(r, 800));
     },
     onSuccess: () => {
       toast({ title: "Solicitud recibida", description: "Nos pondremos en contacto contigo pronto." });
       setReturnDialogOpen(false);
       setReturnNote("");
+    },
+  });
+
+  // Testimonial: fetch user's existing testimonial
+  const { data: myTestimonial } = useQuery({
+    queryKey: ["my-testimonial", user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("testimonials")
+        .select("*")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const testimonialMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const { error } = await (supabase as any)
+        .from("testimonials")
+        .insert({ user_id: user!.id, content });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "¡Gracias por compartir tu experiencia!", description: "Tu comentario será revisado por nuestro equipo." });
+      setTestimonialText("");
+      queryClient.invalidateQueries({ queryKey: ["my-testimonial"] });
+    },
+    onError: () => {
+      toast({ title: "Error al enviar", description: "Inténtalo de nuevo.", variant: "destructive" });
     },
   });
 
@@ -224,6 +257,53 @@ const Account = () => {
                   })}
                 </TableBody>
               </Table>
+            )}
+          </div>
+        </AnimatedSection>
+
+        {/* Testimonial Section */}
+        <AnimatedSection delay={0.15}>
+          <div className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-8 mt-10">
+            <div className="flex items-center gap-3 mb-6">
+              <MessageSquareQuote size={22} className="text-primary" />
+              <h2 className="font-playfair text-xl font-semibold text-foreground">Tu experiencia Shenna</h2>
+            </div>
+
+            {myTestimonial ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground italic leading-relaxed">
+                  "{myTestimonial.content}"
+                </p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <CheckCircle2 size={14} className={myTestimonial.is_featured ? "text-emerald-500" : "text-muted-foreground"} />
+                  <span>{myTestimonial.is_featured ? "Publicado" : "Pendiente de aprobación"}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Cuéntanos cómo ha sido tu experiencia con nuestras herramientas. Tu opinión nos ayuda a crecer.
+                </p>
+                <Textarea
+                  value={testimonialText}
+                  onChange={(e) => setTestimonialText(e.target.value)}
+                  placeholder="Comparte tu experiencia con Shenna Brows…"
+                  className="min-h-[100px] bg-background border-border resize-none"
+                  maxLength={500}
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{testimonialText.length}/500</span>
+                  <Button
+                    variant="outline"
+                    onClick={() => testimonialMutation.mutate(testimonialText)}
+                    disabled={testimonialText.trim().length < 10 || testimonialMutation.isPending}
+                    className="border-primary/30 text-primary hover:bg-primary/5"
+                  >
+                    {testimonialMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Enviar Opinión
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </AnimatedSection>
