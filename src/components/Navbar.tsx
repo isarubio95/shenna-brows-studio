@@ -40,10 +40,8 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
-  const isHome = location.pathname === "/";
-
-  // On Home: transparent until scroll. On other pages: always solid.
-  const isSolid = !isHome || scrolled;
+  // Always solid navbar (hero no longer has dark bg)
+  const isSolid = true;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
