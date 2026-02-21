@@ -32,7 +32,7 @@ const Index = () => {
     <main>
       {/* Hero */}
       <section
-        className="relative min-h-screen flex flex-col items-center justify-center px-6 py-32 bg-cover bg-center bg-no-repeat"
+        className="relative h-dvh max-h-dvh flex flex-col items-center justify-center px-6 bg-cover bg-center bg-no-repeat overflow-hidden"
         style={{ backgroundImage: `url(${heroBg})` }}
       >
 
