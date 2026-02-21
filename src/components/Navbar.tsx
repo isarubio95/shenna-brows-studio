@@ -53,9 +53,9 @@ const Navbar = () => {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // Dynamic color classes
-  const linkColor = isSolid ? "text-carbon/70" : "text-white/90";
-  const iconColor = isSolid ? "text-carbon/60" : "text-white/80";
+  // Always dark text/icons since hero bg is light
+  const linkColor = "text-carbon/70";
+  const iconColor = "text-carbon/60";
 
   return (
     <header
@@ -81,7 +81,7 @@ const Navbar = () => {
                 to={link.to}
                 className={`text-sm font-medium tracking-wide transition-colors duration-300 hover:text-gold ${
                   location.pathname === link.to
-                    ? "text-gold"
+                    ? isSolid ? "text-gold" : "text-gold/80"
                     : linkColor
                 }`}
               >
@@ -157,9 +157,7 @@ const Navbar = () => {
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setMobileOpen(true)}
-            className={`lg:hidden transition-colors duration-300 hover:text-gold ${
-              isSolid ? "text-carbon/70" : "text-white/90"
-            }`}
+            className={`lg:hidden transition-colors duration-300 hover:text-gold text-carbon/70`}
             aria-label="Menú"
           >
             <Menu size={24} />
