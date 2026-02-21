@@ -7,7 +7,7 @@ import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { Scissors, Target, Gem } from "lucide-react";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
-import heroBg from "@/assets/hero-bg.jpg";
+import logoGrande from "@/assets/logo-grande.png";
 import { getProductImageUrl } from "@/lib/product-images";
 
 const benefits = [
@@ -30,38 +30,22 @@ const Index = () => {
   return (
     <main>
       {/* Hero */}
-      <section
-        className="relative min-h-screen flex items-center overflow-hidden bg-cover bg-center bg-no-repeat bg-fixed"
-        style={{ backgroundImage: `url(${heroBg})` }}
-      >
-        {/* Dark overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
-        
-        <div className="container mx-auto max-w-7xl px-6 py-32 relative z-10">
-          <AnimatedSection>
-            <p className="text-gold text-sm uppercase tracking-[0.3em] font-medium mb-6">
-              Herramientas profesionales de cejas
-            </p>
-          </AnimatedSection>
-          <AnimatedSection delay={0.1}>
-            <h1 className="font-playfair text-5xl md:text-7xl lg:text-8xl font-bold text-cream leading-[1.1] mb-6">
-              La precisión<br />
-              <span className="italic text-gold">que te define</span>
-            </h1>
-          </AnimatedSection>
-          <AnimatedSection delay={0.2}>
-            <p className="text-white/80 text-lg md:text-xl max-w-xl mb-10 leading-relaxed">
-              Herramientas creadas desde la experiencia profesional. Acero italiano, diseño con alma.
-            </p>
-          </AnimatedSection>
-          <AnimatedSection delay={0.3}>
-            <Link to="/pinzas">
-              <Button className="bg-gold hover:bg-gold/90 text-white px-10 py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.4)] transition-all duration-300">
-                Descubrir colección
-              </Button>
-            </Link>
-          </AnimatedSection>
-        </div>
+      <section className="min-h-screen flex flex-col items-center justify-center bg-cream px-6 py-32">
+        <AnimatedSection>
+          <img src={logoGrande} alt="Shenna Brows" className="w-72 md:w-96 lg:w-[28rem] mx-auto mb-10" />
+        </AnimatedSection>
+        <AnimatedSection delay={0.1}>
+          <p className="text-carbon/60 text-lg md:text-xl max-w-xl text-center mb-10 leading-relaxed">
+            Herramientas creadas desde la experiencia profesional. Acero italiano, diseño con alma.
+          </p>
+        </AnimatedSection>
+        <AnimatedSection delay={0.2}>
+          <Link to="/pinzas">
+            <Button className="bg-gold hover:bg-gold/90 text-white px-10 py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.4)] transition-all duration-300">
+              Descubrir colección
+            </Button>
+          </Link>
+        </AnimatedSection>
       </section>
 
       {/* Benefits */}
