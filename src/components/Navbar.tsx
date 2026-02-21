@@ -40,8 +40,8 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
-  // Always solid navbar (hero no longer has dark bg)
-  const isSolid = true;
+  const isHome = location.pathname === "/";
+  const isSolid = !isHome || scrolled;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
