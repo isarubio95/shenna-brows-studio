@@ -8,6 +8,7 @@ import { Scissors, Target, Gem } from "lucide-react";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import logoGrande from "@/assets/logo-grande.png";
+import paperTexture from "@/assets/paper-texture.avif";
 import { getProductImageUrl } from "@/lib/product-images";
 
 const benefits = [
@@ -30,7 +31,10 @@ const Index = () => {
   return (
     <main>
       {/* Hero */}
-      <section className="min-h-screen flex flex-col items-center justify-center bg-cream px-6 py-32">
+      <section
+        className="relative min-h-screen flex flex-col items-center justify-center px-6 py-32 bg-cream bg-cover bg-center"
+        style={{ backgroundImage: `url(${paperTexture})` }}
+      >
         <AnimatedSection>
           <img src={logoGrande} alt="Shenna Brows" className="w-80 md:w-[26rem] lg:w-[32rem] mx-auto mb-6" />
         </AnimatedSection>
