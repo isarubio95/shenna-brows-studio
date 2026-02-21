@@ -66,12 +66,8 @@ const ProductPage = () => {
   return (
     <main className="min-h-screen bg-cream pt-24 pb-16">
       <div className="container mx-auto px-6">
-        <AnimatedSection>
-          <Link to="/" className="inline-flex items-center gap-2 text-carbon/50 hover:text-gold transition-colors text-sm mb-8">
-            <ArrowLeft size={16} />
-            Volver a la colección
-          </Link>
-        </AnimatedSection>
+
+
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
           <AnimatedSection>
