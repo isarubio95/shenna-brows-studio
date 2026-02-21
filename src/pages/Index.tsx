@@ -35,12 +35,12 @@ const Index = () => {
         className="relative min-h-screen flex flex-col items-center justify-center px-6 py-32 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${heroBg})` }}
       >
-        <div className="absolute inset-0 bg-black/40" />
+
         <AnimatedSection>
           <img src={logoGrande} alt="Shenna Brows" className="w-80 md:w-[26rem] lg:w-[32rem] mx-auto mb-6 relative z-10" />
         </AnimatedSection>
         <AnimatedSection delay={0.1}>
-          <p className="text-white/80 text-lg md:text-xl max-w-xl text-center mb-8 leading-relaxed relative z-10">
+          <p className="text-carbon/60 text-lg md:text-xl max-w-xl text-center mb-8 leading-relaxed relative z-10">
             Herramientas creadas desde la experiencia profesional. Acero italiano, diseño con alma.
           </p>
         </AnimatedSection>
