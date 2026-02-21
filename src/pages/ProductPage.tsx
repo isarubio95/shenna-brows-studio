@@ -64,7 +64,7 @@ const ProductPage = () => {
   };
 
   return (
-    <main className="min-h-screen bg-cream pt-24 pb-16">
+    <main className="min-h-screen bg-cream pt-32 pb-16">
       <div className="container mx-auto px-6">
 
 

@@ -32,10 +32,10 @@ const Index = () => {
       {/* Hero */}
       <section className="min-h-screen flex flex-col items-center justify-center bg-cream px-6 py-32">
         <AnimatedSection>
-          <img src={logoGrande} alt="Shenna Brows" className="w-72 md:w-96 lg:w-[28rem] mx-auto mb-10" />
+          <img src={logoGrande} alt="Shenna Brows" className="w-80 md:w-[26rem] lg:w-[32rem] mx-auto mb-6" />
         </AnimatedSection>
         <AnimatedSection delay={0.1}>
-          <p className="text-carbon/60 text-lg md:text-xl max-w-xl text-center mb-10 leading-relaxed">
+          <p className="text-carbon/60 text-lg md:text-xl max-w-xl text-center mb-8 leading-relaxed">
             Herramientas creadas desde la experiencia profesional. Acero italiano, diseño con alma.
           </p>
         </AnimatedSection>
