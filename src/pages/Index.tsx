@@ -8,7 +8,7 @@ import { Scissors, Target, Gem } from "lucide-react";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import logoGrande from "@/assets/logo-grande.png";
-import heroBg from "@/assets/hero-bg.avif";
+import heroBg from "@/assets/hero-bg.jpg";
 import { getProductImageUrl } from "@/lib/product-images";
 
 const benefits = [
