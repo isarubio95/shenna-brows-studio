@@ -4,18 +4,13 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
-import { Scissors, Target, Gem } from "lucide-react";
+
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import logoGrande from "@/assets/logo-grande.png";
 import heroBg from "@/assets/hero-bg.jpg";
 import { getProductImageUrl } from "@/lib/product-images";
-
-const benefits = [
-  { icon: Gem, title: "Acero inoxidable italiano", desc: "Materiales premium seleccionados por su durabilidad y precisión." },
-  { icon: Target, title: "Precisión absoluta", desc: "Cada herramienta calibrada a mano para un rendimiento perfecto." },
-  { icon: Scissors, title: "Diseñado por experiencia", desc: "Nacido de años de trabajo profesional con cejas reales." },
-];
+import alexandraImg from "@/assets/alexandra.png";
 
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -63,26 +58,57 @@ const Index = () => {
         </AnimatedSection>
       </section>
 
-      {/* Benefits */}
-      <section className="py-24 bg-white">
+      {/* Brand Story */}
+      <section className="py-24 md:py-32 bg-white">
         <div className="container mx-auto px-6">
-          <AnimatedSection>
-            <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon text-center mb-16">
-              ¿Por qué <span className="italic text-gold">Shenna</span>?
-            </h2>
-          </AnimatedSection>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            {benefits.map((b, i) => (
-              <AnimatedSection key={b.title} delay={i * 0.1}>
-                <div className="text-center group">
-                  <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-gold/10 flex items-center justify-center group-hover:bg-gold/20 transition-colors duration-300">
-                    <b.icon size={28} className="text-gold" strokeWidth={1.5} />
-                  </div>
-                  <h3 className="font-playfair text-xl font-semibold text-carbon mb-3">{b.title}</h3>
-                  <p className="text-carbon/50 text-sm leading-relaxed max-w-xs mx-auto">{b.desc}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <AnimatedSection>
+              <div className="relative">
+                <img
+                  src={alexandraImg}
+                  alt="Shenna - Artista profesional de cejas"
+                  className="w-full max-w-md mx-auto lg:mx-0 object-contain"
+                />
+              </div>
+            </AnimatedSection>
+
+            <AnimatedSection delay={0.15}>
+              <div className="space-y-6">
+                <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon">
+                  SHENNA <span className="italic text-gold">BROWS</span>
+                </h2>
+
+                <div className="space-y-4 text-carbon/60 text-[0.95rem] leading-relaxed">
+                  <p>
+                    Shenna BROWS es más que una marca. Es una manera de entender la belleza desde la precisión, el equilibrio y la excelencia.
+                  </p>
+                  <p>
+                    Nace tras años de experiencia en el diseño profesional de cejas, del perfeccionismo constante y del compromiso innegociable con cada detalle del rostro. No surge de una tendencia. Surge de una convicción: <strong className="text-carbon/80">la belleza bien trabajada transforma la seguridad de una persona.</strong>
+                  </p>
+                  <p className="font-semibold text-carbon/80 italic">
+                    Nuestra misión es clara y exigente: Elevar el estándar de la belleza a través de la precisión, la técnica y la coherencia estética.
+                  </p>
+                  <p>
+                    Cada pieza responde a una misma filosofía: precisión absoluta. Todo lo que lleva el nombre de Shenna BROWS está concebido bajo criterios rigurosos de calidad europea, donde innovación, técnica, diseño refinado y funcionalidad conviven en equilibrio.
+                  </p>
+                  <p>
+                    Nada es casual. Cada detalle está pensado para aportar armonía, seguridad y elegancia real.
+                  </p>
+                  <p>
+                    Shenna BROWS representa profesionalismo, pero también accesibilidad consciente. Está creada para quienes entienden que la belleza no es exageración, sino equilibrio; no es exceso, sino intención.
+                  </p>
+                  <p>
+                    Creemos en la armonía. En el detalle que marca la diferencia. En la elegancia que no necesita imponerse para destacar.
+                  </p>
+                  <p>
+                    Aquí no vendemos productos. Creamos experiencia. Construimos confianza. Definimos un nuevo nivel de excelencia en el cuidado de la mirada.
+                  </p>
+                  <p className="font-playfair text-lg text-gold font-semibold pt-2">
+                    Bienvenida a SHENNA BROWS.
+                  </p>
                 </div>
-              </AnimatedSection>
-            ))}
+              </div>
+            </AnimatedSection>
           </div>
         </div>
       </section>
