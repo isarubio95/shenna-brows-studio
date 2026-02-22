@@ -47,6 +47,8 @@ const Navbar = () => {
     if (location.pathname === "/") {
       e.preventDefault();
       window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
     }
   };
   const isHome = location.pathname === "/";
