@@ -42,6 +42,13 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
+
+  const scrollToTop = (e: React.MouseEvent) => {
+    if (location.pathname === "/") {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   const isHome = location.pathname === "/";
   const isSolid = !isHome || scrolled;
 
@@ -75,7 +82,7 @@ const Navbar = () => {
       }`}
     >
       <nav className="container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
-        <Link to="/">
+        <Link to="/" onClick={scrollToTop}>
           <img
             src={logo}
             alt="Shenna Brows"
@@ -88,6 +95,7 @@ const Navbar = () => {
             <li key={link.to}>
               <Link
                 to={link.to}
+                onClick={link.to === "/" ? scrollToTop : undefined}
                 className={`text-sm font-medium tracking-wide transition-colors duration-300 hover:text-gold ${
                   location.pathname === link.to ? "text-gold font-semibold" : linkColor
                 }`}
@@ -187,7 +195,7 @@ const Navbar = () => {
                 <li key={link.to} className="border-b border-gold/10 last:border-b-0">
                   <Link
                     to={link.to}
-                    onClick={() => setMobileOpen(false)}
+                    onClick={(e) => { if (link.to === "/") scrollToTop(e); setMobileOpen(false); }}
                     className={`flex w-full items-center justify-between py-4 px-1 transition-colors ${
                       isActive
                         ? "text-gold"
