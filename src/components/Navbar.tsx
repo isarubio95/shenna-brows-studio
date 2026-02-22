@@ -54,14 +54,14 @@ const Navbar = () => {
   }, [location.pathname]);
 
   // Always dark text/icons since hero bg is light
-  const linkColor = "text-carbon/70";
-  const iconColor = "text-carbon/60";
+  const linkColor = "text-carbon/90";
+  const iconColor = "text-carbon/70";
 
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
         isSolid
-          ? "bg-cream/90 backdrop-blur-lg shadow-sm"
+          ? "bg-cream/85 backdrop-blur-lg shadow-sm"
           : "bg-transparent"
       }`}
     >
@@ -80,9 +80,7 @@ const Navbar = () => {
               <Link
                 to={link.to}
                 className={`text-sm font-medium tracking-wide transition-colors duration-300 hover:text-gold ${
-                  location.pathname === link.to
-                    ? isSolid ? "text-gold" : "text-gold/80"
-                    : linkColor
+                  location.pathname === link.to ? "text-gold font-semibold" : linkColor
                 }`}
               >
                 {link.label}

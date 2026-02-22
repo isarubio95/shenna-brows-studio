@@ -35,15 +35,18 @@ const Index = () => {
         className="relative h-dvh max-h-dvh flex flex-col items-center justify-center px-6 bg-cover bg-center bg-no-repeat brightness-105 overflow-hidden"
         style={{ backgroundImage: `url(${heroBg})` }}
       >
-        <div className="absolute inset-0 bg-white opacity-10"></div>
+        <div className="absolute inset-0 bg-white opacity-15"></div>
         <AnimatedSection>
-          <img src={logoGrande} alt="Shenna Brows" className="w-full md:w-[26rem] lg:w-[32rem] mx-auto mb-6 relative z-10 
-               [filter:drop-shadow(0px_0px_50px_rgba(0,0,0,1)_brightness(0.5))] 
-               [mask-image:linear-gradient(black,black)]" />
+          <img 
+            src={logoGrande} 
+            alt="Shenna Brows" 
+            className="w-full md:w-[26rem] lg:w-[32rem] mx-auto mb-6 relative z-10 
+                      [filter:drop-shadow(4px_4px_4px_rgba(0,0,0,.2))]" 
+          />
         </AnimatedSection>
         <AnimatedSection delay={0.1}>
-          <h1 className="text-carbon/60 md:text-2xl font-semibold max-w-xl text-center mb-5 leading-relaxed relative z-10">
-            BIENVENIDA AL UNIVERSO SHENNA 💫
+          <h1 className="text-carbon/60 text-xl md:text-2xl font-semibold max-w-xl text-center mb-5 leading-relaxed relative z-10">
+            BIENVENIDA AL UNIVERSO SHENNA
           </h1>
           <p className="text-carbon/60 text-lg md:text-xl max-w-xl text-center mb-5 leading-relaxed relative z-10">
             Herramientas y productos para cejas diseñados por la artista de cejas profesional Shenna.
