@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import logoGrande from "@/assets/logo-grande.png";
-import heroBg from "@/assets/hero-bg.jpg";
+import heroBg from "@/assets/hero-bg-new.jpg";
 import { getProductImageUrl } from "@/lib/product-images";
 import CeoSection from "@/components/CeoSection";
 
@@ -27,35 +27,50 @@ const Index = () => {
     <main>
       {/* Hero */}
       <section
-        className="relative h-dvh max-h-dvh flex flex-col items-center justify-center px-6 bg-cover bg-center bg-no-repeat brightness-105 overflow-hidden"
+        className="relative h-dvh max-h-dvh flex flex-col items-center justify-between px-6 bg-cover bg-center bg-no-repeat overflow-hidden"
         style={{ backgroundImage: `url(${heroBg})` }}
       >
-        <div className="absolute inset-0 bg-white opacity-15"></div>
-        <AnimatedSection>
-          <img 
-            src={logoGrande} 
-            alt="Shenna Brows" 
-            className="w-full md:w-[26rem] lg:w-[32rem] mx-auto mb-6 relative z-10 
-                      [filter:drop-shadow(4px_4px_4px_rgba(0,0,0,.2))]" 
-          />
-        </AnimatedSection>
-        <AnimatedSection delay={0.1}>
-          <h1 className="text-carbon/60 text-xl md:text-2xl font-semibold max-w-xl text-center mb-5 leading-relaxed relative z-10">
-            BIENVENIDA AL UNIVERSO SHENNA
-          </h1>
-          <p className="text-carbon/60 text-lg md:text-xl max-w-xl text-center mb-5 leading-relaxed relative z-10">
-            Herramientas y productos para cejas diseñados por la artista de cejas profesional Shenna.
-          </p>
-        </AnimatedSection>
-        <AnimatedSection delay={0.2}>
-          <div className="relative z-10">
-          <Link to="/pinzas">
-            <Button className="bg-gold hover:bg-gold/90 text-white px-10 py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.4)] transition-all duration-300">
-              Descubrir colección
-            </Button>
-          </Link>
-          </div>
-        </AnimatedSection>
+        {/* Top spacer to push content down */}
+        <div className="flex-1" />
+
+        {/* Center content */}
+        <div className="flex flex-col items-center relative z-10">
+          <AnimatedSection>
+            <h1 className="font-playfair text-carbon text-3xl md:text-5xl lg:text-6xl font-bold text-center leading-tight tracking-wide mb-3">
+              LA PRECISIÓN
+            </h1>
+            <h1 className="font-playfair text-carbon text-3xl md:text-5xl lg:text-6xl font-bold text-center leading-tight tracking-wide">
+              QUE TE DEFINE.
+            </h1>
+            <div className="w-20 h-[2px] bg-gold mx-auto mt-5 mb-8" />
+          </AnimatedSection>
+
+          <AnimatedSection delay={0.15}>
+            <Link to="/pinzas">
+              <Button className="bg-gradient-to-r from-gold to-[hsl(38,50%,65%)] hover:from-gold/90 hover:to-[hsl(38,50%,60%)] text-white px-10 py-6 text-sm md:text-base tracking-[0.25em] uppercase rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.35)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.5)] transition-all duration-300">
+                Explorar colección →
+              </Button>
+            </Link>
+          </AnimatedSection>
+        </div>
+
+        {/* Bottom section */}
+        <div className="flex-1 flex flex-col items-center justify-end pb-8 relative z-10">
+          <AnimatedSection delay={0.3}>
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+              className="text-gold/60 mb-4"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </motion.div>
+            <p className="text-carbon/50 text-sm md:text-base tracking-wide font-medium">
+              Conoce la historia de Shenna BROWS
+            </p>
+          </AnimatedSection>
+        </div>
       </section>
 
       {/* Products Grid */}
