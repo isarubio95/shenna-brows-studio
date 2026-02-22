@@ -33,6 +33,8 @@ const navLinks: { label: string; to: string; icon: LucideIcon }[] = [
 
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { openCart, totalItems } = useCart();
   const { user, isAdmin, profile, signOut } = useAuth();
@@ -44,10 +46,15 @@ const Navbar = () => {
   const isSolid = !isHome || scrolled;
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
+    const onScroll = () => {
+      const currentY = window.scrollY;
+      setScrolled(currentY > 20);
+      setHidden(currentY > lastScrollY && currentY > 60);
+      setLastScrollY(currentY);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [lastScrollY]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -60,6 +67,8 @@ const Navbar = () => {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
+        hidden ? "-translate-y-full" : "translate-y-0"
+      } ${
         isSolid
           ? "bg-cream/85 backdrop-blur-lg shadow-sm"
           : "bg-transparent"
