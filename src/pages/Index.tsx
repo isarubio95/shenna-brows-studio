@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import logoGrande from "@/assets/logo-grande.png";
 import heroBg from "@/assets/hero-bg.jpg";
 import { getProductImageUrl } from "@/lib/product-images";
+import CeoSection from "@/components/CeoSection";
 
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -154,6 +155,9 @@ const Index = () => {
           </AnimatedSection>
         </div>
       </section>
+
+      {/* CEO */}
+      <CeoSection />
 
       {/* Testimonials */}
       <TestimonialsCarousel />
