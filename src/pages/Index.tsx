@@ -7,8 +7,8 @@ import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { motion } from "framer-motion";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import logoGrande from "@/assets/logo-grande.png";
-import heroBg from "@/assets/hero-bg-new.jpg";
+import heroBg from "@/assets/hero-bg-new.png";
+import logoMetalico from "@/assets/logo-metalico.png";
 import { getProductImageUrl } from "@/lib/product-images";
 import CeoSection from "@/components/CeoSection";
 
@@ -36,13 +36,18 @@ const Index = () => {
         {/* Center content */}
         <div className="flex flex-col items-center relative z-10">
           <AnimatedSection>
-            <h1 className="font-playfair text-carbon text-3xl md:text-5xl lg:text-6xl font-bold text-center leading-tight tracking-wide mb-3">
+            <img 
+              src={logoMetalico} 
+              alt="Shenna Brows Logo" 
+              className="sm:w-6/12 lg:w-5/12 h-auto object-contain mb-4 drop-shadow-2xl m-auto" 
+            />
+            <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-center tracking-[0.10em] mb-3">
               LA PRECISIÓN
             </h1>
-            <h1 className="font-playfair text-carbon text-3xl md:text-5xl lg:text-6xl font-bold text-center leading-tight tracking-wide">
-              QUE TE DEFINE.
+            <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-center leading-tight tracking-[0.10em]">
+              QUE TE DEFINE
             </h1>
-            <div className="w-20 h-[2px] bg-gold mx-auto mt-5 mb-8" />
+            <div className="w-24 h-[2px] bg-gold mx-auto mt-6 mb-8" />
           </AnimatedSection>
 
           <AnimatedSection delay={0.15}>

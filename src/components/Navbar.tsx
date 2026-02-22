@@ -70,7 +70,7 @@ const Navbar = () => {
   }, [location.pathname]);
 
   // Always dark text/icons since hero bg is light
-  const linkColor = "text-carbon/90";
+  const linkColor = "text-carbon hover:text-gold";
   const iconColor = "text-carbon/70";
 
   return (
