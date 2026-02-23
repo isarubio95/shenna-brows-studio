@@ -114,7 +114,7 @@ const Navbar = () => {
           {isAdmin && (
             <Link
               to="/admin"
-              className={`shadow-sm p-1 transition-colors duration-300 text-amber-400 hover:text-gold ${iconColor}`}
+              className={`shadow-sm p-1 transition-colors duration-300 text-white/90 hover:text-gold ${iconColor}`}
               aria-label="Admin"
             >
               <Shield size={20} />
@@ -125,10 +125,10 @@ const Navbar = () => {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={`flex flex-col items-center p-1 gap-1 shadow-sm transition-colors focus:outline-none text-amber-400 hover:text-gold ${iconColor}`} aria-label="Mi cuenta">
+                <button className={`flex flex-col items-center p-1 gap-1 shadow-sm transition-colors focus:outline-none text-white/90 hover:text-gold ${iconColor}`} aria-label="Mi cuenta">
                   <User size={20} fill="currentColor" />
                   {firstName && (
-                    <span className={`hidden lg:block text-[10px] uppercase text-amber-400 hover:text-gold tracking-widest font-medium leading-none max-w-[60px] truncate ${iconColor}`}>
+                    <span className={`hidden lg:block text-[10px] uppercase text-white/90 hover:text-gold tracking-widest font-medium leading-none max-w-[60px] truncate ${iconColor}`}>
                       {firstName}
                     </span>
                   )}
@@ -151,7 +151,7 @@ const Navbar = () => {
           ) : (
             <Link
               to="/login"
-              className={`transition-colors duration-300 text-amber-400 hover:text-gold ${iconColor}`}
+              className={`transition-colors duration-300 text-white/80 hover:text-gold ${iconColor}`}
               aria-label="Mi cuenta"
             >
               <User size={20} />
@@ -161,7 +161,7 @@ const Navbar = () => {
           {/* Cart — always visible */}
           <button
             onClick={openCart}
-            className={`relative transition-colors p-1 shadow-sm duration-300 text-amber-400 hover:text-gold ${iconColor}`}
+            className={`relative transition-colors p-1 shadow-sm duration-300 text-white/80 hover:text-gold ${iconColor}`}
             aria-label="Carrito"
           >
             <ShoppingBag size={20} />
@@ -175,7 +175,7 @@ const Navbar = () => {
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setMobileOpen(true)}
-            className={`lg:hidden transition-colors duration-300 hover:text-gold text-amber-400`}
+            className={`lg:hidden transition-colors duration-300 hover:text-gold text-white/80`}
             aria-label="Menú"
           >
             <Menu size={24} />
