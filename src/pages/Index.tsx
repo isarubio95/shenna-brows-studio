@@ -7,7 +7,8 @@ import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { motion } from "framer-motion";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import heroBg from "@/assets/hero-bg-new.png";
+// Nueva imagen de fondo importada
+import fondoBg from "@/assets/fondo.png"; 
 import logoMetalico from "@/assets/logo-metalico.png";
 import { getProductImageUrl } from "@/lib/product-images";
 import CeoSection from "@/components/CeoSection";
@@ -27,32 +28,35 @@ const Index = () => {
     <main>
       {/* Hero */}
       <section
-        className="relative h-dvh max-h-dvh flex flex-col items-center justify-between px-6 bg-cover bg-center bg-no-repeat overflow-hidden"
-        style={{ backgroundImage: `url(${heroBg})` }}
+        className="relative w-full min-h-[100dvh] flex flex-col items-center justify-between px-4 sm:px-6 bg-cover bg-center bg-no-repeat overflow-hidden"
+        style={{ backgroundImage: `url(${fondoBg})` }}
       >
+        {/* Overlay de degradado para aclarar la parte superior y dar profundidad abajo */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.7)_0%,rgba(0,0,0,0.3)_10%,transparent_20%,transparent_70%,rgba(26,26,26,0.4)_100%)] z-0 pointer-events-none" />
+
         {/* Top spacer to push content down */}
         <div className="flex-1" />
 
         {/* Center content */}
-        <div className="flex flex-col items-center relative z-10">
+        <div className="flex flex-col items-center relative z-10 w-full max-w-4xl mx-auto">
           <AnimatedSection>
             <img 
               src={logoMetalico} 
               alt="Shenna Brows Logo" 
-              className="sm:w-6/12 lg:w-5/12 h-auto object-contain mb-4 drop-shadow-2xl m-auto" 
+              className="w-full sm:w-10/12 md:w-8/12 lg:w-7/12 h-auto object-contain mb-4 drop-shadow-2xl m-auto" 
             />
-            <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-center tracking-[0.10em] mb-3">
+            <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-center tracking-[0.05em] mb-2 sm:mb-3">
               LA PRECISIÓN
             </h1>
-            <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-center leading-tight tracking-[0.10em]">
+            <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-center leading-tight tracking-[0.05em]">
               QUE TE DEFINE
             </h1>
-            <div className="w-24 h-[2px] bg-gold mx-auto mt-6 mb-8" />
+            <div className="w-16 sm:w-24 h-[2px] bg-gold mx-auto mt-4 sm:mt-6 mb-6 sm:mb-8" />
           </AnimatedSection>
 
           <AnimatedSection delay={0.15}>
             <Link to="/pinzas">
-              <Button className="bg-gradient-to-r from-gold to-[hsl(38,50%,65%)] hover:from-gold/90 hover:to-[hsl(38,50%,60%)] text-white px-10 py-6 text-sm md:text-base tracking-[0.25em] uppercase rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.35)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.5)] transition-all duration-300">
+              <Button className="bg-gradient-to-r from-gold to-[hsl(38,50%,55%)] hover:from-gold/90 hover:to-[hsl(38,50%,60%)] text-white px-8 sm:px-10 py-5 sm:py-6 text-xs sm:text-sm md:text-base tracking-[0.25em] uppercase rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.35)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.5)] transition-all duration-300">
                 Explorar colección →
               </Button>
             </Link>
@@ -60,18 +64,18 @@ const Index = () => {
         </div>
 
         {/* Bottom section */}
-        <div className="flex-1 flex flex-col items-center justify-end pb-8 relative z-10">
+        <div className="flex-1 flex flex-col items-center justify-end pb-12 relative z-10">
           <AnimatedSection delay={0.3}>
             <motion.div
               animate={{ y: [0, 8, 0] }}
               transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-              className="text-gold/60 mb-4"
+              className="text-gold/60 mb-3 sm:mb-4"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto">
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </motion.div>
-            <p className="text-carbon/50 text-sm md:text-base tracking-wide font-medium">
+            <p className="text-carbon/50 text-xs sm:text-sm md:text-base tracking-wide font-medium text-center">
               Conoce la historia de Shenna BROWS
             </p>
           </AnimatedSection>
@@ -79,17 +83,17 @@ const Index = () => {
       </section>
 
       {/* Products Grid */}
-      <section className="py-24 bg-cream">
+      <section className="py-20 md:py-24 bg-cream">
         <div className="container mx-auto px-6">
           <AnimatedSection>
             <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon text-center mb-4">
               Nuestra colección
             </h2>
-            <p className="text-carbon/50 text-center mb-16 max-w-lg mx-auto">
+            <p className="text-carbon/50 text-center mb-12 md:mb-16 max-w-lg mx-auto">
               Tres herramientas esenciales para la artista que busca perfección.
             </p>
           </AnimatedSection>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="bg-white rounded-2xl overflow-hidden">

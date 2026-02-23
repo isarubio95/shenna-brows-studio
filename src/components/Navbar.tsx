@@ -70,7 +70,7 @@ const Navbar = () => {
   }, [location.pathname]);
 
   // Always dark text/icons since hero bg is light
-  const linkColor = "text-carbon hover:text-gold";
+  const linkColor = "text-white/90 hover:text-gold";
   const iconColor = "text-carbon/70";
 
   return (
@@ -83,23 +83,24 @@ const Navbar = () => {
           : "bg-transparent"
       }`}
     >
-      <nav className="container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
+      {/* Añadido "relative" al nav para que el centrado absoluto funcione correctamente */}
+      <nav className="relative container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
         <Link to="/" onClick={scrollToTop}>
           <img
             src={logo}
             alt="Shenna Brows"
-            className="h-10 lg:h-12 w-auto"
+            className="h-10 lg:h-12 w-auto relative z-10" 
           />
         </Link>
 
-        <ul className="hidden lg:flex items-center gap-8">
+        <ul className="hidden lg:flex items-center gap-8 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-max">
           {navLinks.map((link) => (
             <li key={link.to}>
               <Link
                 to={link.to}
                 onClick={link.to === "/" ? scrollToTop : undefined}
-                className={`text-sm font-medium tracking-wide transition-colors duration-300 hover:text-gold ${
-                  location.pathname === link.to ? "text-gold font-semibold" : linkColor
+                className={`text-sm font-medium tracking-wide p-1 transition-colors duration-300 hover:text-gold ${
+                  location.pathname === link.to ? "text-amber-200" : linkColor
                 }`}
               >
                 {link.label}
@@ -109,11 +110,11 @@ const Navbar = () => {
         </ul>
 
         {/* Right icons — visible on ALL screen sizes */}
-        <div className="flex items-center gap-3 lg:gap-4">
+        <div className="flex items-center gap-3 lg:gap-4 relative z-10">
           {isAdmin && (
             <Link
               to="/admin"
-              className={`hidden lg:block transition-colors duration-300 hover:text-gold ${iconColor}`}
+              className={`shadow-sm p-1 transition-colors duration-300 text-amber-400 hover:text-gold ${iconColor}`}
               aria-label="Admin"
             >
               <Shield size={20} />
@@ -124,10 +125,10 @@ const Navbar = () => {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={`flex flex-col items-center gap-0.5 transition-colors focus:outline-none hover:text-gold ${iconColor}`} aria-label="Mi cuenta">
+                <button className={`flex flex-col items-center p-1 gap-1 shadow-sm transition-colors focus:outline-none text-amber-400 hover:text-gold ${iconColor}`} aria-label="Mi cuenta">
                   <User size={20} fill="currentColor" />
                   {firstName && (
-                    <span className={`hidden lg:block text-[10px] uppercase tracking-widest font-medium leading-none max-w-[60px] truncate ${iconColor}`}>
+                    <span className={`hidden lg:block text-[10px] uppercase text-amber-400 hover:text-gold tracking-widest font-medium leading-none max-w-[60px] truncate ${iconColor}`}>
                       {firstName}
                     </span>
                   )}
@@ -150,7 +151,7 @@ const Navbar = () => {
           ) : (
             <Link
               to="/login"
-              className={`transition-colors duration-300 hover:text-gold ${iconColor}`}
+              className={`transition-colors duration-300 text-amber-400 hover:text-gold ${iconColor}`}
               aria-label="Mi cuenta"
             >
               <User size={20} />
@@ -160,7 +161,7 @@ const Navbar = () => {
           {/* Cart — always visible */}
           <button
             onClick={openCart}
-            className={`relative transition-colors duration-300 hover:text-gold ${iconColor}`}
+            className={`relative transition-colors p-1 shadow-sm duration-300 text-amber-400 hover:text-gold ${iconColor}`}
             aria-label="Carrito"
           >
             <ShoppingBag size={20} />
@@ -174,7 +175,7 @@ const Navbar = () => {
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setMobileOpen(true)}
-            className={`lg:hidden transition-colors duration-300 hover:text-gold text-carbon/70`}
+            className={`lg:hidden transition-colors duration-300 hover:text-gold text-amber-400`}
             aria-label="Menú"
           >
             <Menu size={24} />
@@ -209,20 +210,7 @@ const Navbar = () => {
                   </Link>
                 </li>
               );
-            })}
-
-            {isAdmin && (
-              <li className="border-b border-gold/10">
-                <Link
-                  to="/admin"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex w-full items-center justify-between py-4 px-1 text-gold font-playfair text-lg tracking-wide"
-                >
-                  <span>Admin</span>
-                  <Shield size={20} className="text-gold/70" />
-                </Link>
-              </li>
-            )}
+            })}      
           </ul>
 
           {/* Auth section at bottom */}
