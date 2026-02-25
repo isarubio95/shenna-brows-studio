@@ -69,9 +69,9 @@ const Navbar = () => {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // Always dark text/icons since hero bg is light
-  const linkColor = "text-white/90 hover:text-gold";
-  const iconColor = "text-carbon/70";
+  // En barra transparente (hero): texto e iconos claros. En barra clara (scroll): oscuros.
+  const linkColor = isSolid ? "text-carbon/90 hover:text-gold" : "text-white/90 hover:text-gold";
+  const iconColor = isSolid ? "text-carbon/70 hover:text-gold" : "text-white/90 hover:text-gold";
 
   return (
     <header
@@ -99,8 +99,8 @@ const Navbar = () => {
               <Link
                 to={link.to}
                 onClick={link.to === "/" ? scrollToTop : undefined}
-                className={`text-sm font-medium tracking-wide p-1 transition-colors duration-300 hover:text-gold ${
-                  location.pathname === link.to ? "text-amber-200" : linkColor
+                className={`text-sm font-medium tracking-wide p-1 transition-colors duration-300 ${
+                  location.pathname === link.to ? (isSolid ? "text-gold" : "text-amber-200") : linkColor
                 }`}
               >
                 {link.label}
@@ -114,7 +114,7 @@ const Navbar = () => {
           {isAdmin && (
             <Link
               to="/admin"
-              className={`shadow-sm p-1 transition-colors duration-300 text-white/90 hover:text-gold ${iconColor}`}
+              className={`shadow-sm p-1 transition-colors duration-300 ${iconColor}`}
               aria-label="Admin"
             >
               <Shield size={20} />
@@ -125,10 +125,10 @@ const Navbar = () => {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={`flex flex-col items-center p-1 gap-1 shadow-sm transition-colors focus:outline-none text-white/90 hover:text-gold ${iconColor}`} aria-label="Mi cuenta">
+                <button className={`flex flex-col items-center p-1 gap-1 shadow-sm transition-colors focus:outline-none ${iconColor}`} aria-label="Mi cuenta">
                   <User size={20} fill="currentColor" />
                   {firstName && (
-                    <span className={`hidden lg:block text-[10px] uppercase text-white/90 hover:text-gold tracking-widest font-medium leading-none max-w-[60px] truncate ${iconColor}`}>
+                    <span className={`hidden lg:block text-[10px] uppercase tracking-widest font-medium leading-none max-w-[60px] truncate ${iconColor}`}>
                       {firstName}
                     </span>
                   )}
@@ -151,7 +151,7 @@ const Navbar = () => {
           ) : (
             <Link
               to="/login"
-              className={`transition-colors duration-300 text-white/80 hover:text-gold ${iconColor}`}
+              className={`transition-colors duration-300 ${iconColor}`}
               aria-label="Mi cuenta"
             >
               <User size={20} />
@@ -161,7 +161,7 @@ const Navbar = () => {
           {/* Cart — always visible */}
           <button
             onClick={openCart}
-            className={`relative transition-colors p-1 shadow-sm duration-300 text-white/80 hover:text-gold ${iconColor}`}
+            className={`relative transition-colors p-1 shadow-sm duration-300 ${iconColor}`}
             aria-label="Carrito"
           >
             <ShoppingBag size={20} />
@@ -175,7 +175,7 @@ const Navbar = () => {
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setMobileOpen(true)}
-            className={`lg:hidden transition-colors duration-300 hover:text-gold text-white/80`}
+            className={`lg:hidden transition-colors duration-300 ${iconColor}`}
             aria-label="Menú"
           >
             <Menu size={24} />
