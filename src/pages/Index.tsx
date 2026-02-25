@@ -56,7 +56,7 @@ const Index = () => {
 
           <AnimatedSection delay={0.15}>
             <Link to="/pinzas">
-              <Button className="bg-gradient-to-r from-gold to-[hsl(38,50%,55%)] hover:from-gold/90 hover:to-[hsl(38,50%,60%)] text-white px-8 sm:px-10 py-5 sm:py-6 text-xs sm:text-sm md:text-base tracking-[0.25em] uppercase rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.35)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.5)] transition-all duration-300">
+              <Button className="bg-gradient-to-r from-gold to-[hsl(38,50%,55%)] hover:from-gold/90 hover:to-[hsl(38,50%,60%)] text-white px-8 sm:px-10 py-6 sm:py-6 text-xs sm:text-sm md:text-base tracking-[0.25em] uppercase rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.35)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.5)] transition-all duration-300">
                 Explorar colección →
               </Button>
             </Link>
