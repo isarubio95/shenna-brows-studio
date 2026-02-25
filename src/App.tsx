@@ -8,6 +8,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CartDrawer from "@/components/CartDrawer";
+import ScrollToTop from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import ProductPage from "./pages/ProductPage";
 import About from "./pages/About";
@@ -16,6 +17,10 @@ import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import Account from "./pages/Account";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import ReturnsPolicy from "./pages/ReturnsPolicy";
+import TermsOfService from "./pages/TermsOfService";
+import CookiesPolicy from "./pages/CookiesPolicy";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +33,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ScrollToTop />
             <Navbar />
             <CartDrawer />
             <Routes>
@@ -38,6 +44,10 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/account" element={<Account />} />
+              <Route path="/politica-privacidad" element={<PrivacyPolicy />} />
+              <Route path="/politica-devoluciones" element={<ReturnsPolicy />} />
+              <Route path="/aviso-legal" element={<TermsOfService />} />
+              <Route path="/politica-cookies" element={<CookiesPolicy />} />
               <Route path="/:slug" element={<ProductPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -5,7 +5,7 @@ import logo from "@/assets/logo-shenna.png";
 const Footer = () => (
   <footer className="bg-carbon text-cream/80 border-t border-gold/30">
     <div className="container mx-auto px-6 py-16">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         {/* Brand */}
         <div>
           <Link to="/"><img src={logo} alt="Shenna Brows" className="h-12 w-auto mb-4 brightness-0 invert" /></Link>
@@ -34,11 +34,30 @@ const Footer = () => (
           </ul>
         </div>
 
+        {/* Legal */}
+        <div>
+          <h4 className="font-semibold text-cream text-sm uppercase tracking-widest mb-4">Legal</h4>
+          <ul className="space-y-3 text-sm">
+            {[
+              { label: "Política de privacidad", to: "/politica-privacidad" },
+              { label: "Política de devoluciones", to: "/politica-devoluciones" },
+              { label: "Aviso legal y condiciones", to: "/aviso-legal" },
+              { label: "Política de cookies", to: "/politica-cookies" },
+            ].map((l) => (
+              <li key={l.to}>
+                <Link to={l.to} className="hover:text-gold transition-colors">
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {/* Contact */}
         <div>
           <h4 className="font-semibold text-cream text-sm uppercase tracking-widest mb-4">Contacto</h4>
           <div className="flex gap-4 mb-4">
-            <a href="#" className="hover:text-gold transition-colors" aria-label="Instagram">
+            <a href="https://www.instagram.com/alexandralasherasmicro/" className="hover:text-gold transition-colors" aria-label="Instagram" rel="noopener noreferrer" target="_blank">
               <Instagram size={20} />
             </a>
             <a href="#" className="hover:text-gold transition-colors" aria-label="Email">
