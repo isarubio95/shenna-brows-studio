@@ -3,9 +3,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import AnimatedSection from "@/components/AnimatedSection";
-import { ShoppingBag, ArrowLeft, Loader2 } from "lucide-react";
+import { ShoppingBag, Loader2 } from "lucide-react";
 import { getProductImageUrl } from "@/lib/product-images";
 
 const ProductPage = () => {
@@ -91,20 +90,20 @@ const ProductPage = () => {
                 Añadir al Carrito
               </Button>
 
-              <Accordion type="single" collapsible className="border-t border-gold/10">
-                <AccordionItem value="description" className="border-b border-gold/10">
-                  <AccordionTrigger className="text-carbon hover:text-gold hover:no-underline py-5 text-sm font-medium tracking-wide">Descripción</AccordionTrigger>
-                  <AccordionContent className="text-carbon/60 text-sm leading-relaxed pb-5">{product.description}</AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="materials" className="border-b border-gold/10">
-                  <AccordionTrigger className="text-carbon hover:text-gold hover:no-underline py-5 text-sm font-medium tracking-wide">Materiales</AccordionTrigger>
-                  <AccordionContent className="text-carbon/60 text-sm leading-relaxed pb-5">{product.materials}</AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="shipping" className="border-b border-gold/10">
-                  <AccordionTrigger className="text-carbon hover:text-gold hover:no-underline py-5 text-sm font-medium tracking-wide">Envío</AccordionTrigger>
-                  <AccordionContent className="text-carbon/60 text-sm leading-relaxed pb-5">{product.shipping_info}</AccordionContent>
-                </AccordionItem>
-              </Accordion>
+              <div className="border-t border-gold/10 space-y-0">
+                <section className="border-b border-gold/10 py-5">
+                  <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">Descripción</h3>
+                  <p className="text-carbon/60 text-sm leading-relaxed">{product.description}</p>
+                </section>
+                <section className="border-b border-gold/10 py-5">
+                  <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">Materiales</h3>
+                  <p className="text-carbon/60 text-sm leading-relaxed">{product.materials}</p>
+                </section>
+                <section className="border-b border-gold/10 py-5">
+                  <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">Envío</h3>
+                  <p className="text-carbon/60 text-sm leading-relaxed">{product.shipping_info}</p>
+                </section>
+              </div>
             </div>
           </AnimatedSection>
         </div>
