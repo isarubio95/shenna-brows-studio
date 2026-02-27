@@ -1,11 +1,15 @@
 import productPinzas from "@/assets/product-pinzas.jpg";
 import productTijeras from "@/assets/product-tijeras.jpg";
-import productGel from "@/assets/product-gel.jpg";
+import productEspuma from "@/assets/product-espuma.jpg";
+import productStick from "@/assets/product-stick.jpg";
+import productLapiz from "@/assets/product-lapiz.jpg";
 
 const localFallbacks: Record<string, string> = {
   pinzas: productPinzas,
   tijeras: productTijeras,
-  gel: productGel,
+  espuma: productEspuma,
+  stick: productStick,
+  lapiz: productLapiz,
 };
 
 /**
