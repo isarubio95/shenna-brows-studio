@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo-shenna.png";
 import {
   ShoppingBag, User, Menu, Shield,
-  Sparkles, Target, Scissors, Droplet, HeartHandshake,
+  Sparkles, Target, Scissors, HeartHandshake,
+  Wind, ShieldCheck, PenTool,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCart } from "@/context/CartContext";
@@ -25,9 +26,11 @@ import {
 
 const navLinks: { label: string; to: string; icon: LucideIcon }[] = [
   { label: "Inicio", to: "/", icon: Sparkles },
+  { label: "Espuma", to: "/espuma", icon: Wind },
   { label: "Pinzas", to: "/pinzas", icon: Target },
   { label: "Tijeras", to: "/tijeras", icon: Scissors },
-  { label: "Gel", to: "/gel", icon: Droplet },
+  { label: "Stick", to: "/stick", icon: ShieldCheck },
+  { label: "Lápiz", to: "/lapiz", icon: PenTool },
   { label: "Sobre mí", to: "/sobre-mi", icon: HeartHandshake },
 ];
 

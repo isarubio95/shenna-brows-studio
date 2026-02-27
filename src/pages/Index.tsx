@@ -108,12 +108,12 @@ const Index = () => {
               Nuestra colección
             </h2>
             <p className="text-carbon/50 text-center mb-12 md:mb-16 max-w-lg mx-auto">
-              Tres herramientas esenciales para la artista que busca perfección.
+              Cinco herramientas esenciales para la artista que busca perfección.
             </p>
           </AnimatedSection>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
             {loading ? (
-              Array.from({ length: 3 }).map((_, i) => (
+              Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="bg-white rounded-2xl overflow-hidden">
                   <Skeleton className="aspect-square" />
                   <div className="p-6 space-y-2">
