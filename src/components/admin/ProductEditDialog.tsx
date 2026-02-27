@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, ImageIcon } from "lucide-react";
+import { Loader2, Upload, ImageIcon, Plus, X } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Product = Tables<"products">;
@@ -26,7 +27,8 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [form, setForm] = useState<Partial<Product>>({});
+  const [form, setForm] = useState<Partial<Product & { materials_label?: string }>>({});
+  const [materialItems, setMaterialItems] = useState<string[]>([""]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,6 +38,10 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
   const currentProduct = product;
   const [lastProductId, setLastProductId] = useState<string | null>(null);
   if (currentProduct && currentProduct.id !== lastProductId) {
+    const items = (currentProduct as any).materials
+      ? (currentProduct as any).materials.split('\n').filter((s: string) => s.trim())
+      : [""];
+    setMaterialItems(items.length > 0 ? items : [""]);
     setForm({
       name: currentProduct.name,
       tagline: currentProduct.tagline,
@@ -45,6 +51,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
       price: currentProduct.price,
       stock: currentProduct.stock,
       image_url: currentProduct.image_url,
+      materials_label: (currentProduct as any).materials_label || 'materiales',
     });
     setPreviewUrl(null);
     setLastProductId(currentProduct.id);
@@ -52,6 +59,31 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
 
   const updateField = (field: keyof Product, value: string | number) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const isComposicion = (form as any).materials_label === 'composicion';
+
+  const handleMaterialChange = (index: number, value: string) => {
+    setMaterialItems((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const addMaterialItem = () => {
+    // Don't add if last item is empty
+    const last = materialItems[materialItems.length - 1];
+    if (!last || !last.trim()) return;
+    setMaterialItems((prev) => [...prev, ""]);
+  };
+
+  const removeMaterialItem = (index: number) => {
+    if (materialItems.length <= 1) {
+      setMaterialItems([""]);
+      return;
+    }
+    setMaterialItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const uploadImage = useCallback(
@@ -106,13 +138,15 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
   const handleSave = async () => {
     if (!currentProduct) return;
     setSaving(true);
+    const materialsString = materialItems.filter((m) => m.trim()).join('\n');
     const { error } = await (supabase as any)
       .from("products")
       .update({
         name: form.name,
         tagline: form.tagline || "",
         description: form.description || "",
-        materials: form.materials || "",
+        materials: materialsString,
+        materials_label: (form as any).materials_label || 'materiales',
         shipping_info: form.shipping_info || "",
         price: Number(form.price) || 0,
         stock: Number(form.stock) || 0,
@@ -131,6 +165,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
   };
 
   const displayImage = previewUrl || (currentProduct ? getProductImageUrl(currentProduct.image_url, currentProduct.slug) : form.image_url);
+  const canAddMaterial = materialItems.length === 0 || (materialItems[materialItems.length - 1]?.trim() ?? "") !== "";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -228,17 +263,59 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
                 className="mt-1 bg-white border-gold/15 min-h-[100px]"
               />
             </div>
+
+            {/* Materials / Composición section */}
             <div className="sm:col-span-2">
-              <Label htmlFor="materials" className="text-carbon/70 text-xs uppercase tracking-wider">
-                Materiales
-              </Label>
-              <Textarea
-                id="materials"
-                value={form.materials || ""}
-                onChange={(e) => updateField("materials", e.target.value)}
-                className="mt-1 bg-white border-gold/15"
-              />
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-carbon/70 text-xs uppercase tracking-wider">
+                  {isComposicion ? 'Composición' : 'Materiales'}
+                </Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-carbon/40">Materiales</span>
+                  <Switch
+                    checked={isComposicion}
+                    onCheckedChange={(checked) =>
+                      setForm((prev) => ({ ...prev, materials_label: checked ? 'composicion' : 'materiales' }))
+                    }
+                  />
+                  <span className="text-xs text-carbon/40">Composición</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {materialItems.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="text-gold/60 text-xs shrink-0 w-5 text-center">✦</span>
+                    <Input
+                      value={item}
+                      onChange={(e) => handleMaterialChange(index, e.target.value)}
+                      placeholder={isComposicion ? `Ingrediente ${index + 1}` : `Material ${index + 1}`}
+                      className="bg-white border-gold/15 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeMaterialItem(index)}
+                      className="text-carbon/30 hover:text-red-400 transition-colors shrink-0"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addMaterialItem}
+                disabled={!canAddMaterial}
+                className="mt-2 border-gold/20 text-gold hover:bg-gold/5 disabled:opacity-30"
+              >
+                <Plus size={14} className="mr-1" />
+                Añadir {isComposicion ? 'ingrediente' : 'material'}
+              </Button>
             </div>
+
             <div className="sm:col-span-2">
               <Label htmlFor="shipping_info" className="text-carbon/70 text-xs uppercase tracking-wider">
                 Info de envío
