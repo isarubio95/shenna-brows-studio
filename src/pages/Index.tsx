@@ -56,28 +56,28 @@ const Index = () => {
 
           <AnimatedSection delay={0.15}>
             <Link to="/pinzas">
-  <div className="relative inline-flex rounded-full p-[2px] shadow-[0_8px_30px_rgba(197,160,89,0.35)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.5)] transition-all duration-300 transform hover:-translate-y-1 active:scale-95 active:translate-y-0">
-    
-    {/* Contenedor exclusivo para el borde animado */}
-    <div 
-      className="absolute inset-0 z-0 rounded-full overflow-hidden pointer-events-none"
-      style={{
-        padding: "2px", // Debe coincidir con el padding del div principal
-        WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-        WebkitMaskComposite: "xor",
-        maskComposite: "exclude"
-      }}
-    >
-      <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#92400e_0%,#fef08a_50%,#92400e_100%)]" />
-    </div>
-    
-    {/* Botón interior: Añadido bg-transparent para anular colores por defecto */}
-    <Button className="relative z-10 block bg-transparent bg-gradient-to-r from-gold/50 to-[hsla(38,61%,47%,0.5)] hover:from-gold/30 hover:to-[hsla(38,61%,47%,0.3)] backdrop-blur-md text-white px-8 sm:px-10 py-6 sm:py-5 text-xs sm:text-sm md:text-base tracking-[0.25em] uppercase rounded-full transition-colors duration-300 w-full h-full shadow-inner">
-      Explorar colección →
-    </Button>
+              <div className="relative inline-flex rounded-full p-[2px] shadow-[0_8px_30px_rgba(197,160,89,0.35)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.5)] transition-all duration-300 transform hover:-translate-y-1 active:scale-95 active:translate-y-0">
+                
+                {/* Contenedor exclusivo para el borde animado */}
+                  <div 
+                    className="absolute inset-0 z-0 rounded-full overflow-hidden pointer-events-none"
+                    style={{
+                      padding: "2px", // Debe coincidir con el padding del div principal
+                      WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+                      WebkitMaskComposite: "xor",
+                      maskComposite: "exclude"
+                    }}
+                  >
+                    <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#92400e_0%,#fef08a_50%,#92400e_100%)]" />
+                  </div>
+                  
+                  {/* Botón interior: Añadido bg-transparent para anular colores por defecto */}
+                  <Button className="relative z-10 block bg-transparent bg-gradient-to-r from-gold/50 to-[hsla(38,61%,47%,0.5)] hover:from-gold/30 hover:to-[hsla(38,61%,47%,0.3)] backdrop-blur-md text-white px-8 sm:px-10 py-5 text-xs sm:text-sm md:text-base tracking-[0.25em] uppercase rounded-full transition-colors duration-300 w-full h-full shadow-inner">
+                    Explorar colección →
+                  </Button>
 
-  </div>
-</Link>
+                </div>
+            </Link>
           </AnimatedSection>
         </div>
 
