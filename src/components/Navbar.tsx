@@ -123,7 +123,7 @@ const Navbar = () => {
               className={`p-1 transition-colors duration-300 ${iconColor}`}
               aria-label="Admin"
             >
-              <Shield size={20} />
+              <Shield size={20} className="drop-shadow-sm" />
             </Link>
           )}
 
@@ -132,7 +132,7 @@ const Navbar = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className={`group flex flex-col items-center p-1 gap-0.5 transition-colors focus:outline-none ${iconColor} hover:text-gold`} aria-label="Mi cuenta">
-                  <User size={20} fill="currentColor" className="transition-colors group-hover:text-gold" />
+                  <User size={20} fill="currentColor" className="drop-shadow-sm transition-colors group-hover:text-gold" />
                   {displayName && (
                     <span className={`text-[10px] tracking-widest font-medium leading-none max-w-[60px] truncate transition-colors ${iconColor} group-hover:text-gold`}>
                       {displayName}
@@ -160,7 +160,7 @@ const Navbar = () => {
               className={`transition-colors duration-300 ${iconColor}`}
               aria-label="Mi cuenta"
             >
-              <User size={20} />
+              <User size={20} className="drop-shadow-sm" />
             </Link>
           )}
 
@@ -170,7 +170,7 @@ const Navbar = () => {
             className={`relative transition-colors p-1 duration-300 ${iconColor}`}
             aria-label="Carrito"
           >
-            <ShoppingBag size={20} />
+            <ShoppingBag size={20} className="drop-shadow-sm" />
             {totalItems > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[10px] font-semibold text-white">
                 {totalItems}
@@ -212,7 +212,7 @@ const Navbar = () => {
                     }`}
                   >
                     <span className="font-playfair text-lg tracking-wide">{link.label}</span>
-                    <Icon size={20} className="text-gold/70" />
+                    <Icon size={20} className="text-gold/70 drop-shadow-sm" />
                   </Link>
                 </li>
               );
