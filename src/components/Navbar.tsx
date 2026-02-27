@@ -131,7 +131,7 @@ const Navbar = () => {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={`group flex flex-col items-center p-1 gap-1 transition-colors focus:outline-none ${iconColor} hover:text-gold`} aria-label="Mi cuenta">
+                <button className={`group flex flex-col items-center p-1 gap-0.5 transition-colors focus:outline-none ${iconColor} hover:text-gold`} aria-label="Mi cuenta">
                   <User size={20} fill="currentColor" className="transition-colors group-hover:text-gold" />
                   {displayName && (
                     <span className={`text-[10px] tracking-widest font-medium leading-none max-w-[60px] truncate transition-colors ${iconColor} group-hover:text-gold`}>
