@@ -96,8 +96,21 @@ const ProductPage = () => {
                   <p className="text-carbon/60 text-sm leading-relaxed">{product.description}</p>
                 </section>
                 <section className="border-b border-gold/10 py-5">
-                  <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">Materiales</h3>
-                  <p className="text-carbon/60 text-sm leading-relaxed">{product.materials}</p>
+                  <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">
+                    {product.materials_label === 'composicion' ? 'Composición' : 'Materiales'}
+                  </h3>
+                  {product.materials ? (
+                    <ul className="space-y-2">
+                      {product.materials.split('\n').filter((m: string) => m.trim()).map((item: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2.5 text-carbon/60 text-sm leading-relaxed">
+                          <span className="text-gold/70 mt-0.5 shrink-0">✦</span>
+                          <span>{item.trim()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-carbon/40 text-sm italic">Sin información</p>
+                  )}
                 </section>
                 <section className="border-b border-gold/10 py-5">
                   <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">Envío</h3>
