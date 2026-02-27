@@ -117,7 +117,7 @@ const Navbar = () => {
           {isAdmin && (
             <Link
               to="/admin"
-              className={`shadow-sm p-1 transition-colors duration-300 ${iconColor}`}
+              className={`p-1 transition-colors duration-300 ${iconColor}`}
               aria-label="Admin"
             >
               <Shield size={20} />
@@ -128,7 +128,7 @@ const Navbar = () => {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={`flex flex-col items-center p-1 gap-1 shadow-sm transition-colors focus:outline-none ${iconColor}`} aria-label="Mi cuenta">
+                <button className={`flex flex-col items-center p-1 gap-1 transition-colors focus:outline-none ${iconColor}`} aria-label="Mi cuenta">
                   <User size={20} fill="currentColor" />
                   {firstName && (
                     <span className={`hidden lg:block text-[10px] uppercase tracking-widest font-medium leading-none max-w-[60px] truncate ${iconColor}`}>
@@ -164,7 +164,7 @@ const Navbar = () => {
           {/* Cart — always visible */}
           <button
             onClick={openCart}
-            className={`relative transition-colors p-1 shadow-sm duration-300 ${iconColor}`}
+            className={`relative transition-colors p-1 duration-300 ${iconColor}`}
             aria-label="Carrito"
           >
             <ShoppingBag size={20} />
