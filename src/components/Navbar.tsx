@@ -181,7 +181,7 @@ const Navbar = () => {
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setMobileOpen(true)}
-            className={`lg:hidden transition-colors duration-300 ${iconColor}`}
+            className={`lg:hidden p-1 transition-colors duration-300 ${iconColor}`}
             aria-label="Menú"
           >
             <Menu size={24} />
