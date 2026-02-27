@@ -45,6 +45,9 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
+  const displayName = firstName
+    ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+    : "";
 
   const scrollToTop = (e: React.MouseEvent) => {
     if (location.pathname === "/") {
@@ -128,18 +131,18 @@ const Navbar = () => {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={`flex flex-col items-center p-1 gap-1 transition-colors focus:outline-none ${iconColor}`} aria-label="Mi cuenta">
-                  <User size={20} fill="currentColor" />
-                  {firstName && (
-                    <span className={`hidden lg:block text-[10px] uppercase tracking-widest font-medium leading-none max-w-[60px] truncate ${iconColor}`}>
-                      {firstName}
+                <button className={`group flex flex-col items-center p-1 gap-1 transition-colors focus:outline-none ${iconColor} hover:text-gold`} aria-label="Mi cuenta">
+                  <User size={20} fill="currentColor" className="transition-colors group-hover:text-gold" />
+                  {displayName && (
+                    <span className={`text-[10px] tracking-widest font-medium leading-none max-w-[60px] truncate transition-colors ${iconColor} group-hover:text-gold`}>
+                      {displayName}
                     </span>
                   )}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-card border-border z-50">
                 <DropdownMenuLabel className="font-playfair text-sm">
-                  Hola, {firstName || "Cliente"}
+                  Hola, {displayName || "Cliente"}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/account")} className="cursor-pointer">
@@ -220,6 +223,11 @@ const Navbar = () => {
           <div className="mt-auto pb-6 pt-4 border-t border-gold/10">
             {user ? (
               <div className="flex flex-col gap-3 px-1">
+                {displayName && (
+                  <p className="text-carbon/80 font-playfair text-sm mb-1">
+                    Hola, {displayName}
+                  </p>
+                )}
                 <Link
                   to="/account"
                   onClick={() => setMobileOpen(false)}
