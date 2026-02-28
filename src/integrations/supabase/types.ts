@@ -106,6 +106,7 @@ export type Database = {
           id: string
           image_url: string | null
           materials: string | null
+          materials_label: string | null
           name: string
           price: number
           shipping_info: string | null
@@ -122,6 +123,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           materials?: string | null
+          materials_label?: string | null
           name: string
           price?: number
           shipping_info?: string | null
@@ -138,6 +140,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           materials?: string | null
+          materials_label?: string | null
           name?: string
           price?: number
           shipping_info?: string | null
