@@ -184,7 +184,7 @@ serve(async (req) => {
           const attRes = await fetch(downloadUrl);
           if (!attRes.ok) continue;
           const buffer = await attRes.arrayBuffer();
-          const base64 = encodeBase64(new Uint8Array(buffer));
+          const base64 = encodeBase64(buffer);
           attachments.push({
             content: base64,
             filename: att.filename || "attachment",
