@@ -35,7 +35,7 @@ async function verifySvixSignature(
   const secretBytes = decodeBase64(secretPart);
   const key = await crypto.subtle.importKey(
     "raw",
-    secretBytes,
+    (secretBytes as Uint8Array).buffer as ArrayBuffer,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
@@ -45,7 +45,7 @@ async function verifySvixSignature(
     key,
     new TextEncoder().encode(signedContent)
   );
-  const expectedSig = encodeBase64(new Uint8Array(sigBuffer));
+  const expectedSig = encodeBase64(sigBuffer);
 
   const signatures = svixSignature.split(" ").map((s) => s.trim());
   for (const part of signatures) {
@@ -184,7 +184,7 @@ serve(async (req) => {
           const attRes = await fetch(downloadUrl);
           if (!attRes.ok) continue;
           const buffer = await attRes.arrayBuffer();
-          const base64 = encodeBase64(new Uint8Array(buffer));
+          const base64 = encodeBase64(buffer);
           attachments.push({
             content: base64,
             filename: att.filename || "attachment",

@@ -12,6 +12,7 @@ import { Loader2, Pencil } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
+import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import { getProductImageUrl } from "@/lib/product-images";
 
 const statusColors: Record<string, string> = {
@@ -172,7 +173,14 @@ const Admin = () => {
 
         <div className="mb-12" />
 
-        {/* Site Content Editor */}
+        {/* Email Sender */}
+        <AnimatedSection delay={0.13}>
+          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Enviar Emails</h2>
+          <p className="text-carbon/40 text-sm mb-4">Selecciona usuarios y envía emails desde info@shennabrows.com.</p>
+          <AdminEmailSender />
+        </AnimatedSection>
+
+        <div className="mb-12" />
         <AnimatedSection delay={0.12}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Contenido de la Web</h2>
           <p className="text-carbon/40 text-sm mb-4">Edita los textos del inicio y la página "Sobre mí".</p>
