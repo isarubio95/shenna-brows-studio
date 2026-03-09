@@ -12,6 +12,7 @@ import { Loader2, Pencil } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
+import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import { getProductImageUrl } from "@/lib/product-images";
 
 const statusColors: Record<string, string> = {
