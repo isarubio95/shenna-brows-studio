@@ -22,7 +22,7 @@ const highlights = [
 ];
 
 const CeoSection = () => (
-  <section className="py-24 bg-background">
+  <section className="py-24" style={{ backgroundColor: "var(--theme-section-ceo-bg, #F9F7F2)" }}>
     <div className="container mx-auto px-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 items-center max-w-5xl mx-auto">
         {/* Image */}
