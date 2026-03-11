@@ -109,7 +109,7 @@ const Index = () => {
             <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center mb-4" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
               Nuestra colección
             </h2>
-            <p className="text-carbon/50 text-center mb-12 md:mb-16 max-w-lg mx-auto">
+            <p className="text-center mb-12 md:mb-16 max-w-lg mx-auto" style={{ color: "var(--theme-color-paragraph, #1A1A1A)", opacity: 0.6 }}>
               Cinco herramientas esenciales para la artista que busca perfección.
             </p>
           </AnimatedSection>
