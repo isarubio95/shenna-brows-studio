@@ -103,7 +103,7 @@ const Index = () => {
       </section>
 
       {/* Products Grid */}
-      <section className="py-20 md:py-24 bg-cream">
+      <section className="py-20 md:py-24" style={{ backgroundColor: "var(--theme-section-products-bg, #F9F7F2)" }}>
         <div className="container mx-auto px-6">
           <AnimatedSection>
             <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon text-center mb-4">
