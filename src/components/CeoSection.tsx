@@ -51,7 +51,7 @@ const CeoSection = () => (
               CEO &amp; Fundadora
             </Badge>
 
-            <h2 className="font-playfair text-3xl md:text-4xl font-bold text-foreground leading-tight">
+            <h2 className="font-playfair text-3xl md:text-4xl font-bold leading-tight" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
               La visión detrás de{" "}
               <span className="italic text-primary">Shenna Brows</span>
             </h2>

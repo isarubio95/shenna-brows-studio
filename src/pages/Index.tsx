@@ -162,7 +162,7 @@ const Index = () => {
         <div className="container mx-auto px-6 max-w-3xl">
           <AnimatedSection>
             <div className="space-y-6">
-              <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon text-center">
+              <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
                 {siteContent["index_brand_story"]?.title ? (
                   <>
                     {siteContent["index_brand_story"].title.split(" ").slice(0, -1).join(" ")}{" "}

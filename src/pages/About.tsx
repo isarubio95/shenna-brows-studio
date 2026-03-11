@@ -44,7 +44,7 @@ const About = () => {
                   <h2 className="font-playfair text-2xl md:text-3xl font-semibold mb-6 leading-snug" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
                     {s.title}
                   </h2>
-                  <p className="text-carbon/60 text-lg leading-relaxed">{s.text}</p>
+                  <p className="text-lg leading-relaxed" style={{ color: "var(--theme-color-paragraph, #1A1A1A)", opacity: 0.6 }}>{s.text}</p>
                 </article>
               </AnimatedSection>
             ))}
