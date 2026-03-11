@@ -33,7 +33,7 @@ const TestimonialsCarousel = () => {
   if (testimonials.length === 0) return null;
 
   return (
-    <section className="py-24 bg-cream relative overflow-hidden">
+    <section className="py-24 relative overflow-hidden" style={{ backgroundColor: "var(--theme-section-testimonials-bg, #F9F7F2)" }}>
       {/* Paper texture overlay */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -50,7 +50,7 @@ const TestimonialsCarousel = () => {
           <p className="text-center text-gold text-xs uppercase tracking-[0.3em] font-medium mb-4">
             Testimonios
           </p>
-          <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon text-center mb-16">
+          <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center mb-16" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
             Lo que dicen nuestras <span className="italic text-gold">clientas</span>
           </h2>
         </AnimatedSection>

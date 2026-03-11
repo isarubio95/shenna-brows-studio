@@ -22,7 +22,7 @@ const highlights = [
 ];
 
 const CeoSection = () => (
-  <section className="py-24 bg-background">
+  <section className="py-24" style={{ backgroundColor: "var(--theme-section-ceo-bg, #F9F7F2)" }}>
     <div className="container mx-auto px-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 items-center max-w-5xl mx-auto">
         {/* Image */}
@@ -51,7 +51,7 @@ const CeoSection = () => (
               CEO &amp; Fundadora
             </Badge>
 
-            <h2 className="font-playfair text-3xl md:text-4xl font-bold text-foreground leading-tight">
+            <h2 className="font-playfair text-3xl md:text-4xl font-bold leading-tight" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
               La visión detrás de{" "}
               <span className="italic text-primary">Shenna Brows</span>
             </h2>

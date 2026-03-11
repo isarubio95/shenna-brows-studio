@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
 import AdminEmailSender from "@/components/admin/AdminEmailSender";
+import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import { getProductImageUrl } from "@/lib/product-images";
 
 const statusColors: Record<string, string> = {
@@ -185,6 +186,13 @@ const Admin = () => {
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Contenido de la Web</h2>
           <p className="text-carbon/40 text-sm mb-4">Edita los textos del inicio y la página "Sobre mí".</p>
           <AdminContentEditor />
+        </AnimatedSection>
+
+        <div className="mb-12" />
+        <AnimatedSection delay={0.14}>
+          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Personalización del Tema</h2>
+          <p className="text-carbon/40 text-sm mb-4">Cambia los colores de fondo de las secciones, del footer y de la tipografía.</p>
+          <AdminThemeEditor />
         </AnimatedSection>
 
         <div className="mb-12" />

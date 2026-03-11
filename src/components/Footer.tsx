@@ -3,7 +3,7 @@ import { Instagram, Mail } from "lucide-react";
 import logo from "@/assets/logo-shenna.png";
 
 const Footer = () => (
-  <footer className="bg-amber-950 text-cream/80 border-t border-gold/30">
+  <footer className="border-t border-gold/30" style={{ backgroundColor: "var(--theme-footer-bg, #451a03)", color: "var(--theme-footer-text, #F9F7F2)" }}>
     <div className="container mx-auto px-6 py-16">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         {/* Brand */}

@@ -20,7 +20,7 @@ const About = () => {
   }));
 
   return (
-    <main className="min-h-screen bg-cream pt-32 pb-24">
+    <main className="min-h-screen pt-32 pb-24" style={{ backgroundColor: "var(--theme-section-about-bg, #F9F7F2)" }}>
       <div className="container mx-auto px-6 max-w-3xl">
         <AnimatedSection>
           <p className="text-gold text-sm uppercase tracking-[0.3em] font-medium text-center mb-4">
@@ -41,10 +41,10 @@ const About = () => {
             {sections.map((s, i) => (
               <AnimatedSection key={i} delay={i * 0.08}>
                 <article>
-                  <h2 className="font-playfair text-2xl md:text-3xl font-semibold text-carbon mb-6 leading-snug">
+                  <h2 className="font-playfair text-2xl md:text-3xl font-semibold mb-6 leading-snug" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
                     {s.title}
                   </h2>
-                  <p className="text-carbon/60 text-lg leading-relaxed">{s.text}</p>
+                  <p className="text-lg leading-relaxed" style={{ color: "var(--theme-color-paragraph, #1A1A1A)", opacity: 0.6 }}>{s.text}</p>
                 </article>
               </AnimatedSection>
             ))}
