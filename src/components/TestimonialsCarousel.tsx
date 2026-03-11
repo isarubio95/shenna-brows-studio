@@ -33,7 +33,7 @@ const TestimonialsCarousel = () => {
   if (testimonials.length === 0) return null;
 
   return (
-    <section className="py-24 bg-cream relative overflow-hidden">
+    <section className="py-24 relative overflow-hidden" style={{ backgroundColor: "var(--theme-section-testimonials-bg, #F9F7F2)" }}>
       {/* Paper texture overlay */}
       <div
         className="absolute inset-0 pointer-events-none"
