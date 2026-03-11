@@ -106,7 +106,7 @@ const Index = () => {
       <section className="py-20 md:py-24" style={{ backgroundColor: "var(--theme-section-products-bg, #F9F7F2)" }}>
         <div className="container mx-auto px-6">
           <AnimatedSection>
-            <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon text-center mb-4">
+            <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center mb-4" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
               Nuestra colección
             </h2>
             <p className="text-carbon/50 text-center mb-12 md:mb-16 max-w-lg mx-auto">
