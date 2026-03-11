@@ -158,7 +158,7 @@ const Index = () => {
       </section>
 
       {/* Brand Story */}
-      <section className="py-24 md:py-32 bg-white">
+      <section className="py-24 md:py-32" style={{ backgroundColor: "var(--theme-section-brand-story-bg, #FFFFFF)" }}>
         <div className="container mx-auto px-6 max-w-3xl">
           <AnimatedSection>
             <div className="space-y-6">
