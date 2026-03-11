@@ -38,6 +38,7 @@ const App = () => (
         <CartProvider>
           <Toaster />
           <Sonner />
+          <ThemeLoader />
           <BrowserRouter>
             <ScrollToTop />
             <Navbar />
