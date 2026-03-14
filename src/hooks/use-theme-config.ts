@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface ThemeConfig {
   // Section backgrounds
   sectionProductsBg: string;
+  sectionVideoBg: string;
   sectionBrandStoryBg: string;
   sectionCeoBg: string;
   sectionTestimonialsBg: string;
@@ -24,6 +25,7 @@ export interface ThemeConfig {
 
 export const DEFAULT_THEME: ThemeConfig = {
   sectionProductsBg: "#F9F7F2",
+  sectionVideoBg: "#F9F7F2",
   sectionBrandStoryBg: "#FFFFFF",
   sectionCeoBg: "#F9F7F2",
   sectionTestimonialsBg: "#F9F7F2",
@@ -41,6 +43,7 @@ export const DEFAULT_THEME: ThemeConfig = {
 
 const CSS_VAR_MAP: Record<keyof ThemeConfig, string> = {
   sectionProductsBg: "--theme-section-products-bg",
+  sectionVideoBg: "--theme-section-video-bg",
   sectionBrandStoryBg: "--theme-section-brand-story-bg",
   sectionCeoBg: "--theme-section-ceo-bg",
   sectionTestimonialsBg: "--theme-section-testimonials-bg",

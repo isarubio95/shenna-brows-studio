@@ -13,6 +13,7 @@ interface ColorField {
 
 const SECTION_COLORS: ColorField[] = [
   { key: "sectionProductsBg", label: "Productos (Inicio)" },
+  { key: "sectionVideoBg", label: "Vídeo presentación (Inicio)" },
   { key: "sectionBrandStoryBg", label: "Historia de marca (Inicio)" },
   { key: "sectionCeoBg", label: "CEO / Fundadora (Inicio)" },
   { key: "sectionTestimonialsBg", label: "Testimonios (Inicio)" },
@@ -117,6 +118,7 @@ const AdminThemeEditor = () => {
       const root = document.documentElement;
       const CSS_VAR_MAP: Record<string, string> = {
         sectionProductsBg: "--theme-section-products-bg",
+        sectionVideoBg: "--theme-section-video-bg",
         sectionBrandStoryBg: "--theme-section-brand-story-bg",
         sectionCeoBg: "--theme-section-ceo-bg",
         sectionTestimonialsBg: "--theme-section-testimonials-bg",

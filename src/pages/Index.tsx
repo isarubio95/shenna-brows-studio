@@ -14,9 +14,12 @@ import logoMetalico from "@/assets/logo-metalico.png";
 import { getProductImageUrl } from "@/lib/product-images";
 import CeoSection from "@/components/CeoSection";
 
+const VIDEO_POSTER_TIME = 2; // segundo del que extraer la portada
+
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [videoPoster, setVideoPoster] = useState<string | null>(null);
   const { data: siteContent } = useSiteContent(["index_brand_story"]);
 
   useEffect(() => {
@@ -24,6 +27,40 @@ const Index = () => {
       setProducts(data || []);
       setLoading(false);
     });
+  }, []);
+
+  // Extraer el frame del segundo 1 del vídeo para usarlo como portada
+  useEffect(() => {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.muted = true;
+    video.preload = "metadata";
+    const onLoadedData = () => {
+      video.currentTime = VIDEO_POSTER_TIME;
+    };
+    const onSeeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+          setVideoPoster(canvas.toDataURL("image/jpeg", 0.9));
+        }
+      } finally {
+        video.remove();
+      }
+    };
+    video.addEventListener("loadeddata", onLoadedData);
+    video.addEventListener("seeked", onSeeked);
+    video.src = "/video-presentacion.mp4";
+    video.load();
+    return () => {
+      video.removeEventListener("loadeddata", onLoadedData);
+      video.removeEventListener("seeked", onSeeked);
+      video.remove();
+    };
   }, []);
 
   return (
@@ -154,6 +191,26 @@ const Index = () => {
               ))
             )}
           </div>
+        </div>
+      </section>
+
+      {/* Video presentación */}
+      <section className="py-20 md:py-24" style={{ backgroundColor: "var(--theme-section-video-bg, #F9F7F2)" }}>
+        <div className="container mx-auto px-6">
+          <AnimatedSection>
+            <div className="max-w-sm mx-auto rounded-2xl overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.08)]">
+              <video
+                className="w-full aspect-[9/16] object-cover"
+                src="/video-presentacion.mp4"
+                poster={videoPoster ?? undefined}
+                controls
+                playsInline
+                preload="metadata"
+              >
+                Tu navegador no soporta la reproducción de video.
+              </video>
+            </div>
+          </AnimatedSection>
         </div>
       </section>
 
