@@ -26,7 +26,7 @@ import {
 const navLinks: { label: string; to: string; icon: LucideIcon }[] = [
   { label: "Inicio", to: "/", icon: Sparkles },
   { label: "Tienda", to: "/tienda", icon: ShoppingBag },
-  { label: "Sobre mí", to: "/sobre-mi", icon: HeartHandshake },
+  { label: "Conócenos", to: "/sobre-mi", icon: HeartHandshake },
 ];
 
 const Navbar = () => {
