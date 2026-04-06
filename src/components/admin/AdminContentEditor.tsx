@@ -28,6 +28,7 @@ const AdminContentEditor = () => {
   const [blocks, setBlocks] = useState<ContentBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const HIDDEN_KEYS = new Set(["index_brand_story", "theme_config"]);
 
   useEffect(() => {
     (supabase as any)
@@ -77,9 +78,11 @@ const AdminContentEditor = () => {
     );
   }
 
+  const visibleBlocks = blocks.filter((block) => !HIDDEN_KEYS.has(block.key));
+
   return (
     <div className="space-y-6">
-      {blocks.map((block) => (
+      {visibleBlocks.map((block) => (
         <div
           key={block.key}
           className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6"
@@ -103,7 +106,7 @@ const AdminContentEditor = () => {
               <Textarea
                 value={block.content}
                 onChange={(e) => updateField(block.key, "content", e.target.value)}
-                rows={block.key === "index_brand_story" ? 12 : 4}
+                rows={4}
                 className="mt-1 border-gold/20 focus-visible:ring-gold/30"
               />
               <p className="text-xs text-carbon/30 mt-1">Separa los párrafos con líneas en blanco.</p>

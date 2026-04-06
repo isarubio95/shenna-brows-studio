@@ -20,9 +20,9 @@ const Footer = () => (
           <ul className="space-y-3 text-sm">
             {[
               { label: "Inicio", to: "/" },
+              { label: "Tienda", to: "/tienda" },
               { label: "Pinzas", to: "/pinzas" },
               { label: "Tijeras", to: "/tijeras" },
-              { label: "Gel", to: "/gel" },
               { label: "Sobre mí", to: "/sobre-mi" },
             ].map((l) => (
               <li key={l.to}>

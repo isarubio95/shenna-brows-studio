@@ -12,6 +12,7 @@ import CartDrawer from "@/components/CartDrawer";
 import ScrollToTop from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import ProductPage from "./pages/ProductPage";
+import Tienda from "./pages/Tienda";
 import About from "./pages/About";
 import Checkout from "./pages/Checkout";
 import Login from "./pages/Login";
@@ -45,6 +46,7 @@ const App = () => (
             <CartDrawer />
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/tienda" element={<Tienda />} />
               <Route path="/sobre-mi" element={<About />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />

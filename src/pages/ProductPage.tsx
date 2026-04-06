@@ -62,6 +62,10 @@ const ProductPage = () => {
     });
   };
 
+  const descriptionHtml = (product.description || "").includes("<")
+    ? product.description
+    : (product.description || "").replace(/\n/g, "<br />");
+
   return (
     <main className="min-h-screen bg-cream pt-32 pb-16">
       <div className="container mx-auto px-6">
@@ -93,7 +97,10 @@ const ProductPage = () => {
               <div className="border-t border-gold/10 space-y-0">
                 <section className="border-b border-gold/10 py-5">
                   <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">Descripción</h3>
-                  <p className="text-carbon/60 text-sm leading-relaxed">{product.description}</p>
+                  <div
+                    className="text-carbon/60 text-sm leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_a]:text-gold [&_a]:underline"
+                    dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+                  />
                 </section>
                 <section className="border-b border-gold/10 py-5">
                   <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">

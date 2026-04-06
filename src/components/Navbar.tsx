@@ -3,8 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo-shenna.png";
 import {
   ShoppingBag, User, Menu, Shield,
-  Sparkles, Target, Scissors, HeartHandshake,
-  Wind, ShieldCheck, PenTool,
+  Sparkles, HeartHandshake, Instagram,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCart } from "@/context/CartContext";
@@ -26,11 +25,7 @@ import {
 
 const navLinks: { label: string; to: string; icon: LucideIcon }[] = [
   { label: "Inicio", to: "/", icon: Sparkles },
-  { label: "Espuma", to: "/espuma", icon: Wind },
-  { label: "Pinzas", to: "/pinzas", icon: Target },
-  { label: "Tijeras", to: "/tijeras", icon: Scissors },
-  { label: "Stick", to: "/stick", icon: ShieldCheck },
-  { label: "Lápiz", to: "/lapiz", icon: PenTool },
+  { label: "Tienda", to: "/tienda", icon: ShoppingBag },
   { label: "Sobre mí", to: "/sobre-mi", icon: HeartHandshake },
 ];
 
@@ -56,6 +51,15 @@ const Navbar = () => {
     } else {
       window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
     }
+  };
+
+  const productPaths = new Set(["/espuma", "/pinzas", "/tijeras", "/stick", "/lapiz"]);
+  const isTiendaActive = location.pathname === "/tienda" || productPaths.has(location.pathname);
+  const isInicioActive = location.pathname === "/";
+  const isLinkActive = (to: string) => {
+    if (to === "/") return isInicioActive;
+    if (to === "/tienda") return isTiendaActive;
+    return location.pathname === to;
   };
   const isHome = location.pathname === "/";
   const isSolid = !isHome || scrolled;
@@ -95,7 +99,7 @@ const Navbar = () => {
           <img
             src={logo}
             alt="Shenna Brows"
-            className="h-10 lg:h-12 w-auto relative z-10" 
+            className="h-11 lg:h-[3.35rem] w-auto relative z-10 drop-shadow-[0_2px_10px_rgba(201,162,39,0.22)] brightness-105 transition-all duration-300 hover:brightness-110 hover:scale-[1.02]"
           />
         </Link>
 
@@ -106,7 +110,7 @@ const Navbar = () => {
                 to={link.to}
                 onClick={link.to === "/" ? scrollToTop : undefined}
                 className={`text-sm font-medium tracking-wide p-1 transition-colors duration-300 ${
-                  location.pathname === link.to ? (isSolid ? "text-gold" : "text-amber-200") : linkColor
+                  isLinkActive(link.to) ? (isSolid ? "text-gold" : "text-amber-200") : linkColor
                 }`}
               >
                 {link.label}
@@ -117,13 +121,23 @@ const Navbar = () => {
 
         {/* Right icons — visible on ALL screen sizes */}
         <div className="flex items-center gap-3 lg:gap-4 relative z-10">
+          <a
+            href="https://www.instagram.com/alexandralasherasmicro/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`hidden lg:flex p-1 transition-colors duration-300 ${iconColor}`}
+            aria-label="Instagram"
+          >
+            <Instagram size={21} className="drop-shadow-sm" />
+          </a>
+
           {isAdmin && (
             <Link
               to="/admin"
               className={`p-1 transition-colors duration-300 ${iconColor}`}
               aria-label="Admin"
             >
-              <Shield size={20} className="drop-shadow-sm" />
+              <Shield size={21} className="drop-shadow-sm" />
             </Link>
           )}
 
@@ -132,7 +146,7 @@ const Navbar = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className={`group flex flex-col items-center p-1 gap-0.5 transition-colors focus:outline-none ${iconColor} hover:text-gold`} aria-label="Mi cuenta">
-                  <User size={20} fill="currentColor" className="drop-shadow-sm transition-colors group-hover:text-gold" />
+                  <User size={21} fill="currentColor" className="drop-shadow-sm transition-colors group-hover:text-gold" />
                   {displayName && (
                     <span className={`text-[10px] tracking-widest font-medium leading-none max-w-[60px] truncate transition-colors ${iconColor} group-hover:text-gold`}>
                       {displayName}
@@ -160,7 +174,7 @@ const Navbar = () => {
               className={`transition-colors duration-300 ${iconColor}`}
               aria-label="Mi cuenta"
             >
-              <User size={20} className="drop-shadow-sm" />
+              <User size={21} className="drop-shadow-sm" />
             </Link>
           )}
 
@@ -170,7 +184,7 @@ const Navbar = () => {
             className={`relative transition-colors p-1 duration-300 ${iconColor}`}
             aria-label="Carrito"
           >
-            <ShoppingBag size={20} className="drop-shadow-sm" />
+            <ShoppingBag size={21} className="drop-shadow-sm" />
             {totalItems > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[10px] font-semibold text-white">
                 {totalItems}
@@ -184,7 +198,7 @@ const Navbar = () => {
             className={`lg:hidden p-1 transition-colors duration-300 ${iconColor}`}
             aria-label="Menú"
           >
-            <Menu size={24} />
+            <Menu size={25} />
           </button>
         </div>
       </nav>
@@ -199,20 +213,22 @@ const Navbar = () => {
           <ul className="flex flex-col mt-6">
             {navLinks.map((link) => {
               const Icon = link.icon;
-              const isActive = location.pathname === link.to;
               return (
                 <li key={link.to} className="border-b border-gold/10 last:border-b-0">
                   <Link
                     to={link.to}
-                    onClick={(e) => { if (link.to === "/") scrollToTop(e); setMobileOpen(false); }}
+                    onClick={(e) => {
+                      if (link.to === "/") scrollToTop(e);
+                      setMobileOpen(false);
+                    }}
                     className={`flex w-full items-center justify-between py-4 px-1 transition-colors ${
-                      isActive
+                      isLinkActive(link.to)
                         ? "text-gold"
                         : "text-carbon hover:text-gold"
                     }`}
                   >
                     <span className="font-playfair text-lg tracking-wide">{link.label}</span>
-                    <Icon size={20} className="text-gold/70 drop-shadow-sm" />
+                    <Icon size={21} className="text-gold/70 drop-shadow-sm" />
                   </Link>
                 </li>
               );
@@ -221,6 +237,18 @@ const Navbar = () => {
 
           {/* Auth section at bottom */}
           <div className="mt-auto pb-6 pt-4 border-t border-gold/10">
+            <div className="flex items-center gap-4 px-1 mb-5">
+              <a
+                href="https://www.instagram.com/alexandralasherasmicro/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-carbon/70 hover:text-gold transition-colors"
+                aria-label="Instagram"
+              >
+                <Instagram size={21} />
+              </a>
+            </div>
+
             {user ? (
               <div className="flex flex-col gap-3 px-1">
                 {displayName && (

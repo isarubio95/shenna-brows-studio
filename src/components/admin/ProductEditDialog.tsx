@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getProductImageUrl } from "@/lib/product-images";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, ImageIcon, Plus, X } from "lucide-react";
+import { Loader2, Upload, ImageIcon, Plus, X, Bold, Italic, List, ListOrdered, Link as LinkIcon } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Product = Tables<"products">;
@@ -23,6 +23,16 @@ interface ProductEditDialogProps {
 const BUCKET = "product-images";
 const SUPABASE_URL = "https://vanhsuisvxvclxdgutaw.supabase.co";
 
+const normalizeDescriptionHtml = (html: string) => {
+  const trimmed = (html || "").trim();
+  if (!trimmed) return "";
+
+  return trimmed
+    .replace(/<div>/gi, "<p>")
+    .replace(/<\/div>/gi, "</p>")
+    .replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, "");
+};
+
 const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEditDialogProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,11 +43,12 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const descriptionEditorRef = useRef<HTMLDivElement>(null);
 
   // Sync form when product changes
   const currentProduct = product;
-  const [lastProductId, setLastProductId] = useState<string | null>(null);
-  if (currentProduct && currentProduct.id !== lastProductId) {
+  useEffect(() => {
+    if (!currentProduct || !open) return;
     const items = (currentProduct as any).materials
       ? (currentProduct as any).materials.split('\n').filter((s: string) => s.trim())
       : [""];
@@ -54,12 +65,19 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
       materials_label: (currentProduct as any).materials_label || 'materiales',
     });
     setPreviewUrl(null);
-    setLastProductId(currentProduct.id);
-  }
+  }, [currentProduct, open]);
 
   const updateField = (field: keyof Product, value: string | number) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
+
+  useEffect(() => {
+    if (!descriptionEditorRef.current) return;
+    const next = form.description || "";
+    if (descriptionEditorRef.current.innerHTML !== next) {
+      descriptionEditorRef.current.innerHTML = next;
+    }
+  }, [form.description, currentProduct?.id, open]);
 
   const isComposicion = (form as any).materials_label === 'composicion';
 
@@ -139,12 +157,13 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
     if (!currentProduct) return;
     setSaving(true);
     const materialsString = materialItems.filter((m) => m.trim()).join('\n');
+    const normalizedDescription = normalizeDescriptionHtml(String(form.description || ""));
     const { error } = await (supabase as any)
       .from("products")
       .update({
         name: form.name,
         tagline: form.tagline || "",
-        description: form.description || "",
+        description: normalizedDescription,
         materials: materialsString,
         materials_label: (form as any).materials_label || 'materiales',
         shipping_info: form.shipping_info || "",
@@ -166,6 +185,20 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
 
   const displayImage = previewUrl || (currentProduct ? getProductImageUrl(currentProduct.image_url, currentProduct.slug) : form.image_url);
   const canAddMaterial = materialItems.length === 0 || (materialItems[materialItems.length - 1]?.trim() ?? "") !== "";
+
+  const applyFormat = (command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") => {
+    document.execCommand(command);
+    descriptionEditorRef.current?.focus();
+    updateField("description", normalizeDescriptionHtml(descriptionEditorRef.current?.innerHTML || ""));
+  };
+
+  const insertLink = () => {
+    const url = window.prompt("Introduce la URL del enlace (https://...)");
+    if (!url) return;
+    document.execCommand("createLink", false, url);
+    descriptionEditorRef.current?.focus();
+    updateField("description", normalizeDescriptionHtml(descriptionEditorRef.current?.innerHTML || ""));
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -256,12 +289,74 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
               <Label htmlFor="description" className="text-carbon/70 text-xs uppercase tracking-wider">
                 Descripción
               </Label>
-              <Textarea
-                id="description"
-                value={form.description || ""}
-                onChange={(e) => updateField("description", e.target.value)}
-                className="mt-1 bg-white border-gold/15 min-h-[100px]"
-              />
+              <div className="mt-1 rounded-md border border-gold/15 bg-white overflow-hidden">
+                <div className="flex flex-wrap items-center gap-1 border-b border-gold/10 p-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 border-gold/20"
+                    onClick={() => applyFormat("bold")}
+                    aria-label="Negrita"
+                  >
+                    <Bold size={14} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 border-gold/20"
+                    onClick={() => applyFormat("italic")}
+                    aria-label="Cursiva"
+                  >
+                    <Italic size={14} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 border-gold/20"
+                    onClick={() => applyFormat("insertUnorderedList")}
+                    aria-label="Lista con viñetas"
+                  >
+                    <List size={14} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 border-gold/20"
+                    onClick={() => applyFormat("insertOrderedList")}
+                    aria-label="Lista numerada"
+                  >
+                    <ListOrdered size={14} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 border-gold/20"
+                    onClick={insertLink}
+                    aria-label="Insertar enlace"
+                  >
+                    <LinkIcon size={14} />
+                  </Button>
+                </div>
+                <div
+                  id="description"
+                  ref={descriptionEditorRef}
+                  contentEditable
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      document.execCommand("insertParagraph");
+                    }
+                  }}
+                  onInput={(e) => updateField("description", normalizeDescriptionHtml((e.target as HTMLDivElement).innerHTML))}
+                  className="min-h-[140px] p-3 text-sm text-carbon leading-relaxed focus:outline-none [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_a]:text-gold [&_a]:underline"
+                />
+              </div>
+              <p className="text-xs text-carbon/40 mt-1">Enter crea un párrafo nuevo. Shift+Enter crea salto de línea.</p>
             </div>
 
             {/* Materials / Composición section */}
