@@ -54,7 +54,10 @@ serve(async (req) => {
       lineItems.push({ price: shippingPrice.id, quantity: 1 });
     }
 
-    const origin = req.headers.get("origin") || "https://id-preview--41e8d2ca-bef1-4564-b263-4708aa204775.lovable.app";
+    const origin =
+      req.headers.get("origin") ||
+      Deno.env.get("SITE_URL") ||
+      "http://localhost:8080";
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       line_items: lineItems,

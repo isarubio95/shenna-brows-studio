@@ -62,10 +62,11 @@ const TestimonialsCarousel = () => {
             className="w-full"
           >
             <CarouselContent>
-              {testimonials.map((t: any) => {
+              {testimonials.map((t: any, index: number) => {
                 const name = t.author_name;
+                const testimonialKey = t.id ? `testimonial-${t.id}` : `testimonial-fallback-${index}`;
                 return (
-                  <CarouselItem key={t.id}>
+                  <CarouselItem key={testimonialKey}>
                     <div className="flex flex-col items-center text-center px-4 md:px-12 py-8">
                       <Quote
                         size={36}
