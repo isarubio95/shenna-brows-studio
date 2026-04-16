@@ -139,13 +139,15 @@ const Checkout = () => {
                 </p>
               ) : null}
               {turnstileSiteKey ? (
-                <Turnstile
-                  sitekey={turnstileSiteKey}
-                  onVerify={(token) => setTurnstileToken(token)}
-                  onExpire={() => setTurnstileToken("")}
-                  onError={() => setTurnstileToken("")}
-                  options={{ theme: "light" }}
-                />
+                <div className="w-full">
+                  <Turnstile
+                    sitekey={turnstileSiteKey}
+                    onVerify={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken("")}
+                    onError={() => setTurnstileToken("")}
+                    options={{ theme: "light", size: "flexible" }}
+                  />
+                </div>
               ) : null}
             </form>
           </AnimatedSection>

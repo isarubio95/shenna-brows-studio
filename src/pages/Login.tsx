@@ -173,13 +173,13 @@ const Login = () => {
               </p>
             ) : null}
             {turnstileSiteKey ? (
-              <div className="pt-1">
+              <div className="pt-1 w-full">
                 <Turnstile
                   sitekey={turnstileSiteKey}
                   onVerify={(token) => setTurnstileToken(token)}
                   onExpire={() => setTurnstileToken("")}
                   onError={() => setTurnstileToken("")}
-                  options={{ theme: "light" }}
+                  options={{ theme: "light", size: "flexible" }}
                 />
               </div>
             ) : null}

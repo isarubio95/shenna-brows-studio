@@ -56,7 +56,7 @@ const Index = () => {
     };
     video.addEventListener("loadeddata", onLoadedData);
     video.addEventListener("seeked", onSeeked);
-    video.src = "/video-presentacion.mp4";
+    video.src = "/video-presentacion2-vertical.mov";
     video.load();
     return () => {
       video.removeEventListener("loadeddata", onLoadedData);
@@ -123,7 +123,7 @@ const Index = () => {
               <div className="max-w-[320px] sm:max-w-[360px] mx-auto rounded-2xl overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.25)] border border-white/25 backdrop-blur-sm">
                 <video
                   className="w-full aspect-[9/16] object-cover"
-                  src="/video-presentacion.mp4"
+                  src="/video-presentacion2-vertical.mov"
                   poster={videoPoster ?? undefined}
                   autoPlay
                   muted
@@ -161,7 +161,7 @@ const Index = () => {
       <section className="lg:hidden relative w-full h-[100dvh] overflow-hidden">
         <video
           className="w-full h-full object-cover"
-          src="/video-presentacion.mp4"
+          src="/video-presentacion2-vertical.mov"
           poster={videoPoster ?? undefined}
           autoPlay
           muted
