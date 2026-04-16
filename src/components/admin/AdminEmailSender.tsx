@@ -48,6 +48,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TiptapImage from "@tiptap/extension-image";
 import TiptapLink from "@tiptap/extension-link";
+import { getVisitorId } from "@/lib/security";
 
 interface Profile {
   user_id: string;
@@ -66,6 +67,8 @@ interface Attachment {
 }
 
 const PAGE_SIZE = 10;
+const MAX_ATTACHMENTS = 8;
+const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 
 const AdminEmailSender = () => {
   const { toast } = useToast();
@@ -78,6 +81,7 @@ const AdminEmailSender = () => {
   const [subject, setSubject] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [sending, setSending] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
@@ -137,6 +141,14 @@ const AdminEmailSender = () => {
   );
 
   const addFileAttachment = useCallback((file: File) => {
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      toast({ title: "Límite de adjuntos alcanzado", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      toast({ title: "Archivo demasiado grande (máx 4MB)", variant: "destructive" });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const base64 = (reader.result as string).split(",")[1];
@@ -146,7 +158,7 @@ const AdminEmailSender = () => {
       ]);
     };
     reader.readAsDataURL(file);
-  }, []);
+  }, [attachments.length, toast]);
 
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
@@ -240,6 +252,16 @@ const AdminEmailSender = () => {
   };
 
   const sendEmails = async () => {
+    const cooldownMs = cooldownUntil ? Math.max(0, cooldownUntil - Date.now()) : 0;
+    if (cooldownMs > 0) {
+      toast({
+        title: "Espera antes de reenviar",
+        description: `${Math.ceil(cooldownMs / 1000)}s`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!subject.trim() || !editor?.getHTML()) {
       toast({ title: "Completa el asunto y el mensaje", variant: "destructive" });
       return;
@@ -254,7 +276,7 @@ const AdminEmailSender = () => {
       (id) => !profiles.find((p) => p.user_id === id)
     );
 
-    let allEmails = [...recipientEmails];
+    const allEmails = [...recipientEmails];
 
     if (otherSelected.length > 0) {
       const { data } = await supabase
@@ -284,6 +306,7 @@ const AdminEmailSender = () => {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${accessToken}`,
+            "x-visitor-id": getVisitorId(),
           },
           body: JSON.stringify({
             recipients: allEmails,
@@ -301,6 +324,9 @@ const AdminEmailSender = () => {
         setComposeOpen(false);
         setSelected(new Set());
       } else {
+        if (res.status === 429) {
+          setCooldownUntil(Date.now() + 30000);
+        }
         toast({ title: "Error al enviar", description: result.error, variant: "destructive" });
       }
     } catch (err) {

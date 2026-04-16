@@ -9,12 +9,20 @@ import { getShippingCost, FREE_SHIPPING_THRESHOLD } from "@/data/products";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import Turnstile from "react-turnstile";
+import { getTurnstileSiteKey, getVisitorId } from "@/lib/security";
 
 const Checkout = () => {
   const { items, totalPrice } = useCart();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const { toast } = useToast();
+  const turnstileSiteKey = getTurnstileSiteKey();
+  const cooldownMs = cooldownUntil ? Math.max(0, cooldownUntil - Date.now()) : 0;
+  const cooldownSeconds = Math.ceil(cooldownMs / 1000);
+  const isCooldownActive = cooldownMs > 0;
 
   const shipping = getShippingCost(totalPrice);
   const total = totalPrice + shipping;
@@ -25,9 +33,20 @@ const Checkout = () => {
       toast({ title: "Introduce tu email", variant: "destructive" });
       return;
     }
+    if (isCooldownActive) {
+      toast({ title: "Espera antes de reintentar", description: `${cooldownSeconds}s`, variant: "destructive" });
+      return;
+    }
+    if (!turnstileToken) {
+      toast({ title: "Verifica el desafío de seguridad", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-payment", {
+        headers: {
+          "x-visitor-id": getVisitorId(),
+        },
         body: {
           items: items.map((i) => ({
             stripe_price_id: i.product.stripe_price_id,
@@ -35,6 +54,7 @@ const Checkout = () => {
             price: i.product.price,
           })),
           customerEmail: email,
+          turnstileToken,
         },
       });
       if (error) throw error;
@@ -43,9 +63,16 @@ const Checkout = () => {
       } else {
         throw new Error("No checkout URL returned");
       }
-    } catch (err: any) {
-      toast({ title: "Error al procesar el pago", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error("Error inesperado");
+      const maybeStatus = (err as { context?: { status?: number }; status?: number } | undefined)?.context?.status
+        ?? (err as { status?: number } | undefined)?.status;
+      if (maybeStatus === 429) {
+        setCooldownUntil(Date.now() + 30000);
+      }
+      toast({ title: "Error al procesar el pago", description: error.message, variant: "destructive" });
     } finally {
+      setTurnstileToken("");
       setLoading(false);
     }
   };
@@ -94,7 +121,7 @@ const Checkout = () => {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || isCooldownActive}
                 className="w-full bg-gold hover:bg-gold/90 text-white py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] mt-4"
               >
                 {loading ? (
@@ -106,6 +133,20 @@ const Checkout = () => {
                   `Pagar €${total.toFixed(2)}`
                 )}
               </Button>
+              {isCooldownActive ? (
+                <p className="text-xs text-center text-carbon/60">
+                  Espera {cooldownSeconds}s antes de volver a intentar.
+                </p>
+              ) : null}
+              {turnstileSiteKey ? (
+                <Turnstile
+                  sitekey={turnstileSiteKey}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken("")}
+                  onError={() => setTurnstileToken("")}
+                  options={{ theme: "light" }}
+                />
+              ) : null}
             </form>
           </AnimatedSection>
 

@@ -43,6 +43,7 @@ const Account = () => {
   const [filterMonth, setFilterMonth] = useState("all");
   const [filterYear, setFilterYear] = useState("all");
   const [testimonialText, setTestimonialText] = useState("");
+  const [testimonialCooldownUntil, setTestimonialCooldownUntil] = useState<number | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["my-orders", user?.id],
@@ -119,6 +120,7 @@ const Account = () => {
     onSuccess: () => {
       toast({ title: "¡Gracias por compartir tu experiencia!", description: "Tu comentario será revisado por nuestro equipo." });
       setTestimonialText("");
+      setTestimonialCooldownUntil(Date.now() + 120000);
       queryClient.invalidateQueries({ queryKey: ["my-testimonial"] });
     },
     onError: () => {
@@ -137,6 +139,10 @@ const Account = () => {
   if (!user) return <Navigate to="/login" replace />;
 
   const firstName = profile?.full_name?.split(" ")[0] || "Cliente";
+  const testimonialCooldownMs = testimonialCooldownUntil
+    ? Math.max(0, testimonialCooldownUntil - Date.now())
+    : 0;
+  const testimonialCooldownActive = testimonialCooldownMs > 0;
 
   return (
     <main className="min-h-screen bg-background pt-28 pb-16">
@@ -296,13 +302,18 @@ const Account = () => {
                   <Button
                     variant="outline"
                     onClick={() => testimonialMutation.mutate(testimonialText)}
-                    disabled={testimonialText.trim().length < 10 || testimonialMutation.isPending}
+                    disabled={testimonialText.trim().length < 10 || testimonialMutation.isPending || testimonialCooldownActive}
                     className="border-primary/30 text-primary hover:bg-primary/5"
                   >
                     {testimonialMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Enviar Opinión
                   </Button>
                 </div>
+                {testimonialCooldownActive ? (
+                  <p className="text-xs text-muted-foreground">
+                    Espera {Math.ceil(testimonialCooldownMs / 1000)}s antes de enviar otra opinión.
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

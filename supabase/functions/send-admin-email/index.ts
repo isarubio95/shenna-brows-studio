@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
 
 const RESEND_API = "https://api.resend.com";
 const FROM_ADDRESS = "Shenna Brows <info@shennabrows.com>";
@@ -16,6 +17,22 @@ serve(async (req) => {
   }
 
   // Verify admin
+  const ip = getClientIp(req);
+  const ipLimit = await applyRateLimit({
+    endpoint: "send-admin-email",
+    kind: "ip",
+    key: ip,
+    limit: 5,
+    window: "1 m",
+  });
+  if (!ipLimit.success) {
+    console.warn("rate_limit_block", { endpoint: "send-admin-email", scope: "ip", retryAfter: ipLimit.retryAfterSec });
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", ...rateLimitHeaders(ipLimit) },
+    });
+  }
+
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -40,6 +57,20 @@ serve(async (req) => {
   }
 
   const userId = claimsData.claims.sub as string;
+  const userLimit = await applyRateLimit({
+    endpoint: "send-admin-email",
+    kind: "identity",
+    key: userId,
+    limit: 10,
+    window: "1 m",
+  });
+  if (!userLimit.success) {
+    console.warn("rate_limit_block", { endpoint: "send-admin-email", scope: "user", userId, retryAfter: userLimit.retryAfterSec });
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", ...rateLimitHeaders(userLimit) },
+    });
+  }
 
   // Check admin role
   const { data: roleData } = await supabase
@@ -69,6 +100,12 @@ serve(async (req) => {
 
     if (!recipients?.length || !subject || !html) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (recipients.length > 100) {
+      return new Response(JSON.stringify({ error: "Too many recipients in one request" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

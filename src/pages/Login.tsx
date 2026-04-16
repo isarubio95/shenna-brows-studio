@@ -7,6 +7,11 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import Turnstile from "react-turnstile";
+import { getTurnstileSiteKey, getVisitorId } from "@/lib/security";
+
+const AUTH_RATE_LIMIT_ENDPOINT = "https://vanhsuisvxvclxdgutaw.supabase.co/functions/v1/auth-rate-limit";
+type AuthGuardError = Error & { status?: number; unlockAt?: string };
 
 const Login = () => {
   const [isRegister, setIsRegister] = useState(false);
@@ -14,27 +19,118 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [failCount, setFailCount] = useState(0);
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const turnstileSiteKey = getTurnstileSiteKey();
+
+  const cooldownMs = cooldownUntil ? Math.max(0, cooldownUntil - Date.now()) : 0;
+  const cooldownSeconds = Math.ceil(cooldownMs / 1000);
+  const isCooldownActive = cooldownMs > 0;
+
+  const getBackoffMs = (nextFailCount: number) => {
+    if (nextFailCount >= 5) return 30000;
+    if (nextFailCount >= 3) return 15000;
+    return 5000;
+  };
+
+  const callAuthGuard = async (payload: Record<string, unknown>) => {
+    const visitorId = getVisitorId();
+    const response = await fetch(AUTH_RATE_LIMIT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-visitor-id": visitorId,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      const error: AuthGuardError = new Error(result?.error || "Error de seguridad");
+      error.status = response.status;
+      error.unlockAt = result?.unlockAt;
+      throw error;
+    }
+
+    return result as { ok?: boolean; locked?: boolean; unlockAt?: string };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCooldownActive) {
+      toast({
+        title: "Espera antes de reintentar",
+        description: `Puedes volver a intentarlo en ${cooldownSeconds}s.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!turnstileToken) {
+      toast({ title: "Verifica el desafío de seguridad", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     try {
+      await callAuthGuard({
+        action: "precheck",
+        email,
+        turnstileToken,
+      });
+
       if (isRegister) {
         const { error } = await signUp(email, password, fullName);
         if (error) throw error;
+        await callAuthGuard({ action: "report", email, success: true });
+        setFailCount(0);
         toast({ title: "¡Cuenta creada!", description: "Revisa tu email para confirmar tu cuenta." });
       } else {
         const { error } = await signIn(email, password);
         if (error) throw error;
+        await callAuthGuard({ action: "report", email, success: true });
+        setFailCount(0);
         toast({ title: "¡Bienvenida!" });
         navigate("/");
       }
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const safeError = err instanceof Error ? (err as AuthGuardError) : new Error("Error inesperado");
+      const status = safeError.status;
+      if (status === 423) {
+        toast({
+          title: "Cuenta temporalmente bloqueada",
+          description: "Demasiados intentos fallidos. Vuelve a intentarlo más tarde.",
+          variant: "destructive",
+        });
+      } else if (status === 429) {
+        toast({
+          title: "Demasiados intentos",
+          description: "Has alcanzado el límite temporal. Inténtalo en unos minutos.",
+          variant: "destructive",
+        });
+      } else if (status === 403) {
+        toast({
+          title: "Verificación de seguridad fallida",
+          description: "Completa el desafío de seguridad y vuelve a intentar.",
+          variant: "destructive",
+        });
+      } else {
+        const nextFailCount = failCount + 1;
+        const backoffMs = getBackoffMs(nextFailCount);
+        setFailCount(nextFailCount);
+        setCooldownUntil(Date.now() + backoffMs);
+        try {
+          await callAuthGuard({ action: "report", email, success: false });
+        } catch {
+          // No bloquea UX si falla el reporte.
+        }
+        toast({ title: "Error", description: safeError.message, variant: "destructive" });
+      }
     } finally {
+      setTurnstileToken("");
       setLoading(false);
     }
   };
@@ -71,6 +167,22 @@ const Login = () => {
             <Button type="submit" disabled={loading} className="w-full bg-gold hover:bg-gold/90 text-white py-5 tracking-wide rounded-full">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : isRegister ? "Registrarse" : "Entrar"}
             </Button>
+            {isCooldownActive ? (
+              <p className="text-xs text-center text-carbon/60">
+                Espera {cooldownSeconds}s antes de volver a enviar.
+              </p>
+            ) : null}
+            {turnstileSiteKey ? (
+              <div className="pt-1">
+                <Turnstile
+                  sitekey={turnstileSiteKey}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken("")}
+                  onError={() => setTurnstileToken("")}
+                  options={{ theme: "light" }}
+                />
+              </div>
+            ) : null}
           </form>
 
           <p className="text-center text-sm text-carbon/50 mt-6">

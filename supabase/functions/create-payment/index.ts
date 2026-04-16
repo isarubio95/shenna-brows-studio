@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
+import { sha256Hex, verifyTurnstileToken } from "../_shared/security.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,11 +14,63 @@ serve(async (req) => {
   }
 
   try {
+    const ip = getClientIp(req);
+    const visitorId = req.headers.get("x-visitor-id")?.trim() || "anonymous";
+    const authHeader = req.headers.get("authorization");
+    const userKey = authHeader?.startsWith("Bearer ") ? await sha256Hex(authHeader.slice(7)) : null;
+
+    const ipLimit = await applyRateLimit({
+      endpoint: "create-payment",
+      kind: "ip",
+      key: ip,
+      limit: 5,
+      window: "1 m",
+    });
+    if (!ipLimit.success) {
+      console.warn("rate_limit_block", {
+        endpoint: "create-payment",
+        scope: "ip",
+        retryAfter: ipLimit.retryAfterSec,
+      });
+      return new Response(JSON.stringify({ error: "Too many requests" }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json", ...rateLimitHeaders(ipLimit) },
+      });
+    }
+
+    const identityLimit = await applyRateLimit({
+      endpoint: "create-payment",
+      kind: "identity",
+      key: userKey ?? visitorId,
+      limit: userKey ? 30 : 20,
+      window: "1 m",
+    });
+    if (!identityLimit.success) {
+      console.warn("rate_limit_block", {
+        endpoint: "create-payment",
+        scope: "identity",
+        retryAfter: identityLimit.retryAfterSec,
+      });
+      return new Response(JSON.stringify({ error: "Too many requests" }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json", ...rateLimitHeaders(identityLimit) },
+      });
+    }
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
 
-    const { items, customerEmail, shippingAddress } = await req.json();
+    const { items, customerEmail, turnstileToken } = await req.json();
+
+    const turnstileValid = await verifyTurnstileToken(String(turnstileToken || ""), ip);
+    if (!turnstileValid) {
+      console.warn("checkout_blocked_turnstile", { endpoint: "create-payment", ip });
+      return new Response(JSON.stringify({ error: "Bot challenge failed" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw new Error("No items provided");
@@ -32,11 +86,10 @@ serve(async (req) => {
 
     // Calculate subtotal to determine shipping
     // We'll add shipping as a line item if applicable
-    const subtotal = items.reduce(
-      (sum: number, item: { price: number; quantity: number }) =>
-        sum + item.price * item.quantity,
-      0
-    );
+    const subtotal = items.reduce((sum: number, item: { price?: number; quantity: number }) => {
+      const unitPrice = Number(item.price ?? 0);
+      return sum + unitPrice * item.quantity;
+    }, 0);
 
     const FREE_SHIPPING_THRESHOLD = 50;
     const SHIPPING_COST = 5;

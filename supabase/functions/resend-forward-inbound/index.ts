@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { encode as encodeBase64, decode as decodeBase64 } from "https://deno.land/std@0.190.0/encoding/base64.ts";
+import { applyRateLimit, dedupeEvent, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
 
 const RESEND_API = "https://api.resend.com";
 const FORWARD_TO = "Shennabrows@hotmail.com";
@@ -97,6 +98,22 @@ serve(async (req) => {
     });
   }
 
+  const ip = getClientIp(req);
+  const ipLimit = await applyRateLimit({
+    endpoint: "resend-forward-inbound",
+    kind: "ip",
+    key: ip,
+    limit: 60,
+    window: "1 m",
+  });
+  if (!ipLimit.success) {
+    console.warn("rate_limit_block", { endpoint: "resend-forward-inbound", scope: "ip", retryAfter: ipLimit.retryAfterSec });
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", ...rateLimitHeaders(ipLimit) },
+    });
+  }
+
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) {
     console.error("RESEND_API_KEY is not set");
@@ -128,6 +145,16 @@ serve(async (req) => {
           JSON.stringify({ error: "Invalid webhook signature" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+
+      if (svixId) {
+        const firstTimeSeen = await dedupeEvent(`resend:${svixId}`, WEBHOOK_TOLERANCE_SEC);
+        if (!firstTimeSeen) {
+          return new Response(
+            JSON.stringify({ error: "Duplicate webhook event" }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
       }
     }
 
