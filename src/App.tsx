@@ -61,7 +61,7 @@ const App = () => {
             <Sonner />
             <ThemeLoader />
             {showFirstVisitBanner && (
-              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+              <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 p-4">
                 <div className="w-full max-w-lg rounded-2xl border border-primary/20 bg-background p-6 text-center shadow-2xl">
                   <p className="text-lg font-semibold text-foreground">
                     Hola! Estamos preparando la web con mucho amor
