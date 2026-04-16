@@ -139,17 +139,13 @@ const Checkout = () => {
                 </p>
               ) : null}
               {turnstileSiteKey ? (
-                <div className="w-full bg-transparent [&_iframe]:w-full [&_iframe]:max-w-full">
+                <div className="w-full">
                   <Turnstile
                     sitekey={turnstileSiteKey}
-                    theme="light"
-                    size="flexible"
-                    appearance="interaction-only"
-                    className="w-full"
-                    style={{ width: "100%", maxWidth: "100%" }}
                     onVerify={(token) => setTurnstileToken(token)}
                     onExpire={() => setTurnstileToken("")}
                     onError={() => setTurnstileToken("")}
+                    options={{ theme: "light", size: "flexible" }}
                   />
                 </div>
               ) : null}
