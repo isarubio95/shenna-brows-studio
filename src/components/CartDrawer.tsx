@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
 import { Minus, Plus, Trash2, ShoppingBag, Truck } from "lucide-react";
@@ -16,6 +16,9 @@ const CartDrawer = () => {
           <SheetTitle className="font-playfair text-xl text-carbon">
             Tu Carrito
           </SheetTitle>
+          <SheetDescription className="sr-only">
+            Revisa los productos de tu carrito, ajusta cantidades y finaliza tu compra.
+          </SheetDescription>
         </SheetHeader>
 
         {items.length === 0 ? (

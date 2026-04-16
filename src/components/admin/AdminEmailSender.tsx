@@ -90,7 +90,9 @@ const AdminEmailSender = () => {
   // Tiptap editor
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        link: false,
+      }),
       TiptapImage.configure({ inline: true, allowBase64: true }),
       TiptapLink.configure({ openOnClick: false }),
     ],
