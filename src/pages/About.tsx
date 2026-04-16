@@ -48,7 +48,7 @@ const About = () => {
     };
     video.addEventListener("loadeddata", onLoadedData);
     video.addEventListener("seeked", onSeeked);
-    video.src = "/video-presentacion2-vertical.mov";
+    video.src = "/video-presentacion2-vertical.mp4";
     video.load();
     return () => {
       video.removeEventListener("loadeddata", onLoadedData);
@@ -65,7 +65,7 @@ const About = () => {
             <div className="max-w-[320px] sm:max-w-[360px] mx-auto lg:mx-0 rounded-2xl overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-gold/15 lg:sticky lg:top-28">
               <video
                 className="w-full aspect-[9/16] object-cover"
-                src="/video-presentacion2-vertical.mov"
+                src="/video-presentacion2-vertical.mp4"
                 poster={videoPoster ?? undefined}
                 autoPlay
                 muted
