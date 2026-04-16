@@ -10,7 +10,10 @@ import { Loader2 } from "lucide-react";
 import Turnstile from "react-turnstile";
 import { getTurnstileSiteKey, getVisitorId } from "@/lib/security";
 
-const AUTH_RATE_LIMIT_ENDPOINT = "https://vanhsuisvxvclxdgutaw.supabase.co/functions/v1/auth-rate-limit";
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL ?? "https://vanhsuisvxvclxdgutaw.supabase.co";
+const AUTH_RATE_LIMIT_ENDPOINT = `${SUPABASE_URL}/functions/v1/auth-rate-limit`;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
 type AuthGuardError = Error & { status?: number; unlockAt?: string };
 
 const Login = () => {
@@ -43,6 +46,8 @@ const Login = () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        apikey: SUPABASE_ANON_KEY,
         "x-visitor-id": visitorId,
       },
       body: JSON.stringify(payload),
