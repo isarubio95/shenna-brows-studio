@@ -9,6 +9,7 @@ export interface CartItem {
 interface CartContextType {
   items: CartItem[];
   isOpen: boolean;
+  isAddToCartDisabled: boolean;
   openCart: () => void;
   closeCart: () => void;
   addItem: (product: Product) => void;
@@ -20,6 +21,7 @@ interface CartContextType {
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
+const IS_STORE_UNDER_CONSTRUCTION = import.meta.env.VITE_SHOW_FIRST_VISIT_BANNER === "true";
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -29,6 +31,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const closeCart = useCallback(() => setIsOpen(false), []);
 
   const addItem = useCallback((product: Product) => {
+    if (IS_STORE_UNDER_CONSTRUCTION) return;
+
     setItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) {
@@ -62,7 +66,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <CartContext.Provider
-      value={{ items, isOpen, openCart, closeCart, addItem, removeItem, updateQuantity, clearCart, totalItems, totalPrice }}
+      value={{
+        items,
+        isOpen,
+        isAddToCartDisabled: IS_STORE_UNDER_CONSTRUCTION,
+        openCart,
+        closeCart,
+        addItem,
+        removeItem,
+        updateQuantity,
+        clearCart,
+        totalItems,
+        totalPrice,
+      }}
     >
       {children}
     </CartContext.Provider>

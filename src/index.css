@@ -88,6 +88,13 @@
     @apply border-border;
   }
 
+  button,
+  [role="button"],
+  .lucide,
+  svg {
+    cursor: pointer;
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
   }

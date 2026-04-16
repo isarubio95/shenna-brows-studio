@@ -46,7 +46,7 @@ const stripHtml = (value: string | null) => (value || "").replace(/<[^>]*>/g, " 
 
 const Tienda = () => {
   const navigate = useNavigate();
-  const { addItem } = useCart();
+  const { addItem, isAddToCartDisabled } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -221,13 +221,13 @@ const Tienda = () => {
                             e.stopPropagation();
                             handleAddToCart(product);
                           }}
-                          disabled={product.stock <= 0}
+                          disabled={isAddToCartDisabled || product.stock <= 0}
                         >
                           <span className="relative mr-2 inline-flex">
                             <ShoppingCart size={16} />
                             <Plus size={11} className="absolute -top-1 -right-1" />
                           </span>
-                          Añadir
+                          {isAddToCartDisabled ? "Próximamente" : "Añadir"}
                         </Button>
                       </div>
                     </div>

@@ -9,7 +9,7 @@ import { getProductImageUrl } from "@/lib/product-images";
 
 const ProductPage = () => {
   const { slug } = useParams<{ slug: string }>();
-  const { addItem } = useCart();
+  const { addItem, isAddToCartDisabled } = useCart();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -88,10 +88,11 @@ const ProductPage = () => {
 
               <Button
                 onClick={handleAdd}
+                disabled={isAddToCartDisabled || product.stock <= 0}
                 className="bg-gold hover:bg-gold/90 text-white px-8 py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.4)] transition-all duration-300 w-full sm:w-auto mb-10"
               >
                 <ShoppingBag size={18} className="mr-2" />
-                Añadir al Carrito
+                {isAddToCartDisabled ? "Próximamente" : "Añadir al Carrito"}
               </Button>
 
               <div className="border-t border-gold/10 space-y-0">
