@@ -3,12 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import AnimatedSection from "@/components/AnimatedSection";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import Turnstile from "react-turnstile";
-import { getTurnstileSiteKey, getVisitorId } from "@/lib/security";
+import { getTurnstileSiteKey, getVisitorId, isCloudflareProtectionEnabled } from "@/lib/security";
 
 const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL ?? "https://vanhsuisvxvclxdgutaw.supabase.co";
@@ -21,6 +22,8 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
@@ -29,6 +32,7 @@ const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const turnstileSiteKey = getTurnstileSiteKey();
+  const cloudflareProtectionEnabled = isCloudflareProtectionEnabled();
 
   const cooldownMs = cooldownUntil ? Math.max(0, cooldownUntil - Date.now()) : 0;
   const cooldownSeconds = Math.ceil(cooldownMs / 1000);
@@ -74,21 +78,31 @@ const Login = () => {
       });
       return;
     }
-    if (!turnstileToken) {
+    if (cloudflareProtectionEnabled && !turnstileToken) {
       toast({ title: "Verifica el desafío de seguridad", variant: "destructive" });
       return;
     }
 
     setLoading(true);
     try {
-      await callAuthGuard({
-        action: "precheck",
-        email,
-        turnstileToken,
-      });
+      if (cloudflareProtectionEnabled) {
+        await callAuthGuard({
+          action: "precheck",
+          email,
+          turnstileToken,
+        });
+      }
 
       if (isRegister) {
-        const { error } = await signUp(email, password, fullName);
+        if (!privacyAccepted) {
+          toast({
+            title: "Debes aceptar la política de privacidad",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const { error } = await signUp(email, password, fullName, privacyAccepted, newsletterOptIn);
         if (error) throw error;
         await callAuthGuard({ action: "report", email, success: true });
         setFailCount(0);
@@ -169,6 +183,32 @@ const Login = () => {
               <Label htmlFor="password" className="text-carbon/70 text-sm">Contraseña</Label>
               <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="bg-cream/50 border-gold/15 focus:border-gold" minLength={6} />
             </div>
+            {isRegister && (
+              <div className="space-y-3 rounded-xl border border-gold/15 bg-cream/40 p-3.5">
+                <label className="flex items-start gap-2.5 text-xs text-carbon/75 leading-relaxed">
+                  <Checkbox
+                    checked={privacyAccepted}
+                    onCheckedChange={(value) => setPrivacyAccepted(value === true)}
+                    className="mt-0.5 border-gold/30 data-[state=checked]:bg-gold data-[state=checked]:border-gold"
+                  />
+                  <span>
+                    He leído y acepto la{" "}
+                    <Link to="/politica-privacidad" className="text-gold hover:underline">
+                      política de privacidad
+                    </Link>
+                    .
+                  </span>
+                </label>
+                <label className="flex items-start gap-2.5 text-xs text-carbon/75 leading-relaxed">
+                  <Checkbox
+                    checked={newsletterOptIn}
+                    onCheckedChange={(value) => setNewsletterOptIn(value === true)}
+                    className="mt-0.5 border-gold/30 data-[state=checked]:bg-gold data-[state=checked]:border-gold"
+                  />
+                  <span>Quiero suscribirme a la newsletter (opcional).</span>
+                </label>
+              </div>
+            )}
             <Button type="submit" disabled={loading} className="w-full bg-gold hover:bg-gold/90 text-white py-5 tracking-wide rounded-full">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : isRegister ? "Registrarse" : "Entrar"}
             </Button>
@@ -177,22 +217,34 @@ const Login = () => {
                 Espera {cooldownSeconds}s antes de volver a enviar.
               </p>
             ) : null}
-            {turnstileSiteKey ? (
+            {cloudflareProtectionEnabled && turnstileSiteKey ? (
               <div className="pt-1 w-full">
                 <Turnstile
                   sitekey={turnstileSiteKey}
                   onVerify={(token) => setTurnstileToken(token)}
                   onExpire={() => setTurnstileToken("")}
                   onError={() => setTurnstileToken("")}
-                  options={{ theme: "light", size: "flexible" }}
+                  theme="light"
+                  size="flexible"
                 />
               </div>
-            ) : null}
+            ) : (
+              <p className="text-xs text-center text-carbon/50">
+                Protección Cloudflare desactivada en entorno local.
+              </p>
+            )}
           </form>
 
           <p className="text-center text-sm text-carbon/50 mt-6">
             {isRegister ? "¿Ya tienes cuenta?" : "¿No tienes cuenta?"}{" "}
-            <button onClick={() => setIsRegister(!isRegister)} className="text-gold hover:underline font-medium">
+            <button
+              onClick={() => {
+                setIsRegister(!isRegister);
+                setPrivacyAccepted(false);
+                setNewsletterOptIn(false);
+              }}
+              className="text-gold hover:underline font-medium"
+            >
               {isRegister ? "Inicia sesión" : "Regístrate"}
             </button>
           </p>

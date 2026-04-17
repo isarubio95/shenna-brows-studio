@@ -4,6 +4,7 @@ import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLi
 
 const RESEND_API = "https://api.resend.com";
 const FROM_ADDRESS = "Shenna Brows <info@shennabrows.com>";
+const NEWSLETTER_AUDIENCE = "newsletter";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,15 +97,48 @@ serve(async (req) => {
   }
 
   try {
-    const { recipients, subject, html, attachments } = await req.json();
+    const { recipients, subject, html, attachments, audience } = await req.json();
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseServiceRoleKey) {
+      return new Response(JSON.stringify({ error: "SUPABASE_SERVICE_ROLE_KEY not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    if (!recipients?.length || !subject || !html) {
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      supabaseServiceRoleKey
+    );
+
+    let finalRecipients: string[] = [];
+    if (audience === NEWSLETTER_AUDIENCE) {
+      const { data, error } = await adminClient
+        .from("newsletter_subscribers")
+        .select("email")
+        .eq("is_subscribed", true);
+      if (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      finalRecipients = (data ?? [])
+        .map((item) => String(item.email || "").trim().toLowerCase())
+        .filter((email) => !!email);
+    } else {
+      finalRecipients = Array.isArray(recipients) ? recipients : [];
+    }
+
+    finalRecipients = [...new Set(finalRecipients)];
+
+    if (!finalRecipients.length || !subject || !html) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (recipients.length > 100) {
+    if (finalRecipients.length > 100) {
       return new Response(JSON.stringify({ error: "Too many recipients in one request" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -115,8 +149,8 @@ serve(async (req) => {
     const results: { email: string; success: boolean; error?: string }[] = [];
     const batchSize = 10;
 
-    for (let i = 0; i < recipients.length; i += batchSize) {
-      const batch = recipients.slice(i, i + batchSize);
+    for (let i = 0; i < finalRecipients.length; i += batchSize) {
+      const batch = finalRecipients.slice(i, i + batchSize);
       const promises = batch.map(async (email: string) => {
         try {
           const sendBody: Record<string, unknown> = {

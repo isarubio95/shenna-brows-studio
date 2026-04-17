@@ -16,6 +16,12 @@ const LOCKOUT_SECONDS = 15 * 60;
 const LOCKOUT_THRESHOLD = 5;
 const redis = Redis.fromEnv();
 
+function isCloudflareProtectionEnabled(): boolean {
+  const raw = Deno.env.get("ENABLE_CLOUDFLARE_PROTECTION") ?? "true";
+  const value = raw.trim().toLowerCase();
+  return value === "true" || value === "1" || value === "yes";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -88,19 +94,22 @@ serve(async (req) => {
     }
 
     if (action === "precheck") {
-      if (!turnstileToken) {
+      const cloudflareProtectionEnabled = isCloudflareProtectionEnabled();
+      if (cloudflareProtectionEnabled && !turnstileToken) {
         return new Response(JSON.stringify({ error: "Missing Turnstile token" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const validTurnstile = await verifyTurnstileToken(turnstileToken, ip);
-      if (!validTurnstile) {
-        return new Response(JSON.stringify({ error: "Bot challenge failed" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (cloudflareProtectionEnabled) {
+        const validTurnstile = await verifyTurnstileToken(turnstileToken!, ip);
+        if (!validTurnstile) {
+          return new Response(JSON.stringify({ error: "Bot challenge failed" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
 
       const lockedUntilRaw = await redis.get<string>(`auth:lockout:${emailHash}`);

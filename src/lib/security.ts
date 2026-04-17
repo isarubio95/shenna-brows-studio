@@ -20,3 +20,8 @@ export function getVisitorId(): string {
 export function getTurnstileSiteKey(): string {
   return import.meta.env.VITE_TURNSTILE_SITE_KEY || "";
 }
+
+export function isCloudflareProtectionEnabled(): boolean {
+  const raw = String(import.meta.env.VITE_ENABLE_CLOUDFLARE_PROTECTION ?? "true").trim().toLowerCase();
+  return raw === "true" || raw === "1" || raw === "yes";
+}

@@ -13,7 +13,13 @@ interface AuthContextType {
   loading: boolean;
   profile: Profile | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    privacyAccepted: boolean,
+    newsletterOptIn: boolean
+  ) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -88,15 +94,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error as Error | null };
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    privacyAccepted: boolean,
+    newsletterOptIn: boolean
+  ) => {
+    const acceptedAt = new Date().toISOString();
+    const { error, data } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: {
+          full_name: fullName,
+          privacy_policy_accepted: privacyAccepted,
+          privacy_policy_accepted_at: acceptedAt,
+          privacy_policy_version: "v1",
+          newsletter_opt_in: newsletterOptIn,
+          newsletter_opt_in_at: newsletterOptIn ? acceptedAt : null,
+        },
         emailRedirectTo: window.location.origin,
       },
     });
+    if (!error && newsletterOptIn) {
+      await supabase.from("newsletter_subscribers").upsert(
+        {
+          email: email.trim().toLowerCase(),
+          user_id: data.user?.id ?? null,
+          is_subscribed: true,
+          privacy_accepted_at: acceptedAt,
+          source: "register_form",
+          unsubscribed_at: null,
+        },
+        { onConflict: "email" }
+      );
+    }
     return { error: error as Error | null };
   };
 

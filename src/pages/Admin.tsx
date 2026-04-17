@@ -174,10 +174,10 @@ const Admin = () => {
 
         <div className="mb-12" />
 
-        {/* Email Sender */}
+        {/* Newsletter Sender */}
         <AnimatedSection delay={0.13}>
-          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Enviar Emails</h2>
-          <p className="text-carbon/40 text-sm mb-4">Selecciona usuarios y envía emails desde info@shennabrows.com.</p>
+          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Newsletter</h2>
+          <p className="text-carbon/40 text-sm mb-4">Envía campañas solo a suscriptores con consentimiento activo.</p>
           <AdminEmailSender />
         </AnimatedSection>
 
