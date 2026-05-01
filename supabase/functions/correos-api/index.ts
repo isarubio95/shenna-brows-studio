@@ -107,15 +107,30 @@ async function getCorreosAccessToken(): Promise<string> {
     const data = (() => {
       try {
         return JSON.parse(raw || "{}") as
-          | { access_token?: string; token_type?: string; expires_in?: number }
+          | {
+              access_token?: string;
+              idToken?: string;
+              token_type?: string;
+              tokenType?: string;
+              expires_in?: number;
+              expiresIn?: number;
+            }
           | Record<string, unknown>;
       } catch {
         return {} as Record<string, unknown>;
       }
     })();
 
-    if (response.ok && typeof data?.access_token === "string") {
-      return data.access_token;
+    // Correos Identidad devuelve idToken; otros flujos pueden devolver access_token
+    const bearerToken =
+      typeof (data as { access_token?: string }).access_token === "string"
+        ? (data as { access_token: string }).access_token
+        : typeof (data as { idToken?: string }).idToken === "string"
+          ? (data as { idToken: string }).idToken
+          : null;
+
+    if (response.ok && bearerToken) {
+      return bearerToken;
     }
 
     if (response.ok && data && typeof data === "object" && "qrCode" in data) {
