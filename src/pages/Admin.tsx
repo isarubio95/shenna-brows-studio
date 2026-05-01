@@ -133,6 +133,36 @@ const extractCorreosLabelPrintCodes = (payload: unknown): string[] => {
   return [];
 };
 
+/** Códigos de expedición (un por envío en shipments[]), para impresión cuando packageCode falla por oid/eid. */
+const extractCorreosExpeditionPrintCodes = (payload: unknown): string[] => {
+  if (!payload || typeof payload !== "object") return [];
+  const data = payload as Record<string, unknown>;
+  const shipments = data.shipments;
+  if (!Array.isArray(shipments) || shipments.length === 0) return [];
+  const out: string[] = [];
+  for (const item of shipments) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const sc = readStringField(row, ["shipmentCode", "shipment_code", "expeditionCode", "codExpedicion"]);
+    if (sc) out.push(sc);
+  }
+  return out;
+};
+
+const isCorreosLabelsOidError = (payload: unknown): boolean => {
+  if (!payload || typeof payload !== "object") return false;
+  const d = payload as Record<string, unknown>;
+  const more = d.moreInformation as Record<string, unknown> | undefined;
+  const msg =
+    (more && typeof more.errorMessage === "string" && more.errorMessage) ||
+    (more && typeof more.description === "string" && more.description) ||
+    "";
+  return (
+    (d.code === "404" || d.code === 404 || d.message === "Not Found") &&
+    /oid|eid|pertenecen/i.test(String(msg))
+  );
+};
+
 /** Un solo código para guardar en BD (preferimos primer packageCode). */
 const extractCorreosPreregisterCode = (payload: unknown): string | null => {
   const list = extractCorreosLabelPrintCodes(payload);
@@ -483,6 +513,7 @@ const Admin = () => {
 
   const handlePrintLabel = async (order: any) => {
     setPrintingLabelOrderId(order.id);
+    let lastPreregisterData: unknown | null = null;
     try {
       const endpoint = (import.meta.env.VITE_CORREOS_LABELS_ENDPOINT as string | undefined)?.trim() || "/labels/print";
       const preregisterEndpoint = (import.meta.env.VITE_CORREOS_PREREGISTER_ENDPOINT as string | undefined)?.trim() || "";
@@ -531,7 +562,14 @@ const Admin = () => {
         }
 
         const labelCodes = extractCorreosLabelPrintCodes(preregisterRes.data);
-        const shipmentsForPrint = labelCodes.length > 0 ? labelCodes : [newShipmentCode];
+        const expeditionCodes = extractCorreosExpeditionPrintCodes(preregisterRes.data);
+        const codesOrder = (import.meta.env.VITE_CORREOS_LABEL_CODES_ORDER as string | undefined)?.trim().toLowerCase();
+        const shipmentsForPrint =
+          codesOrder === "expedition_first" && expeditionCodes.length > 0
+            ? expeditionCodes
+            : labelCodes.length > 0
+              ? labelCodes
+              : [newShipmentCode];
 
         const { error: saveError } = await (supabase as any)
           .from("orders")
@@ -545,9 +583,10 @@ const Admin = () => {
 
         setOrders((prev) => prev.map((item) => (item.id === order.id ? { ...item, correos_shipment_code: newShipmentCode } : item)));
         shipments = shipmentsForPrint;
+        lastPreregisterData = preregisterRes.data;
       }
 
-      const body = {
+      const buildLabelRequestBody = (shipmentsArr: string[]) => ({
         application: (import.meta.env.VITE_CORREOS_APPLICATION as string | undefined)?.trim() || "P3",
         documentationType: getEnvNumber(import.meta.env.VITE_CORREOS_DOCUMENTATION_TYPE as string | undefined, 0),
         print: {
@@ -557,18 +596,51 @@ const Admin = () => {
           labelPrintInitialPosition: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_INITIAL_POSITION as string | undefined, 1),
           labelPrintMode: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_PRINT_MODE as string | undefined, 2),
           clientLogo: (import.meta.env.VITE_CORREOS_LABEL_CLIENT_LOGO as string | undefined)?.trim() || "",
-          shipments,
-        },
-      };
-
-      const { data, error } = await supabase.functions.invoke("correos-api", {
-        body: {
-          service: "labels",
-          endpoint,
-          method: "POST",
-          body,
+          shipments: shipmentsArr,
         },
       });
+
+      const invokeLabels = (shipmentsArr: string[]) =>
+        supabase.functions.invoke("correos-api", {
+          body: {
+            service: "labels",
+            endpoint,
+            method: "POST",
+            body: buildLabelRequestBody(shipmentsArr),
+          },
+        });
+
+      let { data, error } = await invokeLabels(shipments);
+
+      if (error) throw error;
+
+      if (
+        data &&
+        isCorreosLabelsOidError(data) &&
+        lastPreregisterData &&
+        extractCorreosLabelPrintCodes(lastPreregisterData).length > 0 &&
+        extractCorreosExpeditionPrintCodes(lastPreregisterData).length > 0
+      ) {
+        const pkg = extractCorreosLabelPrintCodes(lastPreregisterData);
+        const exp = extractCorreosExpeditionPrintCodes(lastPreregisterData);
+        const sentSameAsPackages =
+          pkg.length > 0 &&
+          shipments.length === pkg.length &&
+          shipments.every((c, i) => c === pkg[i]);
+        const sentSameAsExpedition =
+          exp.length > 0 &&
+          shipments.length === exp.length &&
+          shipments.every((c, i) => c === exp[i]);
+        if (sentSameAsPackages && exp.join("|") !== pkg.join("|")) {
+          const retry = await invokeLabels(exp);
+          data = retry.data;
+          error = retry.error;
+        } else if (sentSameAsExpedition && pkg.join("|") !== exp.join("|")) {
+          const retry = await invokeLabels(pkg);
+          data = retry.data;
+          error = retry.error;
+        }
+      }
 
       if (error) throw error;
 
@@ -582,7 +654,7 @@ const Admin = () => {
             (more && typeof more.description === "string" && more.description.trim() && more.description) ||
             (typeof d.message === "string" ? d.message : "");
           throw new Error(
-            `Correos labels: ${detail || "Not Found"}. Si indica oid/eid: imprime con los packageCode del preregister y verifica que la app de Correos Identidad y el client_id de API estén dados de alta para el mismo contrato.`
+            `Correos labels: ${detail || "Not Found"}. Si indica oid/eid: en Correos deben vincular la app de Identidad (OAuth) con el mismo contrato/cliente que el client_id de Developers del preregister; o prueba con VITE_CORREOS_LABEL_PREREGISTER_IND=0 si Correos lo indica para tu producto.`
           );
         }
       }
