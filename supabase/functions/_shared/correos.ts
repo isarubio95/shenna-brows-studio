@@ -33,12 +33,17 @@ export function buildCorreosUrl(path: string): string {
 }
 
 export function buildCorreosOAuthUrl(path: string): string {
+  const explicitTokenUrl = Deno.env.get("CORREOS_OAUTH_TOKEN_URL") || "";
+  if (explicitTokenUrl.trim().length > 0) {
+    return explicitTokenUrl.trim();
+  }
+
   const rawBase =
     Deno.env.get("CORREOS_OAUTH_BASE_URL") ||
     Deno.env.get("CORREOS_API_BASE_URL") ||
     "";
   if (!rawBase) {
-    throw new Error("CORREOS_OAUTH_BASE_URL o CORREOS_API_BASE_URL no está configurada");
+    throw new Error("CORREOS_OAUTH_TOKEN_URL, CORREOS_OAUTH_BASE_URL o CORREOS_API_BASE_URL no está configurada");
   }
 
   const base = trimSlash(rawBase);

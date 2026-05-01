@@ -41,8 +41,14 @@ function sanitizeEndpoint(endpoint?: string): string {
 }
 
 async function getCorreosAccessToken(): Promise<string> {
-  const clientId = Deno.env.get("CORREOS_CLIENT_ID") || "";
-  const clientSecret = Deno.env.get("CORREOS_CLIENT_SECRET") || "";
+  const clientId =
+    Deno.env.get("CORREOS_OAUTH_CLIENT_ID") ||
+    Deno.env.get("CORREOS_CLIENT_ID") ||
+    "";
+  const clientSecret =
+    Deno.env.get("CORREOS_OAUTH_CLIENT_SECRET") ||
+    Deno.env.get("CORREOS_CLIENT_SECRET") ||
+    "";
   const scope = Deno.env.get("CORREOS_OAUTH_SCOPE") || "";
 
   if (!clientId || !clientSecret) {
@@ -112,14 +118,21 @@ async function getCorreosAccessToken(): Promise<string> {
       return data.access_token;
     }
 
+    if (response.ok && data && typeof data === "object" && "qrCode" in data) {
+      errors.push(
+        `${attempt.label}: ${response.status} (respuesta con qrCode en vez de access_token; revisa CORREOS_OAUTH_TOKEN_URL/CORREOS_OAUTH_BASE_URL/CORREOS_OAUTH_TOKEN_PATH)`
+      );
+      continue;
+    }
+
     const detail = raw ? raw.slice(0, 240) : "sin detalle";
     errors.push(`${attempt.label}: ${response.status} (${detail})`);
   }
 
   if (errors.length > 0) {
-    throw new Error(`No se pudo obtener token de Correos. Intentos: ${errors.join(" | ")}`);
+    throw new Error(`No se pudo obtener token de Correos en ${tokenUrl}. Intentos: ${errors.join(" | ")}`);
   }
-  throw new Error("No se pudo obtener token de Correos");
+  throw new Error(`No se pudo obtener token de Correos en ${tokenUrl}`);
 }
 
 serve(async (req) => {
@@ -150,12 +163,32 @@ serve(async (req) => {
     const query = buildQueryString(payload.query);
     const url = buildCorreosUrl(`${servicePath}${endpoint}${query}`);
     const token = payload.token || await getCorreosAccessToken();
+    const apiClientId =
+      Deno.env.get("CORREOS_API_CLIENT_ID") ||
+      Deno.env.get("CORREOS_CLIENT_ID") ||
+      "";
+    const apiClientSecret =
+      Deno.env.get("CORREOS_API_CLIENT_SECRET") ||
+      Deno.env.get("CORREOS_CLIENT_SECRET") ||
+      "";
 
     const response = await fetch(url, {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
+        ...(apiClientId
+          ? {
+              client_id: apiClientId,
+              "x-ibm-client-id": apiClientId,
+            }
+          : {}),
+        ...(apiClientSecret
+          ? {
+              client_secret: apiClientSecret,
+              "x-ibm-client-secret": apiClientSecret,
+            }
+          : {}),
       },
       body: method === "GET" ? undefined : JSON.stringify(payload.body ?? {}),
     });

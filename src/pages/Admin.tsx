@@ -22,6 +22,270 @@ const statusColors: Record<string, string> = {
   shipped: "bg-blue-100 text-blue-700",
 };
 
+const getEnvNumber = (raw: string | undefined, fallback: number): number => {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const readStringField = (obj: Record<string, unknown>, keys: string[]): string | null => {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+};
+
+const SHIPMENT_CODE_KEYS = [
+  "correos_shipment_code",
+  "correosShipmentCode",
+  "shipment_code",
+  "shipmentCode",
+  "shipment",
+  "tracking_code",
+  "trackingCode",
+  "tracking_number",
+  "trackingNumber",
+  "packageCode",
+  "package_code",
+  "cod_envio",
+  "codEnvio",
+  "codExpedicion",
+];
+
+const extractShipmentCodeFromXml = (raw: string): string | null => {
+  const codEnvioMatch = raw.match(/<CodEnvio>\s*([^<]+)\s*<\/CodEnvio>/i);
+  if (codEnvioMatch?.[1]) return codEnvioMatch[1].trim();
+  const codExpedicionMatch = raw.match(/<CodExpedicion>\s*([^<]+)\s*<\/CodExpedicion>/i);
+  if (codExpedicionMatch?.[1]) return codExpedicionMatch[1].trim();
+  return null;
+};
+
+const extractShipmentCodeFromPayload = (payload: unknown): string | null => {
+  if (!payload) return null;
+
+  if (typeof payload === "string") {
+    const fromXml = extractShipmentCodeFromXml(payload);
+    if (fromXml) return fromXml;
+    if (/^[A-Z0-9]{12,}$/i.test(payload.trim())) return payload.trim();
+    return null;
+  }
+
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const code = extractShipmentCodeFromPayload(item);
+      if (code) return code;
+    }
+    return null;
+  }
+
+  if (typeof payload === "object") {
+    const data = payload as Record<string, unknown>;
+    const directCode = readStringField(data, [...SHIPMENT_CODE_KEYS, "codExpedicion", "CodEnvio", "CodExpedicion"]);
+    if (directCode) return directCode;
+
+    const xml = data.xml;
+    if (typeof xml === "string") {
+      const fromXml = extractShipmentCodeFromXml(xml);
+      if (fromXml) return fromXml;
+    }
+
+    for (const value of Object.values(data)) {
+      const nestedCode = extractShipmentCodeFromPayload(value);
+      if (nestedCode) return nestedCode;
+    }
+  }
+
+  return null;
+};
+
+const stringFrom = (obj: Record<string, unknown>, keys: string[], fallback = ""): string => {
+  const value = readStringField(obj, keys);
+  return value ?? fallback;
+};
+
+const toNumericText = (value: unknown, fallback = "0"): string => {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value).toString();
+  if (typeof value === "string") {
+    const cleaned = value.replace(",", ".").trim();
+    const parsed = Number(cleaned);
+    if (Number.isFinite(parsed)) return Math.round(parsed).toString();
+  }
+  return fallback;
+};
+
+const buildCorreosPreregisterBody = (order: any) => {
+  const orderRecord = (order && typeof order === "object" ? order : {}) as Record<string, unknown>;
+  const rawAddress =
+    orderRecord.shipping_address && typeof orderRecord.shipping_address === "object"
+      ? (orderRecord.shipping_address as Record<string, unknown>)
+      : {};
+
+  const fullName = stringFrom(rawAddress, ["name", "full_name", "fullName", "recipient", "recipient_name"]);
+  const [name = "Cliente", lastName1 = "Web"] = fullName
+    .split(" ")
+    .filter(Boolean)
+    .length > 0
+    ? fullName.split(" ").filter(Boolean)
+    : ["Cliente", "Web"];
+
+  const addressee = {
+    address: stringFrom(rawAddress, ["line1", "address", "street", "address1"], "Sin direccion"),
+    addressComplement: stringFrom(rawAddress, ["line2", "address2", "address_complement"], ""),
+    addressType: (import.meta.env.VITE_CORREOS_ADDRESSEE_ADDRESS_TYPE as string | undefined)?.trim() || "CL",
+    block: stringFrom(rawAddress, ["block"], ""),
+    company: stringFrom(rawAddress, ["company"], ""),
+    contactPerson: fullName || name,
+    contactPhone: stringFrom(rawAddress, ["phone", "contactPhone", "phoneNumber"], ""),
+    country: stringFrom(rawAddress, ["country", "country_code"], "ESP").toUpperCase(),
+    cp: stringFrom(rawAddress, ["postal_code", "zip", "cp", "postcode"], ""),
+    doiNumber: stringFrom(rawAddress, ["doiNumber", "dni", "nif"], ""),
+    doiType: stringFrom(rawAddress, ["doiType"], "1"),
+    door: stringFrom(rawAddress, ["door"], ""),
+    email: stringFrom(orderRecord, ["email"], ""),
+    floor: stringFrom(rawAddress, ["floor"], ""),
+    language: "spa",
+    lastName1,
+    lastName2: stringFrom(rawAddress, ["lastName2", "last_name2", "surname2"], ""),
+    locality: stringFrom(rawAddress, ["city", "locality", "town"], ""),
+    name,
+    number: stringFrom(rawAddress, ["number", "street_number"], ""),
+    portal: stringFrom(rawAddress, ["portal"], ""),
+    province: stringFrom(
+      rawAddress,
+      ["province", "province_code", "state_code", "state", "region"],
+      (import.meta.env.VITE_CORREOS_DEFAULT_ADDRESSEE_PROVINCE as string | undefined)?.trim() || ""
+    ),
+    smsNumber: stringFrom(rawAddress, ["phone", "smsNumber", "contactPhone"], ""),
+    staircase: stringFrom(rawAddress, ["staircase"], ""),
+    zip: "",
+  };
+
+  const senderName = (import.meta.env.VITE_CORREOS_SENDER_NAME as string | undefined)?.trim() || "Shenna Brows";
+  const [senderFirstName = "Shenna", senderLastName1 = "Brows"] = senderName.split(" ").filter(Boolean);
+  const sender = {
+    address: (import.meta.env.VITE_CORREOS_SENDER_ADDRESS as string | undefined)?.trim() || "Direccion remitente",
+    addressComplement: (import.meta.env.VITE_CORREOS_SENDER_ADDRESS_COMPLEMENT as string | undefined)?.trim() || "",
+    addressType: (import.meta.env.VITE_CORREOS_SENDER_ADDRESS_TYPE as string | undefined)?.trim() || "CL",
+    block: (import.meta.env.VITE_CORREOS_SENDER_BLOCK as string | undefined)?.trim() || "",
+    company: (import.meta.env.VITE_CORREOS_SENDER_COMPANY as string | undefined)?.trim() || "Shenna Brows Studio",
+    contactPerson: (import.meta.env.VITE_CORREOS_SENDER_CONTACT_PERSON as string | undefined)?.trim() || senderName,
+    contactPhone: (import.meta.env.VITE_CORREOS_SENDER_PHONE as string | undefined)?.trim() || "",
+    country: (import.meta.env.VITE_CORREOS_SENDER_COUNTRY as string | undefined)?.trim() || "ESP",
+    cp: (import.meta.env.VITE_CORREOS_SENDER_CP as string | undefined)?.trim() || "",
+    doiNumber: (import.meta.env.VITE_CORREOS_SENDER_DOI_NUMBER as string | undefined)?.trim() || "",
+    doiType: (import.meta.env.VITE_CORREOS_SENDER_DOI_TYPE as string | undefined)?.trim() || "1",
+    door: (import.meta.env.VITE_CORREOS_SENDER_DOOR as string | undefined)?.trim() || "",
+    email: (import.meta.env.VITE_CORREOS_SENDER_EMAIL as string | undefined)?.trim() || stringFrom(orderRecord, ["email"], ""),
+    floor: (import.meta.env.VITE_CORREOS_SENDER_FLOOR as string | undefined)?.trim() || "",
+    language: "spa",
+    lastName1: senderLastName1,
+    lastName2: (import.meta.env.VITE_CORREOS_SENDER_LAST_NAME2 as string | undefined)?.trim() || "",
+    locality: (import.meta.env.VITE_CORREOS_SENDER_LOCALITY as string | undefined)?.trim() || "",
+    name: senderFirstName,
+    number: (import.meta.env.VITE_CORREOS_SENDER_NUMBER as string | undefined)?.trim() || "",
+    portal: (import.meta.env.VITE_CORREOS_SENDER_PORTAL as string | undefined)?.trim() || "",
+    province: (import.meta.env.VITE_CORREOS_SENDER_PROVINCE as string | undefined)?.trim() || "",
+    smsNumber: (import.meta.env.VITE_CORREOS_SENDER_SMS as string | undefined)?.trim() || "",
+    staircase: (import.meta.env.VITE_CORREOS_SENDER_STAIRCASE as string | undefined)?.trim() || "",
+    zip: "",
+  };
+
+  const weightGrams = toNumericText(
+    import.meta.env.VITE_CORREOS_DEFAULT_WEIGHT_GRAMS as string | undefined,
+    "500"
+  );
+  const packageId = `Pedido ${stringFrom(orderRecord, ["id"], "").slice(0, 8) || "WEB"}`;
+
+  return {
+    errorCodeLanguage: "spa",
+    shipments: [
+      {
+        addressee,
+        admissionProvince: (import.meta.env.VITE_CORREOS_ADMISSION_PROVINCE as string | undefined)?.trim() || sender.province || "",
+        clientNumber: (import.meta.env.VITE_CORREOS_CLIENT_NUMBER as string | undefined)?.trim() || "",
+        contractNumber: (import.meta.env.VITE_CORREOS_CONTRACT_NUMBER as string | undefined)?.trim() || "",
+        deliveryMethod: (import.meta.env.VITE_CORREOS_DELIVERY_METHOD as string | undefined)?.trim() || "",
+        labellerCode: (import.meta.env.VITE_CORREOS_LABELLER_CODE as string | undefined)?.trim() || "",
+        packages: [
+          {
+            clientReference: stringFrom(orderRecord, ["id"], ""),
+            clientReference2: stringFrom(orderRecord, ["email"], ""),
+            clientReference3: "",
+            packageId,
+            packageWeightGrams: weightGrams,
+          },
+        ],
+        packagesNumber: "1",
+        product: (import.meta.env.VITE_CORREOS_PRODUCT as string | undefined)?.trim() || "",
+        sender,
+        shipmentReference1: stringFrom(orderRecord, ["id"], ""),
+        shipmentReference2: "",
+        shipmentReference3: "",
+        totalWeight: weightGrams,
+      },
+    ],
+  };
+};
+
+const validateCorreosPreregisterConfig = (order: any): string[] => {
+  const orderRecord = (order && typeof order === "object" ? order : {}) as Record<string, unknown>;
+  const rawAddress =
+    orderRecord.shipping_address && typeof orderRecord.shipping_address === "object"
+      ? (orderRecord.shipping_address as Record<string, unknown>)
+      : {};
+
+  const missing: string[] = [];
+  const requiredEnvVars = [
+    "VITE_CORREOS_CLIENT_NUMBER",
+    "VITE_CORREOS_CONTRACT_NUMBER",
+    "VITE_CORREOS_PRODUCT",
+    "VITE_CORREOS_DELIVERY_METHOD",
+    "VITE_CORREOS_LABELLER_CODE",
+    "VITE_CORREOS_SENDER_ADDRESS",
+    "VITE_CORREOS_SENDER_CP",
+    "VITE_CORREOS_SENDER_LOCALITY",
+    "VITE_CORREOS_SENDER_PROVINCE",
+    "VITE_CORREOS_SENDER_PHONE",
+    "VITE_CORREOS_SENDER_EMAIL",
+    "VITE_CORREOS_ADMISSION_PROVINCE",
+  ] as const;
+
+  for (const key of requiredEnvVars) {
+    const value = (import.meta.env[key] as string | undefined)?.trim();
+    if (!value) {
+      missing.push(key);
+    }
+  }
+
+  const requiredAddressChecks: Array<{ label: string; keys: string[] }> = [
+    { label: "shipping_address.name", keys: ["name", "full_name", "fullName", "recipient", "recipient_name"] },
+    { label: "shipping_address.address", keys: ["line1", "address", "street", "address1"] },
+    { label: "shipping_address.cp", keys: ["postal_code", "zip", "cp", "postcode"] },
+    { label: "shipping_address.locality", keys: ["city", "locality", "town"] },
+    { label: "shipping_address.province", keys: ["province", "province_code", "state_code", "state", "region"] },
+    { label: "shipping_address.phone", keys: ["phone", "contactPhone", "phoneNumber"] },
+  ];
+
+  for (const check of requiredAddressChecks) {
+    if (check.label === "shipping_address.province") {
+      const fallbackProvince = (import.meta.env.VITE_CORREOS_DEFAULT_ADDRESSEE_PROVINCE as string | undefined)?.trim();
+      if (fallbackProvince) continue;
+    }
+    if (!readStringField(rawAddress, check.keys)) {
+      missing.push(check.label);
+    }
+  }
+
+  if (!readStringField(orderRecord, ["email"])) {
+    missing.push("order.email");
+  }
+
+  return missing;
+};
+
 const Admin = () => {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -128,6 +392,17 @@ const Admin = () => {
 
     if (typeof payload === "object") {
       const data = payload as Record<string, unknown>;
+      const error = data.error;
+      if (typeof error === "string" && error.trim().length > 0) {
+        throw new Error(error);
+      }
+
+      const apiPdf = data.pdf as string | undefined;
+      if (apiPdf && typeof apiPdf === "string") {
+        printBase64Pdf(apiPdf);
+        return;
+      }
+
       const maybeUrl = (data.label_url || data.labelUrl || data.pdf_url || data.pdfUrl || data.url) as string | undefined;
       if (maybeUrl && typeof maybeUrl === "string") {
         openAndPrint(maybeUrl);
@@ -147,11 +422,74 @@ const Admin = () => {
   const handlePrintLabel = async (order: any) => {
     setPrintingLabelOrderId(order.id);
     try {
-      const endpoint = (import.meta.env.VITE_CORREOS_LABELS_ENDPOINT as string | undefined)?.trim() || "";
+      const endpoint = (import.meta.env.VITE_CORREOS_LABELS_ENDPOINT as string | undefined)?.trim() || "/print";
+      const preregisterEndpoint = (import.meta.env.VITE_CORREOS_PREREGISTER_ENDPOINT as string | undefined)?.trim() || "";
+      const shippingAddress =
+        order.shipping_address && typeof order.shipping_address === "object"
+          ? (order.shipping_address as Record<string, unknown>)
+          : {};
+      const orderRecord = (order && typeof order === "object" ? order : {}) as Record<string, unknown>;
+
+      const shipmentsCsv = (import.meta.env.VITE_CORREOS_SHIPMENTS as string | undefined)?.trim() || "";
+      const shipmentFromEnv = shipmentsCsv
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      const shipmentFromOrder = readStringField(orderRecord, SHIPMENT_CODE_KEYS);
+      const shipmentFromAddress = readStringField(shippingAddress, SHIPMENT_CODE_KEYS);
+
+      let shipments = shipmentFromEnv.length > 0
+        ? shipmentFromEnv
+        : [shipmentFromOrder, shipmentFromAddress].filter((v): v is string => Boolean(v));
+
+      if (shipments.length === 0) {
+        const missingFields = validateCorreosPreregisterConfig(order);
+        if (missingFields.length > 0) {
+          throw new Error(
+            `Faltan datos para preregistrar en Correos: ${missingFields.join(", ")}`
+          );
+        }
+
+        const preregisterBody = buildCorreosPreregisterBody(order);
+        const preregisterRes = await supabase.functions.invoke("correos-api", {
+          body: {
+            service: "preregister",
+            endpoint: preregisterEndpoint || "/api/v1/delivery",
+            method: "POST",
+            body: preregisterBody,
+          },
+        });
+
+        if (preregisterRes.error) throw preregisterRes.error;
+        const newShipmentCode = extractShipmentCodeFromPayload(preregisterRes.data);
+        if (!newShipmentCode) {
+          throw new Error("Correos preregister no devolvió un código de envío (codEnvio).");
+        }
+
+        const { error: saveError } = await (supabase as any)
+          .from("orders")
+          .update({ correos_shipment_code: newShipmentCode })
+          .eq("id", order.id);
+        if (saveError) {
+          throw new Error(
+            "Se obtuvo codEnvio de Correos, pero no se pudo guardar en orders.correos_shipment_code. Ejecuta la migración pendiente."
+          );
+        }
+
+        setOrders((prev) => prev.map((item) => (item.id === order.id ? { ...item, correos_shipment_code: newShipmentCode } : item)));
+        shipments = [newShipmentCode];
+      }
+
       const body = {
-        orderId: order.id,
-        email: order.email,
-        shippingAddress: order.shipping_address ?? null,
+        application: (import.meta.env.VITE_CORREOS_APPLICATION as string | undefined)?.trim() || "APPNAME",
+        documentationType: getEnvNumber(import.meta.env.VITE_CORREOS_DOCUMENTATION_TYPE as string | undefined, 0),
+        print: {
+          labelFormat: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_FORMAT as string | undefined, 2),
+          labelOrderType: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_ORDER_TYPE as string | undefined, 2),
+          labelPrintInitialPosition: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_INITIAL_POSITION as string | undefined, 1),
+          labelPrintMode: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_PRINT_MODE as string | undefined, 1),
+          shipments,
+        },
       };
 
       const { data, error } = await supabase.functions.invoke("correos-api", {

@@ -61,6 +61,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          correos_shipment_code: string | null
           created_at: string | null
           email: string
           id: string
@@ -73,6 +74,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          correos_shipment_code?: string | null
           created_at?: string | null
           email: string
           id?: string
@@ -85,6 +87,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          correos_shipment_code?: string | null
           created_at?: string | null
           email?: string
           id?: string
