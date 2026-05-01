@@ -101,6 +101,62 @@ const extractShipmentCodeFromPayload = (payload: unknown): string | null => {
   return null;
 };
 
+/**
+ * Códigos para impresión de etiquetas: Correos suele exigir packageCode (bulto) alineado con el oid del JWT.
+ * Multibulto: un código por paquete en el mismo orden que en preregister.
+ */
+const extractCorreosLabelPrintCodes = (payload: unknown): string[] => {
+  if (!payload || typeof payload !== "object") return [];
+  const data = payload as Record<string, unknown>;
+  const shipments = data.shipments;
+  if (!Array.isArray(shipments) || shipments.length === 0) return [];
+  const codes: string[] = [];
+  for (const item of shipments) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const packages = row.packages;
+    if (Array.isArray(packages)) {
+      for (const pkg of packages) {
+        if (!pkg || typeof pkg !== "object") continue;
+        const packageCode = readStringField(pkg as Record<string, unknown>, ["packageCode", "package_code"]);
+        if (packageCode) codes.push(packageCode);
+      }
+    }
+  }
+  if (codes.length > 0) return codes;
+  for (const item of shipments) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const shipmentCode = readStringField(row, ["shipmentCode", "shipment_code", "expeditionCode", "codExpedicion"]);
+    if (shipmentCode) return [shipmentCode];
+  }
+  return [];
+};
+
+/** Un solo código para guardar en BD (preferimos primer packageCode). */
+const extractCorreosPreregisterCode = (payload: unknown): string | null => {
+  const list = extractCorreosLabelPrintCodes(payload);
+  if (list.length > 0) return list[0];
+  return extractShipmentCodeFromPayload(payload);
+};
+
+const describeCorreosPreregisterFailure = (payload: unknown): string => {
+  if (payload == null) return "Sin cuerpo de respuesta.";
+  if (typeof payload === "string") {
+    return payload.length > 280 ? `${payload.slice(0, 280)}…` : payload;
+  }
+  if (typeof payload !== "object") return String(payload);
+  const d = payload as Record<string, unknown>;
+  if (typeof d.qrCode === "string" && d.qrCode.length > 0 && !Array.isArray(d.shipments)) {
+    return "La API devolvió solo qrCode (no el JSON de preregistro con shipments). En Supabase, revisa CORREOS_API_BASE_URL: debe ser la base de admissions en PRO, p. ej. https://api1.correos.es/admissions (sin 'pre'). La URL final debe ser …/admissions/preregister/api/v1/delivery.";
+  }
+  const result = d.result;
+  if (result === "0" || result === 0) {
+    return `result=0 (validación). Revisa el cuerpo devuelto por Correos: ${JSON.stringify(d).slice(0, 500)}`;
+  }
+  return JSON.stringify(d).slice(0, 400);
+};
+
 const stringFrom = (obj: Record<string, unknown>, keys: string[], fallback = ""): string => {
   const value = readStringField(obj, keys);
   return value ?? fallback;
@@ -397,6 +453,12 @@ const Admin = () => {
         throw new Error(error);
       }
 
+      if (typeof data.qrCode === "string" && data.qrCode.length > 0 && !data.pdf && !data.label_url) {
+        throw new Error(
+          "Correos devolvió solo qrCode (no PDF ni URL de etiqueta). Suele indicar URL de impresión incorrecta: en Supabase usa CORREOS_API_BASE_URL=https://api1.correos.es y endpoint de etiquetas /support/labels/api/v1/labels/print (VITE_CORREOS_LABELS_ENDPOINT=/labels/print)."
+        );
+      }
+
       const apiPdf = data.pdf as string | undefined;
       if (apiPdf && typeof apiPdf === "string") {
         printBase64Pdf(apiPdf);
@@ -422,7 +484,7 @@ const Admin = () => {
   const handlePrintLabel = async (order: any) => {
     setPrintingLabelOrderId(order.id);
     try {
-      const endpoint = (import.meta.env.VITE_CORREOS_LABELS_ENDPOINT as string | undefined)?.trim() || "/print";
+      const endpoint = (import.meta.env.VITE_CORREOS_LABELS_ENDPOINT as string | undefined)?.trim() || "/labels/print";
       const preregisterEndpoint = (import.meta.env.VITE_CORREOS_PREREGISTER_ENDPOINT as string | undefined)?.trim() || "";
       const shippingAddress =
         order.shipping_address && typeof order.shipping_address === "object"
@@ -461,10 +523,15 @@ const Admin = () => {
         });
 
         if (preregisterRes.error) throw preregisterRes.error;
-        const newShipmentCode = extractShipmentCodeFromPayload(preregisterRes.data);
+        const newShipmentCode = extractCorreosPreregisterCode(preregisterRes.data);
         if (!newShipmentCode) {
-          throw new Error("Correos preregister no devolvió un código de envío (codEnvio).");
+          throw new Error(
+            `Correos preregister no devolvió shipmentCode ni packageCode. ${describeCorreosPreregisterFailure(preregisterRes.data)}`
+          );
         }
+
+        const labelCodes = extractCorreosLabelPrintCodes(preregisterRes.data);
+        const shipmentsForPrint = labelCodes.length > 0 ? labelCodes : [newShipmentCode];
 
         const { error: saveError } = await (supabase as any)
           .from("orders")
@@ -477,17 +544,19 @@ const Admin = () => {
         }
 
         setOrders((prev) => prev.map((item) => (item.id === order.id ? { ...item, correos_shipment_code: newShipmentCode } : item)));
-        shipments = [newShipmentCode];
+        shipments = shipmentsForPrint;
       }
 
       const body = {
-        application: (import.meta.env.VITE_CORREOS_APPLICATION as string | undefined)?.trim() || "APPNAME",
+        application: (import.meta.env.VITE_CORREOS_APPLICATION as string | undefined)?.trim() || "P3",
         documentationType: getEnvNumber(import.meta.env.VITE_CORREOS_DOCUMENTATION_TYPE as string | undefined, 0),
         print: {
+          preregisterInd: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_PREREGISTER_IND as string | undefined, 1),
           labelFormat: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_FORMAT as string | undefined, 2),
-          labelOrderType: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_ORDER_TYPE as string | undefined, 2),
+          labelOrderType: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_ORDER_TYPE as string | undefined, 4),
           labelPrintInitialPosition: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_INITIAL_POSITION as string | undefined, 1),
-          labelPrintMode: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_PRINT_MODE as string | undefined, 1),
+          labelPrintMode: getEnvNumber(import.meta.env.VITE_CORREOS_LABEL_PRINT_MODE as string | undefined, 2),
+          clientLogo: (import.meta.env.VITE_CORREOS_LABEL_CLIENT_LOGO as string | undefined)?.trim() || "",
           shipments,
         },
       };
@@ -502,6 +571,22 @@ const Admin = () => {
       });
 
       if (error) throw error;
+
+      if (data && typeof data === "object") {
+        const d = data as Record<string, unknown>;
+        const errCode = d.code;
+        const more = d.moreInformation as Record<string, unknown> | undefined;
+        if (errCode === "404" || errCode === 404 || d.message === "Not Found") {
+          const detail =
+            (more && typeof more.errorMessage === "string" && more.errorMessage.trim() && more.errorMessage) ||
+            (more && typeof more.description === "string" && more.description.trim() && more.description) ||
+            (typeof d.message === "string" ? d.message : "");
+          throw new Error(
+            `Correos labels: ${detail || "Not Found"}. Si indica oid/eid: imprime con los packageCode del preregister y verifica que la app de Correos Identidad y el client_id de API estén dados de alta para el mismo contrato.`
+          );
+        }
+      }
+
       extractAndPrintLabel(data);
       toast({ title: "Etiqueta preparada", description: "Se abrió la etiqueta para imprimir." });
     } catch (err: unknown) {

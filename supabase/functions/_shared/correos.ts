@@ -1,6 +1,14 @@
+/**
+ * CORREOS_API_BASE_URL debe ser el host API, p. ej. https://api1.correos.es
+ * (sin /admissions). Si termina en /admissions, se normaliza al host solo.
+ *
+ * Rutas PRO alineadas con Postman Correos:
+ * - Preregister: …/admissions/preregister/api/v1/delivery
+ * - Labels:     …/support/labels/api/v1/labels/print
+ */
 export const CORREOS_SERVICE_PATHS = {
-  preregister: "/preregister",
-  labels: "/labels",
+  preregister: "/admissions/preregister",
+  labels: "/support/labels/api/v1",
   requests: "/requests",
   trackpub: "/trackpub",
 } as const;
@@ -22,10 +30,12 @@ function ensureLeadingSlash(value: string): string {
 }
 
 export function buildCorreosUrl(path: string): string {
-  const rawBase = Deno.env.get("CORREOS_API_BASE_URL") || "";
+  let rawBase = Deno.env.get("CORREOS_API_BASE_URL") || "";
   if (!rawBase) {
     throw new Error("CORREOS_API_BASE_URL no está configurada");
   }
+  // Compat: antes se usaba …/admissions; ahora el prefijo va en CORREOS_SERVICE_PATHS
+  rawBase = rawBase.replace(/\/admissions\/?$/i, "");
 
   const base = trimSlash(rawBase);
   const safePath = ensureLeadingSlash(path);

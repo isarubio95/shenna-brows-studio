@@ -2,24 +2,29 @@
 
 Esta función expone una pasarela backend para consumir servicios de Correos sin exponer credenciales en frontend.
 
-## Rutas de servicios configuradas
+## Rutas de servicios (PRO, alineado con Postman Correos)
 
-- `preregister` -> `/preregister`
-- `labels` -> `/labels`
-- `requests` -> `/requests`
-- `trackpub` -> `/trackpub`
-- OAuth token -> `CORREOS_OAUTH_TOKEN_PATH` (por defecto `/oauth/token`)
+Con `CORREOS_API_BASE_URL=https://api1.correos.es` (solo host; si termina en `/admissions` se normaliza):
 
-> Nota: los sub-endpoints concretos de cada servicio (por ejemplo alta de envío, generación de etiqueta o consulta de tracking) se deben validar en tu catálogo privado de `developers.correos.es`, ya que dependen de los productos habilitados por contrato.
+- `preregister` → `…/admissions/preregister` + endpoint (p. ej. `/api/v1/delivery`)
+- `labels` → `…/support/labels/api/v1` + endpoint (p. ej. `/labels/print`)
+- `requests` → `/requests`
+- `trackpub` → `/trackpub`
+
+OAuth (Correos Identidad): `CORREOS_OAUTH_TOKEN_URL` URL completa del token, o `CORREOS_OAUTH_TOKEN_PATH` si usas base OAuth.
+
+Credenciales recomendadas:
+
+- **Identidad (JWT):** `CORREOS_OAUTH_CLIENT_ID`, `CORREOS_OAUTH_CLIENT_SECRET`, `CORREOS_OAUTH_SCOPE` (ej. `AP3 LBS RCG`)
+- **API Developers (preregister/labels):** `CORREOS_API_CLIENT_ID`, `CORREOS_API_CLIENT_SECRET`
 
 ## Variables de entorno necesarias
 
-- `CORREOS_API_BASE_URL` (ejemplo: host base del entorno de Correos asignado a tu cuenta)
-- `CORREOS_OAUTH_BASE_URL` (opcional, si token OAuth va en host distinto; si no se indica usa `CORREOS_API_BASE_URL`)
-- `CORREOS_CLIENT_ID`
-- `CORREOS_CLIENT_SECRET`
-- `CORREOS_OAUTH_SCOPE` (opcional)
-- `CORREOS_OAUTH_TOKEN_PATH` (opcional, default `/oauth/token`)
+- `CORREOS_API_BASE_URL` — ejemplo: `https://api1.correos.es`
+- `CORREOS_OAUTH_TOKEN_URL` — ejemplo: `https://apioauthcid.correos.es/Api/Authorize/Token`
+- `CORREOS_OAUTH_CLIENT_ID` / `CORREOS_OAUTH_CLIENT_SECRET` / `CORREOS_OAUTH_SCOPE`
+- `CORREOS_API_CLIENT_ID` / `CORREOS_API_CLIENT_SECRET`
+- Opcionales: `CORREOS_OAUTH_BASE_URL`, `CORREOS_OAUTH_TOKEN_PATH`
 
 ## Ejemplo de invocación
 
