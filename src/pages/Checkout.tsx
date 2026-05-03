@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import Turnstile from "react-turnstile";
-import { getTurnstileSiteKey, getVisitorId } from "@/lib/security";
+import { getTurnstileSiteKey, getVisitorId, isCloudflareProtectionEnabled } from "@/lib/security";
 
 const Checkout = () => {
   const { items, totalPrice } = useCart();
@@ -20,6 +20,7 @@ const Checkout = () => {
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const { toast } = useToast();
   const turnstileSiteKey = getTurnstileSiteKey();
+  const cloudflareProtectionEnabled = isCloudflareProtectionEnabled();
   const cooldownMs = cooldownUntil ? Math.max(0, cooldownUntil - Date.now()) : 0;
   const cooldownSeconds = Math.ceil(cooldownMs / 1000);
   const isCooldownActive = cooldownMs > 0;
@@ -37,7 +38,7 @@ const Checkout = () => {
       toast({ title: "Espera antes de reintentar", description: `${cooldownSeconds}s`, variant: "destructive" });
       return;
     }
-    if (!turnstileToken) {
+    if (cloudflareProtectionEnabled && !turnstileToken) {
       toast({ title: "Verifica el desafío de seguridad", variant: "destructive" });
       return;
     }
@@ -49,19 +50,40 @@ const Checkout = () => {
         },
         body: {
           items: items.map((i) => ({
-            stripe_price_id: i.product.stripe_price_id,
+            productId: i.product.id,
             quantity: i.quantity,
-            price: i.product.price,
           })),
           customerEmail: email,
-          turnstileToken,
+          turnstileToken: cloudflareProtectionEnabled ? turnstileToken : "",
         },
       });
       if (error) throw error;
-      if (data?.url) {
-        window.location.href = data.url;
+      if (
+        data?.redsysUrl &&
+        data?.Ds_MerchantParameters &&
+        data?.Ds_Signature &&
+        data?.Ds_SignatureVersion
+      ) {
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = data.redsysUrl as string;
+        form.acceptCharset = "UTF-8";
+        const fields: Array<[string, string]> = [
+          ["Ds_SignatureVersion", data.Ds_SignatureVersion as string],
+          ["Ds_MerchantParameters", data.Ds_MerchantParameters as string],
+          ["Ds_Signature", data.Ds_Signature as string],
+        ];
+        for (const [name, value] of fields) {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
       } else {
-        throw new Error("No checkout URL returned");
+        throw new Error("No se recibieron datos de la pasarela de pago");
       }
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error("Error inesperado");
@@ -116,7 +138,8 @@ const Checkout = () => {
                 />
               </div>
               <p className="text-xs text-carbon/40">
-                La dirección de envío se solicita en la página de pago seguro de Stripe.
+                Serás redirigido a la pasarela segura de pago con tarjeta (Redsys / TPV virtual). La dirección de envío la
+                coordinamos contigo por email tras confirmar el pedido.
               </p>
 
               <Button
@@ -138,7 +161,7 @@ const Checkout = () => {
                   Espera {cooldownSeconds}s antes de volver a intentar.
                 </p>
               ) : null}
-              {turnstileSiteKey ? (
+              {cloudflareProtectionEnabled && turnstileSiteKey ? (
                 <div className="w-full">
                   <Turnstile
                     sitekey={turnstileSiteKey}

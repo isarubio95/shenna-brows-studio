@@ -1,12 +1,40 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
+import { Buffer } from "node:buffer";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { sha256Hex, verifyTurnstileToken } from "../_shared/security.ts";
+import {
+  createMerchantSignature,
+  encodeMerchantParameters,
+  formatAmount12,
+  redsysRealizarPagoUrl,
+  type RedsysMerchantParams,
+} from "../_shared/redsys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-visitor-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const FREE_SHIPPING_THRESHOLD = 50;
+const SHIPPING_COST_EUR = 5;
+
+function getRedsysEnv(): "test" | "production" {
+  const v = (Deno.env.get("REDSYS_ENV") || "test").toLowerCase();
+  return v === "production" || v === "prod" ? "production" : "test";
+}
+
+function generateMerchantOrder(): string {
+  const digits: number[] = [];
+  digits.push(1 + Math.floor(Math.random() * 9));
+  for (let i = 1; i < 12; i++) digits.push(Math.floor(Math.random() * 10));
+  return digits.join("");
+}
+
+function minorUnitsFromEur(eur: number): number {
+  return Math.round(eur * 100);
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -27,11 +55,7 @@ serve(async (req) => {
       window: "1 m",
     });
     if (!ipLimit.success) {
-      console.warn("rate_limit_block", {
-        endpoint: "create-payment",
-        scope: "ip",
-        retryAfter: ipLimit.retryAfterSec,
-      });
+      console.warn("rate_limit_block", { endpoint: "create-payment", scope: "ip", retryAfter: ipLimit.retryAfterSec });
       return new Response(JSON.stringify({ error: "Too many requests" }), {
         status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json", ...rateLimitHeaders(ipLimit) },
@@ -57,11 +81,28 @@ serve(async (req) => {
       });
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2025-08-27.basil",
-    });
+    const merchantCode = Deno.env.get("REDSYS_MERCHANT_CODE")?.trim();
+    const terminal = Deno.env.get("REDSYS_TERMINAL")?.trim() || "001";
+    const secretKey = Deno.env.get("REDSYS_SECRET_KEY")?.trim();
+    const currency = Deno.env.get("REDSYS_CURRENCY")?.trim() || "978";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
 
-    const { items, customerEmail, turnstileToken } = await req.json();
+    if (!merchantCode || !secretKey || !supabaseUrl || !serviceKey) {
+      console.error("create_payment_misconfigured");
+      return new Response(JSON.stringify({ error: "Pago no configurado en el servidor" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const terminalPadded = terminal.length >= 3 ? terminal : terminal.padStart(3, "0");
+
+    const { items, customerEmail, turnstileToken } = await req.json() as {
+      items?: Array<{ productId: string; quantity: number }>;
+      customerEmail?: string;
+      turnstileToken?: string;
+    };
 
     const turnstileValid = await verifyTurnstileToken(String(turnstileToken || ""), ip);
     if (!turnstileValid) {
@@ -73,65 +114,109 @@ serve(async (req) => {
     }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      throw new Error("No items provided");
-    }
-
-    // Build line items from cart
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map(
-      (item: { stripe_price_id: string; quantity: number }) => ({
-        price: item.stripe_price_id,
-        quantity: item.quantity,
-      })
-    );
-
-    // Calculate subtotal to determine shipping
-    // We'll add shipping as a line item if applicable
-    const subtotal = items.reduce((sum: number, item: { price?: number; quantity: number }) => {
-      const unitPrice = Number(item.price ?? 0);
-      return sum + unitPrice * item.quantity;
-    }, 0);
-
-    const FREE_SHIPPING_THRESHOLD = 50;
-    const SHIPPING_COST = 5;
-    const shippingCost = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
-
-    if (shippingCost > 0) {
-      // Create a one-time shipping price
-      const shippingPrice = await stripe.prices.create({
-        unit_amount: shippingCost * 100, // in cents
-        currency: "eur",
-        product_data: {
-          name: "Gastos de envío",
-        },
+      return new Response(JSON.stringify({ error: "No items provided" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-      lineItems.push({ price: shippingPrice.id, quantity: 1 });
     }
 
-    const origin =
-      req.headers.get("origin") ||
-      Deno.env.get("SITE_URL") ||
-      "http://localhost:8080";
+    const email = String(customerEmail || "").trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return new Response(JSON.stringify({ error: "Email inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      line_items: lineItems,
-      mode: "payment",
-      success_url: `${origin}/payment-success`,
-      cancel_url: `${origin}/checkout`,
-      shipping_address_collection: {
-        allowed_countries: ["ES", "PT", "FR", "DE", "IT", "GB"],
-      },
+    const admin = createClient(supabaseUrl, serviceKey);
+    const productIds = [...new Set(items.map((i) => String(i.productId)))];
+    const { data: products, error: productsError } = await admin
+      .from("products")
+      .select("id, name, price, stock")
+      .in("id", productIds);
+
+    if (productsError || !products?.length) {
+      console.error("create_payment_products", productsError);
+      return new Response(JSON.stringify({ error: "No se pudieron cargar los productos" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const byId = new Map(products.map((p) => [String(p.id), p]));
+    let subtotalEur = 0;
+    const resolvedLines: Array<{ productId: string; name: string; quantity: number; unitPrice: number }> = [];
+
+    for (const line of items) {
+      const pid = String(line.productId);
+      const qty = Math.floor(Number(line.quantity));
+      const p = byId.get(pid);
+      if (!p || qty < 1) {
+        return new Response(JSON.stringify({ error: "Línea de carrito inválida" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (p.stock != null && qty > Number(p.stock)) {
+        return new Response(JSON.stringify({ error: `Stock insuficiente: ${p.name}` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const unit = Number(p.price);
+      subtotalEur += unit * qty;
+      resolvedLines.push({ productId: pid, name: String(p.name), quantity: qty, unitPrice: unit });
+    }
+
+    const shippingEur = subtotalEur >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST_EUR;
+    const totalEur = subtotalEur + shippingEur;
+    const amountMinor = minorUnitsFromEur(totalEur);
+    if (amountMinor < 1) {
+      return new Response(JSON.stringify({ error: "Importe inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const origin = (req.headers.get("origin") || Deno.env.get("SITE_URL") || "http://localhost:8080").replace(/\/$/, "");
+    const notifyUrl = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/redsys-notify`;
+
+    const merchantOrder = generateMerchantOrder();
+    const merchantDataPayload = {
+      email,
+      lines: resolvedLines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+      shippingEur,
+      subtotalEur,
+    };
+    const merchantDataB64 = Buffer.from(JSON.stringify(merchantDataPayload), "utf8").toString("base64");
+
+    const merchantParams: RedsysMerchantParams = {
+      Ds_Merchant_Amount: formatAmount12(amountMinor),
+      Ds_Merchant_Order: merchantOrder,
+      Ds_Merchant_MerchantCode: merchantCode,
+      Ds_Merchant_Currency: currency,
+      Ds_Merchant_TransactionType: "0",
+      Ds_Merchant_Terminal: terminalPadded,
+      Ds_Merchant_MerchantURL: notifyUrl,
+      Ds_Merchant_UrlOK: `${origin}/payment-success`,
+      Ds_Merchant_UrlKO: `${origin}/payment-ko`,
+      Ds_Merchant_ConsumerLanguage: "001",
+      Ds_Merchant_MerchantData: merchantDataB64,
+      Ds_Merchant_ProductDescription: "Shenna Brows Studio",
     };
 
-    if (customerEmail) {
-      sessionParams.customer_email = customerEmail;
-    }
+    const dsMerchantParameters = encodeMerchantParameters(merchantParams);
+    const dsSignature = createMerchantSignature(secretKey, merchantOrder, dsMerchantParameters);
 
-    const session = await stripe.checkout.sessions.create(sessionParams);
-
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({
+        redsysUrl: redsysRealizarPagoUrl(getRedsysEnv()),
+        Ds_SignatureVersion: "HMAC_SHA256_V1",
+        Ds_MerchantParameters: dsMerchantParameters,
+        Ds_Signature: dsSignature,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("Payment error:", msg);

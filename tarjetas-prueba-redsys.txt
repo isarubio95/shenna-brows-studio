@@ -1,0 +1,48 @@
+Redsys — tarjetas y datos de prueba (entorno TEST / sandbox)
+=============================================================
+Solo válidos en entorno de pruebas. No tienen valor contable.
+Documentación oficial: https://pagosonline.redsys.es/desarrolladores-inicio/integrate-con-nosotros/tarjetas-y-entornos-de-prueba/
+
+Caducidad y CVV (regla general)
+-------------------------------
+- Caducidad: cualquier fecha futura (en la doc suelen usar 12/49 o 12/34).
+- CVV: cualquier valor distinto de 999 (lo habitual en ejemplos es 123).
+- Si pides código SMS/app en el flujo 3DS de prueba, en algunos entornos de ejemplo se usa: 123456 (consulta la guía de tu banco / portal sandbox).
+
+Tarjeta genérica recomendada (Visa, EMV 3DS 2.2)
+------------------------------------------------
+Número:     4548 8100 0000 0003   (sin espacios: 4548810000000003)
+Caducidad: 12/49   (o 12/34)
+CVV:        123
+
+Mastercard (EMV 3DS 2.1)
+------------------------
+Número:     5576 4415 6304 5037   (sin espacios: 5576441563045037)
+Caducidad: 12/49
+CVV:        123
+
+Otras marcas (sandbox)
+----------------------
+American Express:  3766 740000 00008   (376674000000008)
+Diners:            3684 98000 00018    (36849800000018)
+JCB:               3587 8700 0000 0001 (3587870000000001)
+
+Casos útiles (Visa, según doc Redsys)
+-------------------------------------
+- Frictionless EMV3DS 2.1:           4548814479727229
+- Frictionless + threeDSMethodURL: 4918019160034602
+- Challenge EMV3DS 2.1:              4548817212493017
+- Challenge + threeDSMethodURL:      4918019199883839
+
+Simular denegación (solo test)
+-----------------------------
+- CVV = 999, o importe del pedido acabado en 96 → operación denegada en entorno de pruebas.
+
+Datos comercio genéricos de ejemplo (no son de tu tarjeta; sirven para integraciones de demo)
+-----------------------------------------------------------------------------------------------
+Algunas guías de Redsys/Santander citan para pruebas:
+- FUC / código comercio de ejemplo: 999008881
+- Terminal de ejemplo: 001 o 049
+- Clave de firma de ejemplo (SHA-256 en base64, solo demos): sq7HjrUOBfKmC576ILgskD5srU870gJ7
+
+Tu integración debe usar los datos que te facilite tu entidad (REDSYS_* en el proyecto).

@@ -1,0 +1,8 @@
+---
+description: Comandos de Supabase CLI siempre con npx
+alwaysApply: true
+---
+
+# CLI de Supabase
+
+Al indicar o documentar comandos del **Supabase CLI**, escríbelos siempre con **`npx`** delante (por ejemplo `npx supabase functions deploy`, `npx supabase secrets set`, `npx supabase start`), no invoques el binario global `supabase` sin `npx`.

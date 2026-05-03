@@ -24,6 +24,7 @@ import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import Account from "./pages/Account";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentKo from "./pages/PaymentKo";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import ReturnsPolicy from "./pages/ReturnsPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -189,6 +190,7 @@ const App = () => {
                   <Route path="/sobre-mi" element={<About />} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
+                  <Route path="/payment-ko" element={<PaymentKo />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/account" element={<Account />} />

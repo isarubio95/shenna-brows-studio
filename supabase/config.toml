@@ -3,6 +3,9 @@ project_id = "vanhsuisvxvclxdgutaw"
 [functions.create-payment]
 verify_jwt = false
 
+[functions.redsys-notify]
+verify_jwt = false
+
 [functions.send-admin-email]
 verify_jwt = false
 

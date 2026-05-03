@@ -6,7 +6,18 @@ export async function sha256Hex(value: string): Promise<string> {
     .join("");
 }
 
+/** Misma semántica que `VITE_ENABLE_CLOUDFLARE_PROTECTION` en el front: en Supabase usar `ENABLE_CLOUDFLARE_PROTECTION=false`. */
+export function isCloudflareProtectionEnabled(): boolean {
+  const raw = Deno.env.get("ENABLE_CLOUDFLARE_PROTECTION") ?? "true";
+  const value = raw.trim().toLowerCase();
+  return value === "true" || value === "1" || value === "yes";
+}
+
 export async function verifyTurnstileToken(token: string, remoteIp?: string): Promise<boolean> {
+  if (!isCloudflareProtectionEnabled()) {
+    return true;
+  }
+
   const secret = Deno.env.get("TURNSTILE_SECRET_KEY");
   if (!secret) {
     console.warn("TURNSTILE_SECRET_KEY is not configured; bypassing challenge.");

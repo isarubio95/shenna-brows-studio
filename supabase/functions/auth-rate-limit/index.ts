@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Redis } from "npm:@upstash/redis@1.35.6";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
-import { sha256Hex, verifyTurnstileToken } from "../_shared/security.ts";
+import { isCloudflareProtectionEnabled, sha256Hex, verifyTurnstileToken } from "../_shared/security.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,12 +15,6 @@ const LOCKOUT_WINDOW_SECONDS = 10 * 60;
 const LOCKOUT_SECONDS = 15 * 60;
 const LOCKOUT_THRESHOLD = 5;
 const redis = Redis.fromEnv();
-
-function isCloudflareProtectionEnabled(): boolean {
-  const raw = Deno.env.get("ENABLE_CLOUDFLARE_PROTECTION") ?? "true";
-  const value = raw.trim().toLowerCase();
-  return value === "true" || value === "1" || value === "yes";
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
