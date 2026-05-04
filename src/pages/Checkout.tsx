@@ -12,10 +12,21 @@ import { useToast } from "@/hooks/use-toast";
 import Turnstile from "react-turnstile";
 import { getTurnstileSiteKey, getVisitorId, isCloudflareProtectionEnabled } from "@/lib/security";
 
+const emptyShipping = {
+  name: "",
+  line1: "",
+  line2: "",
+  postal_code: "",
+  city: "",
+  province: "",
+  phone: "",
+};
+
 const Checkout = () => {
   const { items, totalPrice } = useCart();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
+  const [shipping, setShipping] = useState(emptyShipping);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const { toast } = useToast();
@@ -25,13 +36,37 @@ const Checkout = () => {
   const cooldownSeconds = Math.ceil(cooldownMs / 1000);
   const isCooldownActive = cooldownMs > 0;
 
-  const shipping = getShippingCost(totalPrice);
-  const total = totalPrice + shipping;
+  const shippingCost = getShippingCost(totalPrice);
+  const total = totalPrice + shippingCost;
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       toast({ title: "Introduce tu email", variant: "destructive" });
+      return;
+    }
+    const ship = {
+      name: shipping.name.trim(),
+      line1: shipping.line1.trim(),
+      line2: shipping.line2.trim(),
+      postal_code: shipping.postal_code.trim(),
+      city: shipping.city.trim(),
+      province: shipping.province.trim(),
+      phone: shipping.phone.trim(),
+    };
+    const missing: string[] = [];
+    if (!ship.name) missing.push("nombre completo");
+    if (!ship.line1) missing.push("dirección");
+    if (!ship.postal_code) missing.push("código postal");
+    if (!ship.city) missing.push("localidad");
+    if (!ship.province) missing.push("provincia");
+    if (!ship.phone) missing.push("teléfono");
+    if (missing.length > 0) {
+      toast({
+        title: "Completa la dirección de envío",
+        description: `Falta: ${missing.join(", ")}`,
+        variant: "destructive",
+      });
       return;
     }
     if (isCooldownActive) {
@@ -54,6 +89,7 @@ const Checkout = () => {
             quantity: i.quantity,
           })),
           customerEmail: email,
+          shippingAddress: ship,
           turnstileToken: cloudflareProtectionEnabled ? turnstileToken : "",
         },
       });
@@ -123,7 +159,7 @@ const Checkout = () => {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
           {/* Form */}
           <AnimatedSection className="lg:col-span-3">
-            <h1 className="font-playfair text-3xl font-bold text-carbon mb-8">Datos de Contacto</h1>
+            <h1 className="font-playfair text-3xl font-bold text-carbon mb-8">Datos de contacto y envío</h1>
             <form className="space-y-6" onSubmit={handlePayment}>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-carbon/70 text-sm">Email *</Label>
@@ -137,9 +173,95 @@ const Checkout = () => {
                   className="bg-white border-gold/15 focus:border-gold"
                 />
               </div>
+
+              <div className="space-y-4 pt-2 border-t border-gold/10">
+                <h2 className="font-playfair text-lg font-semibold text-carbon">Dirección de envío</h2>
+                <div className="space-y-2">
+                  <Label htmlFor="ship-name" className="text-carbon/70 text-sm">Nombre y apellidos *</Label>
+                  <Input
+                    id="ship-name"
+                    value={shipping.name}
+                    onChange={(e) => setShipping((s) => ({ ...s, name: e.target.value }))}
+                    placeholder="María García López"
+                    maxLength={120}
+                    className="bg-white border-gold/15 focus:border-gold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ship-line1" className="text-carbon/70 text-sm">Dirección (calle y número) *</Label>
+                  <Input
+                    id="ship-line1"
+                    value={shipping.line1}
+                    onChange={(e) => setShipping((s) => ({ ...s, line1: e.target.value }))}
+                    placeholder="Calle Ejemplo 12, 2º B"
+                    maxLength={200}
+                    className="bg-white border-gold/15 focus:border-gold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ship-line2" className="text-carbon/70 text-sm">Complemento (opcional)</Label>
+                  <Input
+                    id="ship-line2"
+                    value={shipping.line2}
+                    onChange={(e) => setShipping((s) => ({ ...s, line2: e.target.value }))}
+                    placeholder="Portal, escalera…"
+                    maxLength={120}
+                    className="bg-white border-gold/15 focus:border-gold"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ship-cp" className="text-carbon/70 text-sm">Código postal *</Label>
+                    <Input
+                      id="ship-cp"
+                      value={shipping.postal_code}
+                      onChange={(e) => setShipping((s) => ({ ...s, postal_code: e.target.value }))}
+                      placeholder="28001"
+                      maxLength={12}
+                      inputMode="numeric"
+                      className="bg-white border-gold/15 focus:border-gold"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ship-city" className="text-carbon/70 text-sm">Localidad *</Label>
+                    <Input
+                      id="ship-city"
+                      value={shipping.city}
+                      onChange={(e) => setShipping((s) => ({ ...s, city: e.target.value }))}
+                      placeholder="Madrid"
+                      maxLength={120}
+                      className="bg-white border-gold/15 focus:border-gold"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ship-province" className="text-carbon/70 text-sm">Provincia *</Label>
+                  <Input
+                    id="ship-province"
+                    value={shipping.province}
+                    onChange={(e) => setShipping((s) => ({ ...s, province: e.target.value }))}
+                    placeholder="Madrid"
+                    maxLength={80}
+                    className="bg-white border-gold/15 focus:border-gold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ship-phone" className="text-carbon/70 text-sm">Teléfono *</Label>
+                  <Input
+                    id="ship-phone"
+                    type="tel"
+                    value={shipping.phone}
+                    onChange={(e) => setShipping((s) => ({ ...s, phone: e.target.value }))}
+                    placeholder="+34 600 000 000"
+                    maxLength={32}
+                    className="bg-white border-gold/15 focus:border-gold"
+                  />
+                </div>
+              </div>
+
               <p className="text-xs text-carbon/40">
-                Serás redirigido a la pasarela segura de pago con tarjeta (Redsys / TPV virtual). La dirección de envío la
-                coordinamos contigo por email tras confirmar el pedido.
+                Serás redirigido a la pasarela segura de pago con tarjeta (Redsys / TPV virtual). La dirección se guardará
+                con tu pedido para el envío.
               </p>
 
               <Button
@@ -198,11 +320,11 @@ const Checkout = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-carbon/60">Envío</span>
-                  <span className={shipping === 0 ? "text-green-600 font-medium" : "text-carbon"}>
-                    {shipping === 0 ? "GRATIS" : `€${shipping.toFixed(2)}`}
+                  <span className={shippingCost === 0 ? "text-green-600 font-medium" : "text-carbon"}>
+                    {shippingCost === 0 ? "GRATIS" : `€${shippingCost.toFixed(2)}`}
                   </span>
                 </div>
-                {shipping > 0 && (
+                {shippingCost > 0 && (
                   <p className="text-xs text-carbon/40">
                     Envío gratis en pedidos de €{FREE_SHIPPING_THRESHOLD}+
                   </p>

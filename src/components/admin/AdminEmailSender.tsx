@@ -84,11 +84,16 @@ const AdminEmailSender = () => {
 
   const fetchSubscriberCount = useCallback(async () => {
     setLoadingCount(true);
-    const { count } = await supabase
+    const { count, error } = await supabase
       .from("newsletter_subscribers")
       .select("id", { count: "exact", head: true })
       .eq("is_subscribed", true);
-    setSubscriberCount(count ?? 0);
+    if (error) {
+      console.warn("newsletter_subscribers_count", error.message);
+      setSubscriberCount(0);
+    } else {
+      setSubscriberCount(count ?? 0);
+    }
     setLoadingCount(false);
   }, []);
 

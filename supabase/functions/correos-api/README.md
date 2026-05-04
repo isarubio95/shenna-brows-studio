@@ -26,6 +26,18 @@ Credenciales recomendadas:
 - `CORREOS_API_CLIENT_ID` / `CORREOS_API_CLIENT_SECRET`
 - Opcionales: `CORREOS_OAUTH_BASE_URL`, `CORREOS_OAUTH_TOKEN_PATH`
 
+### Contrato / cliente / etiquetador (PRO vs PRE)
+
+El panel envía en el cuerpo de **preregister** `contractNumber`, `clientNumber` y `labellerCode` desde variables `VITE_*` del build. Si ahí quedan datos del **entorno de pruebas** pero el token y la URL son de **producción**, Correos verá la incoherencia.
+
+Opcionalmente puedes definir en **secrets del proyecto Supabase** (misma función `correos-api`) estos nombres; si un valor está definido y no vacío, **sustituye** el que venga del cliente solo en la petición de preregister:
+
+- `CORREOS_CONTRACT_NUMBER`
+- `CORREOS_CLIENT_NUMBER`
+- `CORREOS_LABELLER_CODE`
+
+Así en producción mandas siempre los datos reales del contrato aunque el frontend tenga `VITE_*` de PRE por error.
+
 ## Ejemplo de invocación
 
 ```json

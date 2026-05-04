@@ -20,6 +20,13 @@ const corsHeaders = {
 const FREE_SHIPPING_THRESHOLD = 50;
 const SHIPPING_COST_EUR = 5;
 
+type CheckoutProductRow = {
+  id: string;
+  name: string;
+  price: unknown;
+  stock: number | null;
+};
+
 function getRedsysEnv(): "test" | "production" {
   const v = (Deno.env.get("REDSYS_ENV") || "test").toLowerCase();
   return v === "production" || v === "prod" ? "production" : "test";
@@ -98,10 +105,11 @@ serve(async (req) => {
 
     const terminalPadded = terminal.length >= 3 ? terminal : terminal.padStart(3, "0");
 
-    const { items, customerEmail, turnstileToken } = await req.json() as {
+    const { items, customerEmail, turnstileToken, shippingAddress } = await req.json() as {
       items?: Array<{ productId: string; quantity: number }>;
       customerEmail?: string;
       turnstileToken?: string;
+      shippingAddress?: Record<string, unknown>;
     };
 
     const turnstileValid = await verifyTurnstileToken(String(turnstileToken || ""), ip);
@@ -143,7 +151,8 @@ serve(async (req) => {
       });
     }
 
-    const byId = new Map(products.map((p) => [String(p.id), p]));
+    const productRows = products as CheckoutProductRow[];
+    const byId = new Map(productRows.map((p) => [String(p.id), p]));
     let subtotalEur = 0;
     const resolvedLines: Array<{ productId: string; name: string; quantity: number; unitPrice: number }> = [];
 
@@ -170,6 +179,42 @@ serve(async (req) => {
 
     const shippingEur = subtotalEur >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST_EUR;
     const totalEur = subtotalEur + shippingEur;
+
+    const trim = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+    const sa = shippingAddress && typeof shippingAddress === "object" ? shippingAddress : {};
+    const shipName = trim(sa.name, 120);
+    const shipLine1 = trim(sa.line1 ?? sa.address, 200);
+    const shipLine2 = trim(sa.line2, 120);
+    const shipCp = trim(sa.postal_code ?? sa.cp ?? sa.zip, 12);
+    const shipCity = trim(sa.city ?? sa.locality, 120);
+    const shipProvince = trim(sa.province ?? sa.state, 80);
+    const shipPhone = trim(sa.phone ?? sa.phoneNumber, 32);
+    const shipCountry = (trim(sa.country, 8) || "ESP").toUpperCase();
+
+    const missingShip: string[] = [];
+    if (!shipName) missingShip.push("name");
+    if (!shipLine1) missingShip.push("line1");
+    if (!shipCp) missingShip.push("postal_code");
+    if (!shipCity) missingShip.push("city");
+    if (!shipProvince) missingShip.push("province");
+    if (!shipPhone) missingShip.push("phone");
+    if (missingShip.length > 0) {
+      return new Response(
+        JSON.stringify({ error: `Faltan datos de envío: ${missingShip.join(", ")}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const normalizedShipping = {
+      name: shipName,
+      line1: shipLine1,
+      line2: shipLine2,
+      postal_code: shipCp,
+      city: shipCity,
+      province: shipProvince,
+      phone: shipPhone,
+      country: shipCountry,
+    };
     const amountMinor = minorUnitsFromEur(totalEur);
     if (amountMinor < 1) {
       return new Response(JSON.stringify({ error: "Importe inválido" }), {
@@ -182,11 +227,26 @@ serve(async (req) => {
     const notifyUrl = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/redsys-notify`;
 
     const merchantOrder = generateMerchantOrder();
+
+    const { error: pendingOrderErr } = await admin.from("orders").insert({
+      email,
+      status: "pending_payment",
+      subtotal: subtotalEur,
+      shipping: shippingEur,
+      total: totalEur,
+      stripe_session_id: merchantOrder,
+      shipping_address: normalizedShipping,
+    });
+    if (pendingOrderErr) {
+      console.warn("create_payment_pending_order_insert", pendingOrderErr);
+    }
+
     const merchantDataPayload = {
       email,
       lines: resolvedLines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
       shippingEur,
       subtotalEur,
+      shippingAddress: normalizedShipping,
     };
     const merchantDataB64 = Buffer.from(JSON.stringify(merchantDataPayload), "utf8").toString("base64");
 

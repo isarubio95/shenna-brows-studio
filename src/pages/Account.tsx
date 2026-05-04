@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   paid: { label: "Pagado", variant: "default" },
   pending: { label: "Pendiente", variant: "secondary" },
+  pending_payment: { label: "Pago en curso", variant: "secondary" },
   shipped: { label: "Enviado", variant: "outline" },
   delivered: { label: "Entregado", variant: "default" },
 };

@@ -18,6 +18,7 @@ import { getProductImageUrl } from "@/lib/product-images";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
+  pending_payment: "bg-amber-100 text-amber-800",
   paid: "bg-green-100 text-green-700",
   shipped: "bg-blue-100 text-blue-700",
 };
@@ -34,8 +35,32 @@ const readStringField = (obj: Record<string, unknown>, keys: string[]): string |
     if (typeof value === "string" && value.trim().length > 0) {
       return value.trim();
     }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const s = String(value);
+      if (s.length > 0) return s;
+    }
   }
   return null;
+};
+
+/** CP nacional (5 dígitos) a partir del valor introducido en checkout. */
+const normalizeSpainPostalCode = (raw: string): string => {
+  const digits = raw.replace(/\D/g, "");
+  return digits.length >= 5 ? digits.slice(0, 5) : "";
+};
+
+const isSpainCountryCode = (raw: string): boolean => {
+  const u = raw.trim().toUpperCase();
+  return u === "" || u === "ES" || u === "ESP" || u === "724" || u === "SPAIN";
+};
+
+/**
+ * Preregister Correos (tabla provincias): código de 2 dígitos alineado con el CP, no el nombre literal.
+ * Errores típicos 1046 / 1115 si se envía "Madrid" en lugar de "28".
+ */
+const correosIneProvinceFromSpanishCp = (postal5: string): string | null => {
+  if (postal5.length !== 5 || !/^\d{5}$/.test(postal5)) return null;
+  return postal5.slice(0, 2);
 };
 
 const SHIPMENT_CODE_KEYS = [
@@ -182,6 +207,29 @@ const describeCorreosPreregisterFailure = (payload: unknown): string => {
   }
   const result = d.result;
   if (result === "0" || result === 0) {
+    const shipments = d.shipments;
+    if (Array.isArray(shipments)) {
+      const lines: string[] = [];
+      for (const s of shipments) {
+        if (!s || typeof s !== "object") continue;
+        const errs = (s as Record<string, unknown>).error;
+        if (!Array.isArray(errs)) continue;
+        for (const e of errs) {
+          if (!e || typeof e !== "object") continue;
+          const rec = e as Record<string, unknown>;
+          const desc = typeof rec.description === "string" ? rec.description : "";
+          const field = typeof rec.errorFieldName === "string" ? rec.errorFieldName : "";
+          const code = rec.errorCode;
+          if (desc) {
+            const suffix = code != null && code !== "" ? ` (${code})` : "";
+            lines.push(field ? `${field}: ${desc}${suffix}` : `${desc}${suffix}`);
+          }
+        }
+      }
+      if (lines.length > 0) {
+        return `Correos rechazó el envío: ${lines.join(" · ")}`;
+      }
+    }
     return `result=0 (validación). Revisa el cuerpo devuelto por Correos: ${JSON.stringify(d).slice(0, 500)}`;
   }
   return JSON.stringify(d).slice(0, 400);
@@ -217,6 +265,30 @@ const buildCorreosPreregisterBody = (order: any) => {
     ? fullName.split(" ").filter(Boolean)
     : ["Cliente", "Web"];
 
+  const countryRaw = stringFrom(rawAddress, ["country", "country_code"], "ESP").toUpperCase();
+  const countryForApi = countryRaw === "ES" ? "ESP" : countryRaw || "ESP";
+  const spanishDestination = isSpainCountryCode(countryForApi);
+  const cpRaw = stringFrom(rawAddress, ["postal_code", "zip", "cp", "postcode"], "");
+  const cpSpain = spanishDestination ? normalizeSpainPostalCode(cpRaw) : "";
+  const cpForAddressee =
+    spanishDestination && cpSpain ? cpSpain : stringFrom(rawAddress, ["postal_code", "zip", "cp", "postcode"], "");
+
+  const userProvince = stringFrom(
+    rawAddress,
+    ["province", "province_code", "state_code", "state", "region"],
+    (import.meta.env.VITE_CORREOS_DEFAULT_ADDRESSEE_PROVINCE as string | undefined)?.trim() || ""
+  );
+  let provinceForCorreos = userProvince;
+  if (spanishDestination) {
+    const fromCp = cpSpain ? correosIneProvinceFromSpanishCp(cpSpain) : null;
+    if (fromCp) provinceForCorreos = fromCp;
+    else {
+      const digitsOnly = userProvince.replace(/\D/g, "");
+      if (digitsOnly.length === 1) provinceForCorreos = digitsOnly.padStart(2, "0");
+      else if (digitsOnly.length === 2) provinceForCorreos = digitsOnly;
+    }
+  }
+
   const addressee = {
     address: stringFrom(rawAddress, ["line1", "address", "street", "address1"], "Sin direccion"),
     addressComplement: stringFrom(rawAddress, ["line2", "address2", "address_complement"], ""),
@@ -225,8 +297,8 @@ const buildCorreosPreregisterBody = (order: any) => {
     company: stringFrom(rawAddress, ["company"], ""),
     contactPerson: fullName || name,
     contactPhone: stringFrom(rawAddress, ["phone", "contactPhone", "phoneNumber"], ""),
-    country: stringFrom(rawAddress, ["country", "country_code"], "ESP").toUpperCase(),
-    cp: stringFrom(rawAddress, ["postal_code", "zip", "cp", "postcode"], ""),
+    country: countryForApi,
+    cp: cpForAddressee,
     doiNumber: stringFrom(rawAddress, ["doiNumber", "dni", "nif"], ""),
     doiType: stringFrom(rawAddress, ["doiType"], "1"),
     door: stringFrom(rawAddress, ["door"], ""),
@@ -239,11 +311,7 @@ const buildCorreosPreregisterBody = (order: any) => {
     name,
     number: stringFrom(rawAddress, ["number", "street_number"], ""),
     portal: stringFrom(rawAddress, ["portal"], ""),
-    province: stringFrom(
-      rawAddress,
-      ["province", "province_code", "state_code", "state", "region"],
-      (import.meta.env.VITE_CORREOS_DEFAULT_ADDRESSEE_PROVINCE as string | undefined)?.trim() || ""
-    ),
+    province: provinceForCorreos,
     smsNumber: stringFrom(rawAddress, ["phone", "smsNumber", "contactPhone"], ""),
     staircase: stringFrom(rawAddress, ["staircase"], ""),
     zip: "",
@@ -359,6 +427,9 @@ const validateCorreosPreregisterConfig = (order: any): string[] => {
     if (check.label === "shipping_address.province") {
       const fallbackProvince = (import.meta.env.VITE_CORREOS_DEFAULT_ADDRESSEE_PROVINCE as string | undefined)?.trim();
       if (fallbackProvince) continue;
+      const countryVal = stringFrom(rawAddress, ["country", "country_code"], "ESP");
+      const cpVal = stringFrom(rawAddress, ["postal_code", "zip", "cp", "postcode"], "");
+      if (isSpainCountryCode(countryVal) && normalizeSpainPostalCode(cpVal).length === 5) continue;
     }
     if (!readStringField(rawAddress, check.keys)) {
       missing.push(check.label);

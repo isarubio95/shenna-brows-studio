@@ -121,16 +121,13 @@ async function getCorreosAccessToken(): Promise<string> {
       }
     })();
 
-    // Correos Identidad devuelve idToken; OAuth estándar suele usar access_token / id_token
-    const d = data as Record<string, unknown>;
+    // Correos Identidad devuelve idToken; otros flujos pueden devolver access_token
     const bearerToken =
-      typeof d.access_token === "string"
-        ? d.access_token
-        : typeof d.idToken === "string"
-          ? d.idToken
-          : typeof d.id_token === "string"
-            ? d.id_token
-            : null;
+      typeof (data as { access_token?: string }).access_token === "string"
+        ? (data as { access_token: string }).access_token
+        : typeof (data as { idToken?: string }).idToken === "string"
+          ? (data as { idToken: string }).idToken
+          : null;
 
     if (response.ok && bearerToken) {
       return bearerToken;
