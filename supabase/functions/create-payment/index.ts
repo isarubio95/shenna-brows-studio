@@ -228,6 +228,10 @@ serve(async (req) => {
 
     const merchantOrder = generateMerchantOrder();
 
+    const pendingCartSnapshot = {
+      lines: resolvedLines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+    };
+
     const { error: pendingOrderErr } = await admin.from("orders").insert({
       email,
       status: "pending_payment",
@@ -236,6 +240,7 @@ serve(async (req) => {
       total: totalEur,
       stripe_session_id: merchantOrder,
       shipping_address: normalizedShipping,
+      pending_cart_snapshot: pendingCartSnapshot,
     });
     if (pendingOrderErr) {
       console.warn("create_payment_pending_order_insert", pendingOrderErr);

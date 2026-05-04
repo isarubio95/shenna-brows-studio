@@ -27,13 +27,83 @@ type MerchantPayload = {
   shipping_address?: MerchantShippingAddress;
 };
 
-function decodeMerchantDataB64(b64: string): MerchantPayload | null {
+function normalizeBase64(s: string): string {
+  let t = s.trim().replace(/-/g, "+").replace(/_/g, "/");
+  const rem = t.length % 4;
+  if (rem !== 0) t += "=".repeat(4 - rem);
+  return t;
+}
+
+function parseMerchantPayloadJson(json: string): MerchantPayload | null {
   try {
-    const json = Buffer.from(b64, "base64").toString("utf8");
-    return JSON.parse(json) as MerchantPayload;
+    const raw = JSON.parse(json) as Record<string, unknown>;
+    const email = raw.email ?? raw.Email;
+    const linesRaw = raw.lines ?? raw.Lines;
+    const lines = Array.isArray(linesRaw)
+      ? linesRaw.filter((x): x is { productId?: string; quantity?: number } => x != null && typeof x === "object")
+      : [];
+    const normalizedLines = lines
+      .map((x) => ({
+        productId: String(x.productId ?? (x as Record<string, unknown>).product_id ?? ""),
+        quantity: Math.floor(Number(x.quantity) || 0),
+      }))
+      .filter((x) => x.productId && x.quantity > 0);
+    if (typeof email !== "string" || !email.trim() || !normalizedLines.length) return null;
+    return {
+      email: String(email).trim().toLowerCase(),
+      lines: normalizedLines,
+      shippingEur: Number(raw.shippingEur ?? 0),
+      subtotalEur: Number(raw.subtotalEur ?? 0),
+      shippingAddress: (raw.shippingAddress ?? raw.shipping_address) as MerchantShippingAddress | undefined,
+      shipping_address: (raw.shipping_address ?? raw.shippingAddress) as MerchantShippingAddress | undefined,
+    };
   } catch {
     return null;
   }
+}
+
+function decodeMerchantDataB64(b64: string): MerchantPayload | null {
+  const attempts = [b64.trim(), normalizeBase64(b64)];
+  for (const candidate of attempts) {
+    if (!candidate) continue;
+    try {
+      const json = Buffer.from(candidate, "base64").toString("utf8");
+      const parsed = parseMerchantPayloadJson(json);
+      if (parsed?.email && parsed.lines?.length) return parsed;
+    } catch {
+      /* siguiente intento */
+    }
+  }
+  return null;
+}
+
+type PendingOrderRow = {
+  email?: string | null;
+  subtotal?: unknown;
+  shipping?: unknown;
+  shipping_address?: unknown;
+  pending_cart_snapshot?: unknown;
+};
+
+function payloadFromPendingRow(row: PendingOrderRow): MerchantPayload | null {
+  const snap = row.pending_cart_snapshot as { lines?: Array<{ productId?: unknown; quantity?: unknown }> } | null;
+  const rawLines = snap?.lines;
+  const email = row.email != null ? String(row.email).trim().toLowerCase() : "";
+  if (!email || !Array.isArray(rawLines) || !rawLines.length) return null;
+  const lines = rawLines
+    .map((l) => ({
+      productId: String(l?.productId ?? ""),
+      quantity: Math.floor(Number(l?.quantity) || 0),
+    }))
+    .filter((l) => l.productId && l.quantity > 0);
+  if (!lines.length) return null;
+  return {
+    email,
+    lines,
+    subtotalEur: Number(row.subtotal ?? 0),
+    shippingEur: Number(row.shipping ?? 0),
+    shipping_address: row.shipping_address as MerchantShippingAddress | undefined,
+  };
 }
 
 function extractMerchantDataB64(decoded: Record<string, unknown>): string {
@@ -106,32 +176,50 @@ serve(async (req) => {
     }
 
     const decoded = decodeMerchantParameters<Record<string, unknown>>(dsMerchantParameters);
-    const dsResponse = pick(decoded, ["Ds_Response", "DS_RESPONSE"]);
-    const responseCode = parseInt(dsResponse, 10);
-    if (Number.isNaN(responseCode) || responseCode !== 0) {
+    const dsResponse = pick(decoded, ["Ds_Response", "DS_RESPONSE"]).trim();
+    // Redsys: 0000–0099 = autorizada (no basta con === 0: p. ej. "0045" es éxito).
+    const responseNum = parseInt(dsResponse, 10);
+    const authorized = !Number.isNaN(responseNum) && responseNum >= 0 && responseNum <= 99;
+    if (!authorized) {
       console.log("redsys_notify_declined", { dsResponse });
       return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain" } });
     }
 
     const dsOrder = pick(decoded, ["Ds_Order", "DS_ORDER"]);
+    if (!dsOrder) {
+      console.warn("redsys_notify_missing_order_or_data");
+      return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain" } });
+    }
+
     const merchantDataB64 = extractMerchantDataB64(decoded) || pick(decoded, [
       "Ds_MerchantData",
       "DS_MERCHANTDATA",
       "Ds_Merchant_MerchantData",
       "DS_MERCHANT_MERCHANTDATA",
     ]);
-    if (!dsOrder || !merchantDataB64) {
-      console.warn("redsys_notify_missing_order_or_data");
-      return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain" } });
+
+    const admin = createClient(supabaseUrl, serviceKey);
+
+    const { data: existing } = await admin
+      .from("orders")
+      .select("id, status, shipping_address, email, subtotal, shipping, total, pending_cart_snapshot")
+      .eq("stripe_session_id", dsOrder)
+      .maybeSingle();
+
+    let payload: MerchantPayload | null = merchantDataB64 ? decodeMerchantDataB64(merchantDataB64) : null;
+
+    if ((!payload?.email || !payload.lines?.length) && existing && String(existing.status) === "pending_payment") {
+      const fromDb = payloadFromPendingRow(existing as PendingOrderRow);
+      if (fromDb) {
+        console.log("redsys_notify_payload_from_snapshot");
+        payload = fromDb;
+      }
     }
 
-    const payload = decodeMerchantDataB64(merchantDataB64);
     if (!payload?.email || !payload.lines?.length) {
       console.warn("redsys_notify_bad_merchant_payload");
       return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain" } });
     }
-
-    const admin = createClient(supabaseUrl, serviceKey);
 
     const subtotal = Number(payload.subtotalEur);
     const shipping = Number(payload.shippingEur);
@@ -139,12 +227,6 @@ serve(async (req) => {
     const shipFromPayload = shippingAddressFromPayload(
       payload.shippingAddress ?? payload.shipping_address,
     );
-
-    const { data: existing } = await admin
-      .from("orders")
-      .select("id, status, shipping_address")
-      .eq("stripe_session_id", dsOrder)
-      .maybeSingle();
 
     const shippingFromRow = (row: unknown): Record<string, string> | null => {
       if (!row || typeof row !== "object") return null;
@@ -184,6 +266,7 @@ serve(async (req) => {
             shipping,
             total,
             shipping_address: keepAddress ?? existing.shipping_address,
+            pending_cart_snapshot: null,
           })
           .eq("id", existing.id)
           .eq("status", "pending_payment")
