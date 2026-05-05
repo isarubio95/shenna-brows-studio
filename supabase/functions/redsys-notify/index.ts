@@ -6,6 +6,10 @@ import { decodeMerchantParameters, isMerchantSignatureValid } from "../_shared/r
 const secretKey = Deno.env.get("REDSYS_SECRET_KEY")?.trim();
 const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim();
+const resendFromAddress =
+  Deno.env.get("RESEND_FROM_ADDRESS")?.trim() || "Shenna Brows <info@shennabrows.com>";
+const resendApiUrl = "https://api.resend.com/emails";
 
 type MerchantShippingAddress = {
   name?: string;
@@ -150,6 +154,61 @@ function pick(obj: Record<string, unknown>, keys: string[]): string {
   return "";
 }
 
+async function sendOrderConfirmationEmail(args: {
+  email: string;
+  orderRef: string;
+  subtotal: number;
+  shipping: number;
+  total: number;
+  lines: Array<{ name: string; quantity: number; unitPrice: number }>;
+}) {
+  if (!resendApiKey) {
+    console.warn("redsys_notify_resend_not_configured");
+    return;
+  }
+
+  const formatEur = (value: number) =>
+    Number(value || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+
+  const linesHtml = args.lines
+    .map(
+      (line) =>
+        `<li>${line.name} x${line.quantity} - ${formatEur(line.unitPrice * line.quantity)}</li>`,
+    )
+    .join("");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #1f2937;">
+      <h2 style="margin: 0 0 12px;">Pago confirmado</h2>
+      <p>Hemos recibido tu pedido correctamente. Gracias por confiar en Shenna Brows Studio.</p>
+      <p><strong>Referencia:</strong> ${args.orderRef}</p>
+      <ul>${linesHtml}</ul>
+      <p style="margin: 12px 0 0;"><strong>Subtotal:</strong> ${formatEur(args.subtotal)}</p>
+      <p style="margin: 4px 0;"><strong>Envío:</strong> ${formatEur(args.shipping)}</p>
+      <p style="margin: 4px 0 0;"><strong>Total:</strong> ${formatEur(args.total)}</p>
+    </div>
+  `;
+
+  const response = await fetch(resendApiUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: resendFromAddress,
+      to: [args.email],
+      subject: "Confirmacion de pedido - Shenna Brows Studio",
+      html,
+    }),
+  });
+
+  if (!response.ok) {
+    const resendErr = await response.text();
+    console.error("redsys_notify_resend_error", resendErr);
+  }
+}
+
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -238,12 +297,17 @@ serve(async (req) => {
 
     const productIds = payload.lines.map((l) => l.productId);
     const { data: products } = await admin.from("products").select("id, name, price").in("id", productIds);
-    const priceById = new Map((products ?? []).map((p) => [String(p.id), Number(p.price)]));
+    const priceById = new Map<string, number>(
+      (products ?? []).map((p) => [String(p.id), Number(p.price)]),
+    );
+    const nameById = new Map<string, string>(
+      (products ?? []).map((p) => [String(p.id), String(p.name ?? "Producto")]),
+    );
 
     const buildOrderItems = (orderId: string) =>
       payload.lines.map((line) => {
         const unit = priceById.get(String(line.productId)) ?? 0;
-        const name = (products ?? []).find((p) => String(p.id) === String(line.productId))?.name ?? "Producto";
+        const name = nameById.get(String(line.productId)) ?? "Producto";
         return {
           order_id: orderId,
           product_id: line.productId,
@@ -251,6 +315,13 @@ serve(async (req) => {
           quantity: line.quantity,
           unit_price: unit,
         };
+      });
+
+    const buildEmailLines = () =>
+      payload.lines.map((line) => {
+        const unitPrice = priceById.get(String(line.productId)) ?? 0;
+        const name = nameById.get(String(line.productId)) ?? "Producto";
+        return { name, quantity: line.quantity, unitPrice };
       });
 
     if (existing?.id) {
@@ -280,6 +351,14 @@ serve(async (req) => {
           if (itemsErr) {
             console.error("redsys_notify_order_items", itemsErr);
           }
+          await sendOrderConfirmationEmail({
+            email: payload.email,
+            orderRef: dsOrder,
+            subtotal,
+            shipping,
+            total,
+            lines: buildEmailLines(),
+          });
         } else {
           const { data: fresh } = await admin.from("orders").select("status").eq("id", existing.id).maybeSingle();
           if (fresh?.status === "paid") {
@@ -327,6 +406,14 @@ serve(async (req) => {
     if (itemsErr) {
       console.error("redsys_notify_order_items", itemsErr);
     }
+    await sendOrderConfirmationEmail({
+      email: payload.email,
+      orderRef: dsOrder,
+      subtotal,
+      shipping,
+      total,
+      lines: buildEmailLines(),
+    });
 
     return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain" } });
   } catch (e) {

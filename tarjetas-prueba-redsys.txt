@@ -12,7 +12,7 @@ Caducidad y CVV (regla general)
 Tarjeta genérica recomendada (Visa, EMV 3DS 2.2)
 ------------------------------------------------
 Número:     4548 8100 0000 0003   (sin espacios: 4548810000000003)
-Caducidad:     (o 12/34)
+Caducidad: 12/49   (o 12/34)
 CVV:        123
 
 Mastercard (EMV 3DS 2.1)
