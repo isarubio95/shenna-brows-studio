@@ -1,28 +1,5 @@
 import AnimatedSection from "@/components/AnimatedSection";
 
-const sections = [
-  {
-    title: "Objeto y aceptación",
-    text: "Estos términos y condiciones regulan el uso de la tienda online Shenna BROWS y la compra de productos a través de la misma. Al realizar un pedido, el usuario acepta estos términos. Si no estás de acuerdo, no debes utilizar este sitio ni realizar compras.",
-  },
-  {
-    title: "Información del titular",
-    text: "Shenna BROWS opera esta tienda online. Para cualquier consulta legal o comercial puedes dirigirte a info@shennabrows.com. Los datos de identificación fiscal y registro se encuentran disponibles en la web o pueden solicitarse por correo electrónico.",
-  },
-  {
-    title: "Productos y precios",
-    text: "Los productos ofrecidos se describen con la mayor exactitud posible. Los precios se muestran en euros (€) e incluyen IVA cuando sea aplicable. Nos reservamos el derecho de modificar precios y de limitar la disponibilidad de productos. En caso de error en precio o descripción, nos reservamos el derecho a cancelar el pedido y reembolsar el importe abonado.",
-  },
-  {
-    title: "Pedidos y contratación",
-    text: "Al confirmar el pedido, el usuario realiza una oferta de compra vinculante. La aceptación del contrato se produce cuando enviamos la confirmación del pedido por email. Nos reservamos el derecho a rechazar pedidos en caso de error, indisponibilidad del producto o motivos legítimos.",
-  },
-  {
-    title: "Ley aplicable y resolución de conflictos",
-    text: "Estos términos se rigen por la legislación española. Para cualquier controversia, las partes se someten a los juzgados y tribunales del domicilio del consumidor, sin perjuicio del derecho del consumidor a acudir a los mecanismos de resolución de conflictos en línea de la Unión Europea.",
-  },
-];
-
 const TermsOfService = () => (
   <main className="min-h-screen bg-cream pt-32 pb-24">
     <div className="container mx-auto px-6 max-w-3xl">
@@ -38,17 +15,75 @@ const TermsOfService = () => (
         </p>
       </AnimatedSection>
 
-      <div className="space-y-14">
-        {sections.map((s, i) => (
-          <AnimatedSection key={i} delay={i * 0.05}>
-            <article>
-              <h2 className="font-playfair text-xl md:text-2xl font-semibold text-carbon mb-4 leading-snug">
-                {s.title}
-              </h2>
-              <p className="text-carbon/60 leading-relaxed">{s.text}</p>
-            </article>
-          </AnimatedSection>
-        ))}
+      <div className="space-y-10 text-carbon/70 leading-relaxed">
+        <AnimatedSection delay={0.05}>
+          <h2 className="font-playfair text-xl md:text-2xl font-semibold text-carbon mb-4 leading-snug">
+            Condiciones generales de utilización del website
+          </h2>
+          <p>
+            Los términos y condiciones recogidos en el presente Aviso Legal regulan el uso del sitio Web
+            http://www.shennabrows.es/ que se pone a disposición de los usuarios que accedan a su Sitio Web con la
+            finalidad de proporcionarles información sobre sus productos, así como la posibilidad de comprar los mismos.
+          </p>
+        </AnimatedSection>
+
+        <AnimatedSection delay={0.1}>
+          <h2 className="font-playfair text-xl md:text-2xl font-semibold text-carbon mb-4 leading-snug">
+            Propiedad Intelectual e Industrial
+          </h2>
+          <p>
+            La totalidad de este website: texto, imágenes, marca comercial, logotipo, archivos descargables, botones,
+            combinaciones de colores, así como la estructura, selección, ordenación y presentación de sus contenidos, se
+            encuentra protegida por las leyes españolas e internacionales sobre propiedad intelectual e industrial.
+          </p>
+          <p className="mt-2">
+            Asimismo, y sin perjuicio de lo anteriormente citado, el contenido de este website también tiene la
+            consideración de programa de ordenador y le es de aplicación toda la normativa española y comunitaria europea
+            vigente sobre la materia.
+          </p>
+          <p className="mt-2">
+            Queda expresamente prohibida la reproducción total o parcial de este website por parte del Usuario sin el permiso
+            expreso y por escrito.
+          </p>
+        </AnimatedSection>
+
+        <AnimatedSection delay={0.15}>
+          <h2 className="font-playfair text-xl md:text-2xl font-semibold text-carbon mb-4 leading-snug">
+            Limitación de Responsabilidad
+          </h2>
+          <p>
+            Aunque tomemos todas las precauciones razonables para mantener la continuidad del sitio web, Internet no es
+            siempre un medio estable y en cualquier momento pueden producirse errores, omisiones, interrupciones del servicio
+            y retrasos. No asumimos ninguna obligación ni responsabilidad sobre el funcionamiento del sitio web o de cualquier
+            parte del mismo.
+          </p>
+          <p className="mt-2">
+            Nos reservamos el derecho a modificar la información del sitio web, en cualquier momento sin previo aviso. Si
+            bien se tomarán todas las precauciones razonables para garantizar en la medida de lo posible que la información
+            que contiene el sitio web sea exacta y veraz, no podemos garantizar su precisión.
+          </p>
+          <p className="mt-2">
+            El usuario reconoce ser la única persona responsable del uso que hace del sitio web. Hacemos todo lo posible para
+            garantizar que el software disponible para descargar en su página no contiene ningún virus, pero no puede
+            garantizar su ausencia.
+          </p>
+          <p className="mt-2">
+            No nos hacemos responsables por cualquier pérdida o daño sufrido por cualquier medio por el software u otros
+            códigos, como los virus. El sitio contiene enlaces o vínculos a páginas externas. No asumimos ningún tipo de
+            responsabilidad con respecto al contenido de esos sitios web, ni sus productos o servicios, incluyendo el uso que
+            dichos sitios puedan hacer de la información personal de los usuarios.
+          </p>
+        </AnimatedSection>
+
+        <AnimatedSection delay={0.2}>
+          <h2 className="font-playfair text-xl md:text-2xl font-semibold text-carbon mb-4 leading-snug">
+            Aceptación del aviso legal
+          </h2>
+          <p>
+            La utilización del website implica la aceptación del presente Aviso Legal. Si tiene alguna duda sobre nuestro
+            Aviso Legal, póngase en contacto con nosotros a través de la dirección arriba indicada.
+          </p>
+        </AnimatedSection>
       </div>
     </div>
   </main>

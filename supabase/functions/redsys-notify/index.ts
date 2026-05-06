@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { Buffer } from "node:buffer";
 import { decodeMerchantParameters, isMerchantSignatureValid } from "../_shared/redsys.ts";
 
@@ -10,6 +11,14 @@ const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim();
 const resendFromAddress =
   Deno.env.get("RESEND_FROM_ADDRESS")?.trim() || "Shenna Brows <info@shennabrows.com>";
 const resendApiUrl = "https://api.resend.com/emails";
+const businessLegalName = Deno.env.get("BUSINESS_LEGAL_NAME")?.trim() || "Shenna Brows Studio";
+const businessTaxId = Deno.env.get("BUSINESS_TAX_ID")?.trim() || "PENDIENTE_NIF";
+const businessAddressLine1 = Deno.env.get("BUSINESS_ADDRESS_LINE1")?.trim() || "Direccion pendiente";
+const businessAddressLine2 = Deno.env.get("BUSINESS_ADDRESS_LINE2")?.trim() || "";
+const businessCity = Deno.env.get("BUSINESS_ADDRESS_CITY")?.trim() || "Ciudad pendiente";
+const businessCountry = Deno.env.get("BUSINESS_COUNTRY")?.trim() || "Espana";
+const vatRatePercent = Number(Deno.env.get("TICKET_VAT_RATE_PERCENT") ?? "21");
+const ticketLogoUrl = Deno.env.get("TICKET_LOGO_URL")?.trim() || "";
 
 type MerchantShippingAddress = {
   name?: string;
@@ -154,6 +163,138 @@ function pick(obj: Record<string, unknown>, keys: string[]): string {
   return "";
 }
 
+function normalizeEuros(value: number): number {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+async function generatePurchaseTicketPdf(args: {
+  orderRef: string;
+  email: string;
+  subtotal: number;
+  shipping: number;
+  total: number;
+  lines: Array<{ name: string; quantity: number; unitPrice: number }>;
+  shippingAddress?: Record<string, string> | null;
+}): Promise<string> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([595.28, 841.89]); // A4
+  const { height } = page.getSize();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const textColor = rgb(0.1, 0.12, 0.16);
+  const mutedColor = rgb(0.35, 0.4, 0.46);
+  let y = height - 50;
+
+  if (ticketLogoUrl) {
+    try {
+      const logoResp = await fetch(ticketLogoUrl);
+      if (logoResp.ok) {
+        const logoBytes = await logoResp.arrayBuffer();
+        const ct = (logoResp.headers.get("content-type") || "").toLowerCase();
+        const image = ct.includes("png")
+          ? await pdf.embedPng(logoBytes)
+          : await pdf.embedJpg(logoBytes);
+        const maxW = 120;
+        const ratio = maxW / image.width;
+        const logoW = maxW;
+        const logoH = image.height * ratio;
+        page.drawImage(image, { x: 40, y: y - logoH + 10, width: logoW, height: logoH });
+      }
+    } catch {
+      // Si el logo falla, no bloqueamos el ticket.
+    }
+  }
+
+  page.drawText("TICKET / FACTURA SIMPLIFICADA", {
+    x: 180,
+    y,
+    size: 16,
+    font: fontBold,
+    color: textColor,
+  });
+  y -= 28;
+
+  const now = new Date();
+  const dateIso = now.toISOString().slice(0, 10);
+  const ticketNumber = `T-${dateIso.replaceAll("-", "")}-${args.orderRef}`;
+
+  const headerLines = [
+    `${businessLegalName}`,
+    `NIF/CIF: ${businessTaxId}`,
+    `${businessAddressLine1}${businessAddressLine2 ? `, ${businessAddressLine2}` : ""}`,
+    `${businessCity}, ${businessCountry}`,
+    `Ticket: ${ticketNumber}`,
+    `Fecha: ${dateIso}`,
+  ];
+  for (const line of headerLines) {
+    page.drawText(line, { x: 40, y, size: 10, font, color: mutedColor });
+    y -= 14;
+  }
+
+  y -= 8;
+  page.drawText(`Cliente: ${args.email}`, { x: 40, y, size: 10, font, color: textColor });
+  y -= 14;
+  if (args.shippingAddress?.name) {
+    page.drawText(`Envio a: ${args.shippingAddress.name}`, { x: 40, y, size: 10, font, color: textColor });
+    y -= 14;
+  }
+
+  y -= 10;
+  page.drawText("Concepto", { x: 40, y, size: 10, font: fontBold, color: textColor });
+  page.drawText("Cant.", { x: 350, y, size: 10, font: fontBold, color: textColor });
+  page.drawText("Importe", { x: 430, y, size: 10, font: fontBold, color: textColor });
+  y -= 12;
+  page.drawLine({ start: { x: 40, y }, end: { x: 555, y }, thickness: 1, color: rgb(0.9, 0.92, 0.95) });
+  y -= 14;
+
+  for (const line of args.lines) {
+    const lineTotal = normalizeEuros(line.quantity * line.unitPrice);
+    const safeName = line.name.length > 48 ? `${line.name.slice(0, 45)}...` : line.name;
+    page.drawText(safeName, { x: 40, y, size: 10, font, color: textColor });
+    page.drawText(String(line.quantity), { x: 355, y, size: 10, font, color: textColor });
+    page.drawText(`${lineTotal.toFixed(2)} EUR`, { x: 430, y, size: 10, font, color: textColor });
+    y -= 16;
+  }
+
+  y -= 8;
+  page.drawLine({ start: { x: 310, y }, end: { x: 555, y }, thickness: 1, color: rgb(0.9, 0.92, 0.95) });
+  y -= 16;
+
+  const grossTotal = normalizeEuros(args.total);
+  const taxRate = Number.isFinite(vatRatePercent) && vatRatePercent > 0 ? vatRatePercent : 21;
+  const taxableBase = normalizeEuros(grossTotal / (1 + taxRate / 100));
+  const taxAmount = normalizeEuros(grossTotal - taxableBase);
+
+  const totals = [
+    ["Subtotal productos", normalizeEuros(args.subtotal)],
+    ["Envio", normalizeEuros(args.shipping)],
+    [`Base imponible`, taxableBase],
+    [`IVA (${taxRate.toFixed(0)}%)`, taxAmount],
+    ["TOTAL", grossTotal],
+  ];
+  for (const [label, value] of totals) {
+    const isTotal = label === "TOTAL";
+    page.drawText(label, { x: 310, y, size: isTotal ? 11 : 10, font: isTotal ? fontBold : font, color: textColor });
+    page.drawText(`${Number(value).toFixed(2)} EUR`, {
+      x: 430,
+      y,
+      size: isTotal ? 11 : 10,
+      font: isTotal ? fontBold : font,
+      color: textColor,
+    });
+    y -= 16;
+  }
+
+  y -= 10;
+  page.drawText(
+    "Documento generado automaticamente para justificar la compra. Conserva este ticket para tus registros.",
+    { x: 40, y, size: 9, font, color: mutedColor },
+  );
+
+  const bytes = await pdf.save();
+  return Buffer.from(bytes).toString("base64");
+}
+
 async function sendOrderConfirmationEmail(args: {
   email: string;
   orderRef: string;
@@ -161,6 +302,7 @@ async function sendOrderConfirmationEmail(args: {
   shipping: number;
   total: number;
   lines: Array<{ name: string; quantity: number; unitPrice: number }>;
+  shippingAddress?: Record<string, string> | null;
 }) {
   if (!resendApiKey) {
     console.warn("redsys_notify_resend_not_configured");
@@ -169,25 +311,96 @@ async function sendOrderConfirmationEmail(args: {
 
   const formatEur = (value: number) =>
     Number(value || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+  const escapeHtml = (value: string) =>
+    value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
 
   const linesHtml = args.lines
     .map(
       (line) =>
-        `<li>${line.name} x${line.quantity} - ${formatEur(line.unitPrice * line.quantity)}</li>`,
+        `
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #0f172a;">
+              ${escapeHtml(line.name)}
+            </td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; text-align: center; color: #334155;">
+              x${line.quantity}
+            </td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; text-align: right; color: #0f172a;">
+              ${formatEur(line.unitPrice * line.quantity)}
+            </td>
+          </tr>
+        `,
     )
     .join("");
 
   const html = `
-    <div style="font-family: Arial, sans-serif; color: #1f2937;">
-      <h2 style="margin: 0 0 12px;">Pago confirmado</h2>
-      <p>Hemos recibido tu pedido correctamente. Gracias por confiar en Shenna Brows Studio.</p>
-      <p><strong>Referencia:</strong> ${args.orderRef}</p>
-      <ul>${linesHtml}</ul>
-      <p style="margin: 12px 0 0;"><strong>Subtotal:</strong> ${formatEur(args.subtotal)}</p>
-      <p style="margin: 4px 0;"><strong>Envío:</strong> ${formatEur(args.shipping)}</p>
-      <p style="margin: 4px 0 0;"><strong>Total:</strong> ${formatEur(args.total)}</p>
+    <div style="background: #f8fafc; padding: 24px 12px; font-family: Arial, sans-serif; color: #1f2937;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <tr>
+          <td style="padding: 24px; background: #111827; color: #ffffff;">
+            <p style="margin: 0; font-size: 12px; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.85;">Shenna Brows Studio</p>
+            <h2 style="margin: 8px 0 0; font-size: 24px; line-height: 1.25;">Pago confirmado</h2>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 24px;">
+            <p style="margin: 0 0 12px; font-size: 15px; line-height: 1.5; color: #334155;">
+              Gracias por tu pedido. Hemos recibido el pago correctamente y ya estamos preparando tu compra.
+            </p>
+            <p style="margin: 0 0 18px; font-size: 14px; color: #475569;">
+              <strong>Referencia del pedido:</strong> ${escapeHtml(args.orderRef)}
+            </p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th align="left" style="padding: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Producto</th>
+                  <th align="center" style="padding: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Cant.</th>
+                  <th align="right" style="padding: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${linesHtml}
+              </tbody>
+            </table>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 18px;">
+              <tr>
+                <td style="padding: 4px 0; color: #475569;">Subtotal</td>
+                <td style="padding: 4px 0; text-align: right; color: #0f172a;">${formatEur(args.subtotal)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 0; color: #475569;">Envío</td>
+                <td style="padding: 4px 0; text-align: right; color: #0f172a;">${formatEur(args.shipping)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 12px 0 0; font-weight: 700; color: #0f172a;">Total</td>
+                <td style="padding: 12px 0 0; text-align: right; font-weight: 700; color: #0f172a;">${formatEur(args.total)}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
     </div>
   `;
+
+  let ticketPdfBase64: string | null = null;
+  try {
+    ticketPdfBase64 = await generatePurchaseTicketPdf({
+      orderRef: args.orderRef,
+      email: args.email,
+      subtotal: args.subtotal,
+      shipping: args.shipping,
+      total: args.total,
+      lines: args.lines,
+      shippingAddress: args.shippingAddress ?? null,
+    });
+  } catch (e) {
+    console.error("redsys_notify_ticket_pdf_error", e instanceof Error ? e.message : e);
+  }
 
   const response = await fetch(resendApiUrl, {
     method: "POST",
@@ -200,6 +413,17 @@ async function sendOrderConfirmationEmail(args: {
       to: [args.email],
       subject: "Confirmacion de pedido - Shenna Brows Studio",
       html,
+      ...(ticketPdfBase64
+        ? {
+            attachments: [
+              {
+                filename: `ticket-${args.orderRef}.pdf`,
+                content: ticketPdfBase64,
+                content_type: "application/pdf",
+              },
+            ],
+          }
+        : {}),
     }),
   });
 
@@ -358,6 +582,7 @@ serve(async (req) => {
             shipping,
             total,
             lines: buildEmailLines(),
+            shippingAddress: keepAddress,
           });
         } else {
           const { data: fresh } = await admin.from("orders").select("status").eq("id", existing.id).maybeSingle();
@@ -413,6 +638,7 @@ serve(async (req) => {
       shipping,
       total,
       lines: buildEmailLines(),
+      shippingAddress: shipping_address,
     });
 
     return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain" } });
