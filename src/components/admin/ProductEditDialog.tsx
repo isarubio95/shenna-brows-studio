@@ -33,13 +33,30 @@ const normalizeDescriptionHtml = (html: string) => {
     .replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, "");
 };
 
+const parseGalleryFromImageUrl = (imageUrl: string | null | undefined): string[] => {
+  if (!imageUrl) return [];
+  const normalized = imageUrl.trim();
+  if (!normalized) return [];
+  if (normalized.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(normalized);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+      }
+    } catch {
+      // Legacy value: continue as single URL.
+    }
+  }
+  return [normalized];
+};
+
 const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEditDialogProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<Partial<Product & { materials_label?: string }>>({});
   const [materialItems, setMaterialItems] = useState<string[]>([""]);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -64,7 +81,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
       image_url: currentProduct.image_url,
       materials_label: (currentProduct as any).materials_label || 'materiales',
     });
-    setPreviewUrl(null);
+    setImageUrls(parseGalleryFromImageUrl(currentProduct.image_url));
   }, [currentProduct, open]);
 
   const updateField = (field: keyof Product, value: string | number) => {
@@ -119,9 +136,12 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
         if (uploadError) throw uploadError;
 
         const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${filePath}`;
-        setForm((prev) => ({ ...prev, image_url: publicUrl }));
-        setPreviewUrl(publicUrl);
-        toast({ title: "Imagen subida correctamente" });
+        setImageUrls((prev) => {
+          const next = [...prev, publicUrl];
+          setForm((formPrev) => ({ ...formPrev, image_url: JSON.stringify(next) }));
+          return next;
+        });
+        toast({ title: "Imagen subida correctamente", description: "La imagen se añadió a la galería del producto." });
       } catch (err: any) {
         toast({ title: "Error al subir imagen", description: err.message, variant: "destructive" });
       } finally {
@@ -135,8 +155,10 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
-      const file = e.dataTransfer.files?.[0];
-      if (file && file.type.startsWith("image/")) uploadImage(file);
+      const files = Array.from(e.dataTransfer.files || []).filter((file) => file.type.startsWith("image/"));
+      files.forEach((file) => {
+        uploadImage(file);
+      });
     },
     [uploadImage]
   );
@@ -149,8 +171,30 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
   const handleDragLeave = () => setIsDragging(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) uploadImage(file);
+    const files = Array.from(e.target.files || []).filter((file) => file.type.startsWith("image/"));
+    files.forEach((file) => {
+      uploadImage(file);
+    });
+    e.target.value = "";
+  };
+
+  const removeImageAt = (index: number) => {
+    setImageUrls((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setForm((formPrev) => ({ ...formPrev, image_url: next.length > 0 ? JSON.stringify(next) : null }));
+      return next;
+    });
+  };
+
+  const setPrimaryImage = (index: number) => {
+    setImageUrls((prev) => {
+      if (index <= 0 || index >= prev.length) return prev;
+      const next = [...prev];
+      const [selected] = next.splice(index, 1);
+      next.unshift(selected);
+      setForm((formPrev) => ({ ...formPrev, image_url: JSON.stringify(next) }));
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -169,7 +213,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
         shipping_info: form.shipping_info || "",
         price: Number(form.price) || 0,
         stock: Number(form.stock) || 0,
-        image_url: form.image_url,
+        image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
       })
       .eq("id", currentProduct.id);
 
@@ -183,7 +227,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
     setSaving(false);
   };
 
-  const displayImage = previewUrl || (currentProduct ? getProductImageUrl(currentProduct.image_url, currentProduct.slug) : form.image_url);
+  const displayImage = imageUrls[0] || (currentProduct ? getProductImageUrl(currentProduct.image_url, currentProduct.slug) : form.image_url);
   const canAddMaterial = materialItems.length === 0 || (materialItems[materialItems.length - 1]?.trim() ?? "") !== "";
 
   const applyFormat = (command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") => {
@@ -240,22 +284,65 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
               ) : (
                 <div className="flex flex-col items-center gap-2 text-carbon/40">
                   <ImageIcon className="h-10 w-10" />
-                  <span className="text-sm">Arrastra una imagen o haz clic</span>
+                  <span className="text-sm">Arrastra una o varias imágenes, o haz clic</span>
                 </div>
               )}
               {displayImage && !uploading && (
                 <div className="absolute inset-0 bg-carbon/0 hover:bg-carbon/30 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
                   <div className="flex items-center gap-2 text-white bg-carbon/60 rounded-lg px-4 py-2 text-sm">
                     <Upload className="h-4 w-4" />
-                    Cambiar imagen
+                    Añadir más imágenes
                   </div>
                 </div>
               )}
             </div>
+            {imageUrls.length > 0 && (
+              <div className="mt-3 grid grid-cols-4 sm:grid-cols-6 gap-2">
+                {imageUrls.map((url, index) => (
+                  <div key={url} className="relative group aspect-square rounded-lg overflow-hidden border border-gold/20">
+                    <img src={url} alt={`Imagen ${index + 1}`} className="w-full h-full object-cover" />
+                    {index === 0 && (
+                      <span className="absolute top-1 left-1 text-[10px] bg-gold text-white px-1.5 py-0.5 rounded">
+                        Principal
+                      </span>
+                    )}
+                    <div className="absolute inset-0 bg-carbon/0 group-hover:bg-carbon/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
+                      {index !== 0 && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 px-2 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPrimaryImage(index);
+                          }}
+                        >
+                          Principal
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="destructive"
+                        className="h-7 w-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImageAt(index);
+                        }}
+                      >
+                        <X size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
               onChange={handleFileSelect}
             />

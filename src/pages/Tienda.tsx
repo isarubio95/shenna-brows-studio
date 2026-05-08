@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ShieldCheck, ShoppingBag, ShoppingCart, Plus, Truck, Sparkles } from "lucide-react";
+import { ShieldCheck, ShoppingCart, Plus, Truck, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { getProductImageUrl } from "@/lib/product-images";
+import { getProductImageGallery } from "@/lib/product-images";
 import { useCart } from "@/context/CartContext";
 import AnimatedSection from "@/components/AnimatedSection";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,124 @@ const setCanonical = (href: string) => {
 };
 
 const stripHtml = (value: string | null) => (value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+interface ProductCardProps {
+  product: Product;
+  delay: number;
+  onOpenProduct: (slug: string) => void;
+  onAddToCart: (product: Product) => void;
+  addToCartDisabled: boolean;
+}
+
+const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisabled }: ProductCardProps) => {
+  const gallery = getProductImageGallery(product.image_url, product.slug);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const goPrevImage = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setCurrentImageIndex((prev) => (prev === 0 ? gallery.length - 1 : prev - 1));
+  };
+
+  const goNextImage = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setCurrentImageIndex((prev) => (prev === gallery.length - 1 ? 0 : prev + 1));
+  };
+
+  return (
+    <AnimatedSection key={product.id} delay={delay} className="h-full">
+      <motion.article
+        whileHover={{ y: -8 }}
+        transition={{ duration: 0.3 }}
+        className="h-full bg-white rounded-2xl overflow-hidden border border-gold/10 shadow-[0_6px_24px_rgba(0,0,0,0.05)] hover:shadow-[0_14px_40px_rgba(0,0,0,0.1)] transition-shadow duration-500 flex flex-col cursor-pointer"
+        role="link"
+        tabIndex={0}
+        onClick={() => onOpenProduct(product.slug)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpenProduct(product.slug);
+          }
+        }}
+      >
+        <Link to={`/${product.slug}`} className="relative block aspect-square bg-muted overflow-hidden">
+          <img
+            src={gallery[currentImageIndex]}
+            alt={`${product.name} - Shenna Brows`}
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+            loading="lazy"
+          />
+          {gallery.length > 1 && (
+            <>
+              <button
+                type="button"
+                aria-label="Foto anterior"
+                onClick={goPrevImage}
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-carbon rounded-full p-1.5 shadow"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                aria-label="Siguiente foto"
+                onClick={goNextImage}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-carbon rounded-full p-1.5 shadow"
+              >
+                <ChevronRight size={16} />
+              </button>
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {gallery.map((_, index) => (
+                  <button
+                    key={`${product.id}-dot-${index}`}
+                    type="button"
+                    aria-label={`Ver foto ${index + 1}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setCurrentImageIndex(index);
+                    }}
+                    className={`h-1.5 rounded-full transition-all ${
+                      index === currentImageIndex ? "w-5 bg-white" : "w-2 bg-white/70"
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </Link>
+
+        <div className="p-6 flex-1 flex flex-col justify-between">
+          <div>
+            <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">{product.category}</p>
+            <h3 className="font-playfair text-xl font-semibold text-carbon mb-1">{product.name}</h3>
+            <p className="text-sm text-carbon/60">{product.tagline}</p>
+          </div>
+
+          <div className="mt-5">
+            <p className="text-lg font-semibold text-carbon mb-4">€{Number(product.price).toFixed(2)}</p>
+            <div className="flex">
+              <Button
+                className="w-full bg-gold hover:bg-gold/90 text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToCart(product);
+                }}
+                disabled={addToCartDisabled || product.stock <= 0}
+              >
+                <span className="relative mr-2 inline-flex">
+                  <ShoppingCart size={16} />
+                  <Plus size={11} className="absolute -top-1 -right-1" />
+                </span>
+                {addToCartDisabled ? "Próximamente" : "Añadir"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </motion.article>
+    </AnimatedSection>
+  );
+};
 
 const Tienda = () => {
   const navigate = useNavigate();
@@ -86,7 +204,7 @@ const Tienda = () => {
           "@type": "Product",
           name: product.name,
           description: stripHtml(product.description) || product.tagline || "",
-          image: getProductImageUrl(product.image_url, product.slug),
+          image: getProductImageGallery(product.image_url, product.slug)[0],
           brand: { "@type": "Brand", name: "Shenna Brows" },
           offers: {
             "@type": "Offer",
@@ -181,59 +299,14 @@ const Tienda = () => {
             ))
           ) : (
             products.map((product, i) => (
-              <AnimatedSection key={product.id} delay={i * 0.06} className="h-full">
-                <motion.article
-                  whileHover={{ y: -8 }}
-                  transition={{ duration: 0.3 }}
-                  className="h-full bg-white rounded-2xl overflow-hidden border border-gold/10 shadow-[0_6px_24px_rgba(0,0,0,0.05)] hover:shadow-[0_14px_40px_rgba(0,0,0,0.1)] transition-shadow duration-500 flex flex-col cursor-pointer"
-                  role="link"
-                  tabIndex={0}
-                  onClick={() => navigate(`/${product.slug}`)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      navigate(`/${product.slug}`);
-                    }
-                  }}
-                >
-                  <Link to={`/${product.slug}`} className="block aspect-square bg-muted overflow-hidden">
-                    <img
-                      src={getProductImageUrl(product.image_url, product.slug)}
-                      alt={`${product.name} - Shenna Brows`}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
-                      loading="lazy"
-                    />
-                  </Link>
-
-                  <div className="p-6 flex-1 flex flex-col justify-between">
-                    <div>
-                      <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">{product.category}</p>
-                      <h3 className="font-playfair text-xl font-semibold text-carbon mb-1">{product.name}</h3>
-                      <p className="text-sm text-carbon/60">{product.tagline}</p>
-                    </div>
-
-                    <div className="mt-5">
-                      <p className="text-lg font-semibold text-carbon mb-4">€{Number(product.price).toFixed(2)}</p>
-                      <div className="flex">
-                        <Button
-                          className="w-full bg-gold hover:bg-gold/90 text-white"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddToCart(product);
-                          }}
-                          disabled={isAddToCartDisabled || product.stock <= 0}
-                        >
-                          <span className="relative mr-2 inline-flex">
-                            <ShoppingCart size={16} />
-                            <Plus size={11} className="absolute -top-1 -right-1" />
-                          </span>
-                          {isAddToCartDisabled ? "Próximamente" : "Añadir"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.article>
-              </AnimatedSection>
+              <ProductCard
+                key={product.id}
+                product={product}
+                delay={i * 0.06}
+                onOpenProduct={(nextSlug) => navigate(`/${nextSlug}`)}
+                onAddToCart={handleAddToCart}
+                addToCartDisabled={isAddToCartDisabled}
+              />
             ))
           )}
         </div>

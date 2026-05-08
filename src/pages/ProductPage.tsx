@@ -4,14 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
-import { ShoppingBag, Loader2 } from "lucide-react";
-import { getProductImageUrl } from "@/lib/product-images";
+import { ShoppingBag, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { getProductImageGallery } from "@/lib/product-images";
 
 const ProductPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { addItem, isAddToCartDisabled } = useCart();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     if (!slug) return;
@@ -22,6 +23,7 @@ const ProductPage = () => {
       .maybeSingle()
       .then(({ data }: any) => {
         setProduct(data);
+        setCurrentImageIndex(0);
         setLoading(false);
       });
   }, [slug]);
@@ -65,6 +67,7 @@ const ProductPage = () => {
   const descriptionHtml = (product.description || "").includes("<")
     ? product.description
     : (product.description || "").replace(/\n/g, "<br />");
+  const gallery = getProductImageGallery(product.image_url, product.slug);
 
   return (
     <main className="min-h-screen bg-cream pt-32 pb-16">
@@ -74,8 +77,47 @@ const ProductPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
           <AnimatedSection>
-            <div className="aspect-square rounded-2xl bg-white overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-              <img src={getProductImageUrl(product.image_url, product.slug)} alt={product.name} className="w-full h-full object-cover" />
+            <div>
+              <div className="relative aspect-square rounded-2xl bg-white overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+                <img src={gallery[currentImageIndex]} alt={product.name} className="w-full h-full object-cover" />
+                {gallery.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Foto anterior"
+                      onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? gallery.length - 1 : prev - 1))}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-carbon rounded-full p-2 shadow"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Siguiente foto"
+                      onClick={() => setCurrentImageIndex((prev) => (prev === gallery.length - 1 ? 0 : prev + 1))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-carbon rounded-full p-2 shadow"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                  </>
+                )}
+              </div>
+              {gallery.length > 1 && (
+                <div className="mt-4 grid grid-cols-5 gap-2">
+                  {gallery.map((imageUrl, index) => (
+                    <button
+                      key={`${product.id}-thumb-${index}`}
+                      type="button"
+                      aria-label={`Ver imagen ${index + 1}`}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`aspect-square rounded-lg overflow-hidden border transition ${
+                        index === currentImageIndex ? "border-gold ring-2 ring-gold/30" : "border-gold/15 hover:border-gold/40"
+                      }`}
+                    >
+                      <img src={imageUrl} alt={`${product.name} miniatura ${index + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </AnimatedSection>
 
