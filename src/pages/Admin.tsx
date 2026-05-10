@@ -250,6 +250,24 @@ const toNumericText = (value: unknown, fallback = "0"): string => {
   return fallback;
 };
 
+/**
+ * Correos valida smsNumber de forma estricta (p.ej. error 1032):
+ * - España: 9 dígitos nacionales (sin +34 ni espacios).
+ * - Internacional: solo dígitos (máx. 15), sin prefijo '+'.
+ */
+const normalizeCorreosSmsNumber = (raw: string, countryCode: string): string => {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+
+  if (isSpainCountryCode(countryCode)) {
+    if (digits.length === 9) return digits;
+    if (digits.length === 11 && digits.startsWith("34")) return digits.slice(2);
+    return "";
+  }
+
+  return digits.length >= 6 && digits.length <= 15 ? digits : "";
+};
+
 const buildCorreosPreregisterBody = (order: any) => {
   const orderRecord = (order && typeof order === "object" ? order : {}) as Record<string, unknown>;
   const rawAddress =
@@ -288,6 +306,10 @@ const buildCorreosPreregisterBody = (order: any) => {
       else if (digitsOnly.length === 2) provinceForCorreos = digitsOnly;
     }
   }
+  const normalizedAddresseeSms = normalizeCorreosSmsNumber(
+    stringFrom(rawAddress, ["phone", "smsNumber", "contactPhone"], ""),
+    countryForApi
+  );
 
   const addressee = {
     address: stringFrom(rawAddress, ["line1", "address", "street", "address1"], "Sin direccion"),
@@ -312,7 +334,7 @@ const buildCorreosPreregisterBody = (order: any) => {
     number: stringFrom(rawAddress, ["number", "street_number"], ""),
     portal: stringFrom(rawAddress, ["portal"], ""),
     province: provinceForCorreos,
-    smsNumber: stringFrom(rawAddress, ["phone", "smsNumber", "contactPhone"], ""),
+    smsNumber: normalizedAddresseeSms,
     staircase: stringFrom(rawAddress, ["staircase"], ""),
     zip: "",
   };
@@ -342,7 +364,10 @@ const buildCorreosPreregisterBody = (order: any) => {
     number: (import.meta.env.VITE_CORREOS_SENDER_NUMBER as string | undefined)?.trim() || "",
     portal: (import.meta.env.VITE_CORREOS_SENDER_PORTAL as string | undefined)?.trim() || "",
     province: (import.meta.env.VITE_CORREOS_SENDER_PROVINCE as string | undefined)?.trim() || "",
-    smsNumber: (import.meta.env.VITE_CORREOS_SENDER_SMS as string | undefined)?.trim() || "",
+    smsNumber: normalizeCorreosSmsNumber(
+      (import.meta.env.VITE_CORREOS_SENDER_SMS as string | undefined)?.trim() || "",
+      (import.meta.env.VITE_CORREOS_SENDER_COUNTRY as string | undefined)?.trim() || "ESP"
+    ),
     staircase: (import.meta.env.VITE_CORREOS_SENDER_STAIRCASE as string | undefined)?.trim() || "",
     zip: "",
   };
@@ -509,15 +534,24 @@ const Admin = () => {
     setTogglingTestimonial(null);
   };
 
-  const openAndPrint = (url: string) => {
-    const popup = window.open(url, "_blank", "noopener,noreferrer");
+  const openAndPrint = (url: string, existingPopup?: Window | null) => {
+    const popup =
+      existingPopup && !existingPopup.closed
+        ? existingPopup
+        : window.open("about:blank", "_blank");
+
+    // Algunos navegadores pueden abrir la pestaña y aun así devolver null.
+    // En ese caso no detenemos el flujo con error.
     if (!popup) {
-      throw new Error("No se pudo abrir la etiqueta. Revisa si el navegador bloquea ventanas emergentes.");
+      window.open(url, "_blank");
+      return;
     }
+
+    popup.location.href = url;
     popup.addEventListener("load", () => popup.print(), { once: true });
   };
 
-  const printBase64Pdf = (base64: string) => {
+  const printBase64Pdf = (base64: string, popup?: Window | null) => {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i += 1) {
@@ -525,24 +559,24 @@ const Admin = () => {
     }
     const blob = new Blob([bytes], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
-    openAndPrint(url);
+    openAndPrint(url, popup);
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
-  const extractAndPrintLabel = (payload: unknown) => {
+  const extractAndPrintLabel = (payload: unknown, popup?: Window | null) => {
     if (!payload) {
       throw new Error("Correos no devolvió contenido para la etiqueta.");
     }
 
     if (typeof payload === "string") {
       if (payload.startsWith("http://") || payload.startsWith("https://")) {
-        openAndPrint(payload);
+        openAndPrint(payload, popup);
         return;
       }
 
       // Compatibilidad: algunos servicios devuelven PDF en base64 en texto plano.
       if (payload.length > 100) {
-        printBase64Pdf(payload);
+        printBase64Pdf(payload, popup);
         return;
       }
     }
@@ -562,19 +596,19 @@ const Admin = () => {
 
       const apiPdf = data.pdf as string | undefined;
       if (apiPdf && typeof apiPdf === "string") {
-        printBase64Pdf(apiPdf);
+        printBase64Pdf(apiPdf, popup);
         return;
       }
 
       const maybeUrl = (data.label_url || data.labelUrl || data.pdf_url || data.pdfUrl || data.url) as string | undefined;
       if (maybeUrl && typeof maybeUrl === "string") {
-        openAndPrint(maybeUrl);
+        openAndPrint(maybeUrl, popup);
         return;
       }
 
       const maybeBase64 = (data.label_base64 || data.labelBase64 || data.pdf_base64 || data.pdfBase64) as string | undefined;
       if (maybeBase64 && typeof maybeBase64 === "string") {
-        printBase64Pdf(maybeBase64);
+        printBase64Pdf(maybeBase64, popup);
         return;
       }
     }
@@ -584,6 +618,9 @@ const Admin = () => {
 
   const handlePrintLabel = async (order: any) => {
     setPrintingLabelOrderId(order.id);
+    // Abrimos una pestaña en el gesto de usuario para evitar bloqueos por popup
+    // cuando la respuesta de Correos llega tras varias llamadas asíncronas.
+    const printPopup = window.open("about:blank", "_blank");
     let lastPreregisterData: unknown | null = null;
     try {
       const endpoint = (import.meta.env.VITE_CORREOS_LABELS_ENDPOINT as string | undefined)?.trim() || "/labels/print";
@@ -730,9 +767,12 @@ const Admin = () => {
         }
       }
 
-      extractAndPrintLabel(data);
+      extractAndPrintLabel(data, printPopup);
       toast({ title: "Etiqueta preparada", description: "Se abrió la etiqueta para imprimir." });
     } catch (err: unknown) {
+      if (printPopup && !printPopup.closed) {
+        printPopup.close();
+      }
       const message = err instanceof Error ? err.message : "Error inesperado al generar la etiqueta";
       toast({
         title: "No se pudo imprimir la etiqueta",
