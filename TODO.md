@@ -7,4 +7,4 @@
 - 10€ baleares
 - 15€ canarias
 - 11€ portugal
-[ ] Añadir número de seguimiento de correos en el correo de confirmación de pedido
+[X] Añadir número de seguimiento de correos en el correo de confirmación de pedido

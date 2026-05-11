@@ -7,13 +7,13 @@ import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { motion } from "framer-motion";
 
 import { Skeleton } from "@/components/ui/skeleton";
-// Nueva imagen de fondo importada
-import fondoBg from "@/assets/fondo.png"; 
 import logoMetalico from "@/assets/logo-metalico.png";
 import { getProductImageUrl } from "@/lib/product-images";
 import CeoSection from "@/components/CeoSection";
 
 const VIDEO_POSTER_TIME = 2; // segundo del que extraer la portada
+
+const HERO_BACKGROUND_URL = "/products/_LABZERODIGITAL_LOW_DSC07311.jpg";
 
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -69,8 +69,8 @@ const Index = () => {
     <main>
       {/* Hero */}
       <section
-        className="relative w-full min-h-[100dvh] flex flex-col items-center justify-between px-4 sm:px-6 bg-cover bg-center bg-no-repeat overflow-hidden"
-        style={{ backgroundImage: `url(${fondoBg})` }}
+        className="relative w-full min-h-dvh flex flex-col items-center justify-between px-4 sm:px-6 bg-cover bg-no-repeat overflow-hidden max-lg:bg-position-[center_calc(50%+4rem)] lg:bg-center"
+        style={{ backgroundImage: `url(${HERO_BACKGROUND_URL})` }}
       >
         {/* Overlay de degradado para aclarar la parte superior y dar profundidad abajo */}
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.7)_0%,rgba(0,0,0,0.3)_10%,transparent_20%,transparent_70%,rgba(26,26,26,0.4)_100%)] z-0 pointer-events-none" />
@@ -81,7 +81,7 @@ const Index = () => {
         {/* Center content */}
         <div className="relative z-10 w-full max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12">
-            <div className="w-full lg:w-[58%] flex flex-col items-center">
+            <div className="w-full lg:w-[58%] flex flex-col items-center pb-14 lg:pb-0">
               <AnimatedSection>
                 <img 
                   src={logoMetalico} 
@@ -111,7 +111,7 @@ const Index = () => {
                     >
                       <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#92400e_0%,#fef08a_50%,#92400e_100%)]" />
                     </div>
-                    <Button className="relative z-10 block bg-transparent bg-gradient-to-r from-gold/50 to-[hsla(38,61%,47%,0.5)] hover:from-gold/30 hover:to-[hsla(38,61%,47%,0.3)] backdrop-blur-md text-white px-8 sm:px-10 py-5 text-xs sm:text-sm md:text-base tracking-[0.25em] uppercase rounded-full transition-colors duration-300 w-full h-full shadow-inner font-playfair">
+                    <Button className="relative z-10 block bg-transparent bg-linear-to-r from-gold/50 to-[hsla(38,61%,47%,0.5)] hover:from-gold/30 hover:to-[hsla(38,61%,47%,0.3)] backdrop-blur-md text-white px-8 sm:px-10 py-5 text-xs sm:text-sm md:text-base tracking-[0.25em] uppercase rounded-full transition-colors duration-300 w-full h-full shadow-inner font-playfair">
                       Explorar tienda →
                     </Button>
                   </div>
