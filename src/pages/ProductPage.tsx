@@ -7,6 +7,30 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { ShoppingBag, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImageGallery } from "@/lib/product-images";
 
+type DescriptionItem = { content: string; format: "text" | "html" };
+
+/** Convierte la descripción en ítems con el mismo criterio que materiales (una línea o un <p> por ítem). */
+function parseProductDescription(description: string | null | undefined): DescriptionItem[] {
+  const raw = (description || "").trim();
+  if (!raw) return [];
+
+  if (!raw.includes("<")) {
+    return raw
+      .split("\n")
+      .filter((l) => l.trim())
+      .map((line) => ({ content: line.trim(), format: "text" as const }));
+  }
+
+  const pBlocks = [...raw.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+    .map((m) => m[1].trim())
+    .filter(Boolean);
+  if (pBlocks.length > 0) {
+    return pBlocks.map((content) => ({ content, format: "html" as const }));
+  }
+
+  return [{ content: raw, format: "html" }];
+}
+
 const ProductPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { addItem, isAddToCartDisabled } = useCart();
@@ -64,9 +88,7 @@ const ProductPage = () => {
     });
   };
 
-  const descriptionHtml = (product.description || "").includes("<")
-    ? product.description
-    : (product.description || "").replace(/\n/g, "<br />");
+  const descriptionItems = parseProductDescription(product.description);
   const gallery = getProductImageGallery(product.image_url, product.slug);
 
   return (
@@ -140,10 +162,23 @@ const ProductPage = () => {
               <div className="border-t border-gold/10 space-y-0">
                 <section className="border-b border-gold/10 py-5">
                   <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">Descripción</h3>
-                  <div
-                    className="text-carbon/60 text-sm leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_a]:text-gold [&_a]:underline"
-                    dangerouslySetInnerHTML={{ __html: descriptionHtml }}
-                  />
+                  {descriptionItems.length > 0 ? (
+                    <ul className="space-y-2">
+                      {descriptionItems.map((item, i) => (
+                        <li
+                          key={i}
+                          className="flex items-start gap-2.5 text-carbon/60 text-sm leading-relaxed [&_a]:text-gold [&_a]:underline"
+                        >
+                          <span className="text-gold/70 mt-0.5 shrink-0">✦</span>
+                          {item.format === "html" ? (
+                            <span dangerouslySetInnerHTML={{ __html: item.content }} />
+                          ) : (
+                            <span>{item.content}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </section>
                 <section className="border-b border-gold/10 py-5">
                   <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">
