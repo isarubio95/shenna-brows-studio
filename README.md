@@ -4,7 +4,7 @@ Aplicacion web construida con React, Vite y TypeScript.
 
 ## Requisitos
 
-- Node.js 18+ (recomendado)
+- Node.js 20+ (recomendado)
 - npm
 
 ## Desarrollo local

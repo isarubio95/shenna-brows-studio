@@ -14,6 +14,7 @@ import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
 import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
+import AdminStockManager from "@/components/admin/AdminStockManager";
 import { getProductImageUrl } from "@/lib/product-images";
 
 const statusColors: Record<string, string> = {
@@ -789,7 +790,7 @@ const Admin = () => {
       <div className="container mx-auto px-6 max-w-5xl">
         <AnimatedSection>
           <h1 className="font-playfair text-3xl font-bold text-carbon mb-2">Panel de Administración</h1>
-          <p className="text-carbon/50 text-sm mb-10">Gestiona productos y pedidos.</p>
+          <p className="text-carbon/50 text-sm mb-10">Gestiona pedidos, inventario y productos.</p>
         </AnimatedSection>
 
         {/* Orders */}
@@ -849,6 +850,18 @@ const Admin = () => {
             )}
           </div>
         </AnimatedSection>
+
+        <div className="mb-12" />
+
+        <AnimatedSection delay={0.08}>
+          <h2 className="font-playfair text-xl font-semibold text-carbon mb-2">Gestión de stock</h2>
+          <p className="text-carbon/40 text-sm mb-4">
+            Los botones y el campo numérico modifican solo un borrador; pulsa Guardar en cada fila para aplicar en el servidor. El ajuste rápido usa la cantidad del recuadro superior de la tabla.
+          </p>
+          <AdminStockManager products={products} loading={loading} onStockUpdated={refreshProducts} />
+        </AnimatedSection>
+
+        <div className="mb-12" />
 
         {/* Products */}
         <AnimatedSection delay={0.1}>
