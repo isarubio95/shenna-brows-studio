@@ -129,7 +129,7 @@ const Footer = () => {
           <div>
             <h4 className="font-semibold text-cream text-sm uppercase tracking-widest mb-4">Contacto</h4>
             <div className="flex gap-4 mb-4">
-              <a href="https://www.instagram.com/alexandralasherasmicro/" className="hover:text-gold transition-colors" aria-label="Instagram" rel="noopener noreferrer" target="_blank">
+              <a href="https://www.instagram.com/shennabrows/" className="hover:text-gold transition-colors" aria-label="Instagram" rel="noopener noreferrer" target="_blank">
                 <Instagram size={20} />
               </a>
               <a href="mailto:info@shennabrows.com" className="hover:text-gold transition-colors" aria-label="Email">

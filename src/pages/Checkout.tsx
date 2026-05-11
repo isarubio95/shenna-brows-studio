@@ -2,12 +2,26 @@ import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import AnimatedSection from "@/components/AnimatedSection";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { getShippingCost, FREE_SHIPPING_THRESHOLD } from "@/data/products";
+import {
+  getProvinceOptionsGrouped,
+  getProvinceOptionByCode,
+  getShippingEurForProvinceCode,
+  SHIPPING_PRICE_LEGEND,
+} from "@/data/shipping-provinces";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import Turnstile from "react-turnstile";
 import { getTurnstileSiteKey, getVisitorId, isCloudflareProtectionEnabled } from "@/lib/security";
@@ -19,7 +33,7 @@ const emptyShipping = {
   postal_code: "",
   city: "",
   province: "",
-  phone: "",
+  province_code: "",
 };
 
 const Checkout = () => {
@@ -36,13 +50,24 @@ const Checkout = () => {
   const cooldownSeconds = Math.ceil(cooldownMs / 1000);
   const isCooldownActive = cooldownMs > 0;
 
-  const shippingCost = getShippingCost(totalPrice);
-  const total = totalPrice + shippingCost;
+  const provinceGroups = useMemo(() => getProvinceOptionsGrouped(), []);
+  const shippingEur = getShippingEurForProvinceCode(shipping.province_code);
+  const canQuoteShipping = shippingEur != null;
+  const total = totalPrice + (shippingEur ?? 0);
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       toast({ title: "Introduce tu email", variant: "destructive" });
+      return;
+    }
+    const quoted = getShippingEurForProvinceCode(shipping.province_code.trim());
+    if (!shipping.province_code.trim() || quoted == null) {
+      toast({
+        title: "Elige tu provincia",
+        description: "Selecciona la provincia de envío en el desplegable para calcular el envío.",
+        variant: "destructive",
+      });
       return;
     }
     const ship = {
@@ -51,15 +76,16 @@ const Checkout = () => {
       line2: shipping.line2.trim(),
       postal_code: shipping.postal_code.trim(),
       city: shipping.city.trim(),
-      province: shipping.province.trim(),
+      province: shipping.province.trim() || getProvinceOptionByCode(shipping.province_code)?.label || "",
+      province_code: shipping.province_code.trim().toUpperCase(),
       phone: shipping.phone.trim(),
+      country: shipping.province_code.trim().toUpperCase() === "PT" ? "PRT" : "ESP",
     };
     const missing: string[] = [];
     if (!ship.name) missing.push("nombre completo");
     if (!ship.line1) missing.push("dirección");
     if (!ship.postal_code) missing.push("código postal");
     if (!ship.city) missing.push("localidad");
-    if (!ship.province) missing.push("provincia");
     if (!ship.phone) missing.push("teléfono");
     if (missing.length > 0) {
       toast({
@@ -234,16 +260,39 @@ const Checkout = () => {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ship-province" className="text-carbon/70 text-sm">Provincia *</Label>
-                  <Input
-                    id="ship-province"
-                    value={shipping.province}
-                    onChange={(e) => setShipping((s) => ({ ...s, province: e.target.value }))}
-                    placeholder="Madrid"
-                    maxLength={80}
-                    className="bg-white border-gold/15 focus:border-gold"
-                  />
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="ship-province" className="text-carbon/70 text-sm">Provincia (España o Portugal) *</Label>
+                  <Select
+                    value={shipping.province_code || undefined}
+                    onValueChange={(code) => {
+                      const opt = getProvinceOptionByCode(code);
+                      setShipping((s) => ({
+                        ...s,
+                        province_code: code,
+                        province: opt?.label ?? "",
+                      }));
+                    }}
+                  >
+                    <SelectTrigger
+                      id="ship-province"
+                      className="bg-white border-gold/15 focus:border-gold w-full h-10"
+                    >
+                      <SelectValue placeholder="Selecciona tu provincia" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {provinceGroups.map(({ ccaa, provinces }) => (
+                        <SelectGroup key={ccaa}>
+                          <SelectLabel className="text-carbon/80">{ccaa}</SelectLabel>
+                          {provinces.map((p) => (
+                            <SelectItem key={p.code} value={p.code}>
+                              {p.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-carbon/45 leading-relaxed">{SHIPPING_PRICE_LEGEND}</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ship-phone" className="text-carbon/70 text-sm">Teléfono *</Label>
@@ -266,7 +315,7 @@ const Checkout = () => {
 
               <Button
                 type="submit"
-                disabled={loading || isCooldownActive}
+                disabled={loading || isCooldownActive || !canQuoteShipping}
                 className="w-full bg-gold hover:bg-gold/90 text-white py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] mt-4"
               >
                 {loading ? (
@@ -274,8 +323,10 @@ const Checkout = () => {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Procesando...
                   </>
-                ) : (
+                ) : canQuoteShipping ? (
                   `Pagar €${total.toFixed(2)}`
+                ) : (
+                  "Selecciona provincia para continuar"
                 )}
               </Button>
               {isCooldownActive ? (
@@ -320,18 +371,20 @@ const Checkout = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-carbon/60">Envío</span>
-                  <span className={shippingCost === 0 ? "text-green-600 font-medium" : "text-carbon"}>
-                    {shippingCost === 0 ? "GRATIS" : `€${shippingCost.toFixed(2)}`}
+                  <span className="text-carbon">
+                    {canQuoteShipping ? `€${shippingEur!.toFixed(2)}` : "—"}
                   </span>
                 </div>
-                {shippingCost > 0 && (
-                  <p className="text-xs text-carbon/40">
-                    Envío gratis en pedidos de €{FREE_SHIPPING_THRESHOLD}+
+                {!canQuoteShipping ? (
+                  <p className="text-xs text-carbon/45">
+                    Elige provincia en el formulario para ver el importe de envío y el total.
                   </p>
-                )}
+                ) : null}
                 <div className="border-t border-gold/10 pt-3 flex justify-between">
                   <span className="font-medium text-carbon">Total</span>
-                  <span className="font-playfair text-xl font-bold text-carbon">€{total.toFixed(2)}</span>
+                  <span className="font-playfair text-xl font-bold text-carbon">
+                    {canQuoteShipping ? `€${total.toFixed(2)}` : "—"}
+                  </span>
                 </div>
               </div>
             </div>

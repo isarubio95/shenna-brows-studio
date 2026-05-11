@@ -1,8 +1,8 @@
-[ ] Gestión de stock
-[ ]Añadir pack dúo tijeras y pinzas 60
-[ ] Quitar gastos de envío gratuitos
+[X] Gestión de stock
+[X] Añadir pack dúo tijeras y pinzas 60
+[X] Quitar gastos de envío gratuitos
 [ ] Cambiar fondo hero
-[ ] Gastos de envío
+[X] Gastos de envío
 - 7€ península
 - 10€ baleares
 - 15€ canarias

@@ -15,10 +15,23 @@ type Product = Tables<"products">;
 
 interface ProductEditDialogProps {
   product: Product | null;
+  /** En creación, `product` debe ser `null`. */
+  mode: "create" | "edit";
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }
+
+const slugify = (raw: string): string => {
+  const s = raw
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return s.length > 0 ? s : "producto";
+};
 
 const BUCKET = "product-images";
 const SUPABASE_URL = "https://vanhsuisvxvclxdgutaw.supabase.co";
@@ -50,7 +63,7 @@ const parseGalleryFromImageUrl = (imageUrl: string | null | undefined): string[]
   return [normalized];
 };
 
-const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEditDialogProps) => {
+const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: ProductEditDialogProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,12 +75,29 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
   const [isDragging, setIsDragging] = useState(false);
   const descriptionEditorRef = useRef<HTMLDivElement>(null);
 
-  // Sync form when product changes
   const currentProduct = product;
   useEffect(() => {
-    if (!currentProduct || !open) return;
+    if (!open) return;
+    if (mode === "create") {
+      setMaterialItems([""]);
+      setForm({
+        name: "",
+        tagline: "",
+        description: "",
+        materials: "",
+        shipping_info: "",
+        price: 0,
+        stock: 0,
+        image_url: null,
+        materials_label: "materiales",
+      });
+      setImageUrls([]);
+      if (descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = "";
+      return;
+    }
+    if (!currentProduct) return;
     const items = (currentProduct as any).materials
-      ? (currentProduct as any).materials.split('\n').filter((s: string) => s.trim())
+      ? (currentProduct as any).materials.split("\n").filter((s: string) => s.trim())
       : [""];
     setMaterialItems(items.length > 0 ? items : [""]);
     setForm({
@@ -79,10 +109,10 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
       price: currentProduct.price,
       stock: currentProduct.stock,
       image_url: currentProduct.image_url,
-      materials_label: (currentProduct as any).materials_label || 'materiales',
+      materials_label: (currentProduct as any).materials_label || "materiales",
     });
     setImageUrls(parseGalleryFromImageUrl(currentProduct.image_url));
-  }, [currentProduct, open]);
+  }, [currentProduct, mode, open]);
 
   const updateField = (field: keyof Product, value: string | number) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -94,7 +124,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
     if (descriptionEditorRef.current.innerHTML !== next) {
       descriptionEditorRef.current.innerHTML = next;
     }
-  }, [form.description, currentProduct?.id, open]);
+  }, [form.description, mode, currentProduct?.id, open]);
 
   const isComposicion = (form as any).materials_label === 'composicion';
 
@@ -123,11 +153,16 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
 
   const uploadImage = useCallback(
     async (file: File) => {
-      if (!currentProduct) return;
+      if (mode !== "create" && !currentProduct) return;
       setUploading(true);
       try {
         const ext = file.name.split(".").pop() || "jpg";
-        const filePath = `${currentProduct.slug}-${Date.now()}.${ext}`;
+        const nameForSlug = (form.name || "").trim();
+        const slugBase =
+          mode === "create"
+            ? (nameForSlug ? slugify(nameForSlug) : `borrador-${Date.now()}`)
+            : (currentProduct?.slug ?? "producto");
+        const filePath = `${slugBase}-${Date.now()}.${ext}`;
 
         const { error: uploadError } = await supabase.storage
           .from(BUCKET)
@@ -148,7 +183,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
         setUploading(false);
       }
     },
-    [currentProduct, toast]
+    [currentProduct, form.name, mode, toast]
   );
 
   const handleDrop = useCallback(
@@ -198,10 +233,44 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
   };
 
   const handleSave = async () => {
+    const materialsString = materialItems.filter((m) => m.trim()).join("\n");
+    const normalizedDescription = normalizeDescriptionHtml(String(form.description || ""));
+
+    if (mode === "create") {
+      const name = (form.name || "").trim();
+      if (!name) {
+        toast({ title: "Falta el nombre", description: "Indica un nombre para el producto.", variant: "destructive" });
+        return;
+      }
+      const slugFinal = slugify(name);
+      setSaving(true);
+      const { error } = await (supabase as any).from("products").insert({
+        name,
+        slug: slugFinal,
+        category: "otros",
+        tagline: form.tagline || "",
+        description: normalizedDescription || null,
+        materials: materialsString || null,
+        materials_label: (form as any).materials_label || "materiales",
+        shipping_info: form.shipping_info || "",
+        price: Number(form.price) || 0,
+        stock: Number(form.stock) || 0,
+        image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+      });
+
+      if (error) {
+        toast({ title: "Error al crear", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Producto creado correctamente" });
+        onSaved();
+        onOpenChange(false);
+      }
+      setSaving(false);
+      return;
+    }
+
     if (!currentProduct) return;
     setSaving(true);
-    const materialsString = materialItems.filter((m) => m.trim()).join('\n');
-    const normalizedDescription = normalizeDescriptionHtml(String(form.description || ""));
     const { error } = await (supabase as any)
       .from("products")
       .update({
@@ -209,7 +278,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
         tagline: form.tagline || "",
         description: normalizedDescription,
         materials: materialsString,
-        materials_label: (form as any).materials_label || 'materiales',
+        materials_label: (form as any).materials_label || "materiales",
         shipping_info: form.shipping_info || "",
         price: Number(form.price) || 0,
         stock: Number(form.stock) || 0,
@@ -227,7 +296,11 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
     setSaving(false);
   };
 
-  const displayImage = imageUrls[0] || (currentProduct ? getProductImageUrl(currentProduct.image_url, currentProduct.slug) : form.image_url);
+  const displayImage =
+    imageUrls[0] ||
+    (currentProduct
+      ? getProductImageUrl(currentProduct.image_url, currentProduct.slug)
+      : getProductImageUrl(form.image_url, slugify((form.name || "").trim() || "nuevo")));
   const canAddMaterial = materialItems.length === 0 || (materialItems[materialItems.length - 1]?.trim() ?? "") !== "";
 
   const applyFormat = (command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") => {
@@ -249,7 +322,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-cream">
         <DialogHeader>
           <DialogTitle className="font-playfair text-xl text-carbon">
-            Editar Producto
+            {mode === "create" ? "Nuevo producto" : "Editar producto"}
           </DialogTitle>
         </DialogHeader>
 
@@ -543,7 +616,7 @@ const ProductEditDialog = ({ product, open, onOpenChange, onSaved }: ProductEdit
             className="w-full bg-gold hover:bg-gold/90 text-white h-11 text-sm font-medium"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Guardar Cambios
+            {mode === "create" ? "Crear producto" : "Guardar cambios"}
           </Button>
         </div>
       </DialogContent>

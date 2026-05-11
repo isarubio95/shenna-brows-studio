@@ -10,15 +10,13 @@ import {
   redsysRealizarPagoUrl,
   type RedsysMerchantParams,
 } from "../_shared/redsys.ts";
+import { normalizeProvinceCode, shippingEurForNormalizedProvinceCode } from "../_shared/shipping.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-visitor-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-const FREE_SHIPPING_THRESHOLD = 50;
-const SHIPPING_COST_EUR = 5;
 
 type CheckoutProductRow = {
   id: string;
@@ -177,9 +175,6 @@ serve(async (req) => {
       resolvedLines.push({ productId: pid, name: String(p.name), quantity: qty, unitPrice: unit });
     }
 
-    const shippingEur = subtotalEur >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST_EUR;
-    const totalEur = subtotalEur + shippingEur;
-
     const trim = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
     const sa = shippingAddress && typeof shippingAddress === "object" ? shippingAddress : {};
     const shipName = trim(sa.name, 120);
@@ -187,16 +182,20 @@ serve(async (req) => {
     const shipLine2 = trim(sa.line2, 120);
     const shipCp = trim(sa.postal_code ?? sa.cp ?? sa.zip, 12);
     const shipCity = trim(sa.city ?? sa.locality, 120);
-    const shipProvince = trim(sa.province ?? sa.state, 80);
+    const shipProvinceLabel = trim(sa.province ?? sa.state, 80);
     const shipPhone = trim(sa.phone ?? sa.phoneNumber, 32);
-    const shipCountry = (trim(sa.country, 8) || "ESP").toUpperCase();
+    const provinceCodeNorm = normalizeProvinceCode(sa.province_code ?? sa.provinceCode);
+    const shipCountryRaw = trim(sa.country, 8).toUpperCase();
+    const shipCountry = provinceCodeNorm === "PT"
+      ? (shipCountryRaw === "ESP" || shipCountryRaw === "" ? "PRT" : shipCountryRaw)
+      : (shipCountryRaw || "ESP");
 
     const missingShip: string[] = [];
     if (!shipName) missingShip.push("name");
     if (!shipLine1) missingShip.push("line1");
     if (!shipCp) missingShip.push("postal_code");
     if (!shipCity) missingShip.push("city");
-    if (!shipProvince) missingShip.push("province");
+    if (!provinceCodeNorm) missingShip.push("province_code");
     if (!shipPhone) missingShip.push("phone");
     if (missingShip.length > 0) {
       return new Response(
@@ -205,13 +204,25 @@ serve(async (req) => {
       );
     }
 
+    const shippingEur = shippingEurForNormalizedProvinceCode(provinceCodeNorm);
+    if (shippingEur == null) {
+      return new Response(JSON.stringify({ error: "Código de provincia de envío no válido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const totalEur = subtotalEur + shippingEur;
+
+    const provinceDisplay = shipProvinceLabel || provinceCodeNorm;
+
     const normalizedShipping = {
       name: shipName,
       line1: shipLine1,
       line2: shipLine2,
       postal_code: shipCp,
       city: shipCity,
-      province: shipProvince,
+      province: provinceDisplay,
+      province_code: provinceCodeNorm,
       phone: shipPhone,
       country: shipCountry,
     };

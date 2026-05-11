@@ -122,7 +122,7 @@ const Navbar = () => {
         {/* Right icons — visible on ALL screen sizes */}
         <div className="flex items-center gap-3 lg:gap-4 relative z-10">
           <a
-            href="https://www.instagram.com/alexandralasherasmicro/"
+            href="https://www.instagram.com/shennabrows/"
             target="_blank"
             rel="noopener noreferrer"
             className={`hidden lg:flex p-1 transition-colors duration-300 ${iconColor}`}
@@ -239,7 +239,7 @@ const Navbar = () => {
           <div className="mt-auto pb-6 pt-4 border-t border-gold/10">
             <div className="flex items-center gap-4 px-1 mb-5">
               <a
-                href="https://www.instagram.com/alexandralasherasmicro/"
+                href="https://www.instagram.com/shennabrows/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-carbon/70 hover:text-gold transition-colors"

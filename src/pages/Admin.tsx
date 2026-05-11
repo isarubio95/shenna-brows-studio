@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Pencil, Printer } from "lucide-react";
+import { Loader2, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
@@ -16,6 +16,15 @@ import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
 import { getProductImageUrl } from "@/lib/product-images";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -294,7 +303,7 @@ const buildCorreosPreregisterBody = (order: any) => {
 
   const userProvince = stringFrom(
     rawAddress,
-    ["province", "province_code", "state_code", "state", "region"],
+    ["province_code", "provinceCode", "province", "state_code", "state", "region"],
     (import.meta.env.VITE_CORREOS_DEFAULT_ADDRESSEE_PROVINCE as string | undefined)?.trim() || ""
   );
   let provinceForCorreos = userProvince;
@@ -445,7 +454,7 @@ const validateCorreosPreregisterConfig = (order: any): string[] => {
     { label: "shipping_address.address", keys: ["line1", "address", "street", "address1"] },
     { label: "shipping_address.cp", keys: ["postal_code", "zip", "cp", "postcode"] },
     { label: "shipping_address.locality", keys: ["city", "locality", "town"] },
-    { label: "shipping_address.province", keys: ["province", "province_code", "state_code", "state", "region"] },
+    { label: "shipping_address.province", keys: ["province_code", "provinceCode", "province", "state_code", "state", "region"] },
     { label: "shipping_address.phone", keys: ["phone", "contactPhone", "phoneNumber"] },
   ];
 
@@ -479,7 +488,10 @@ const Admin = () => {
   const [loading, setLoading] = useState(true);
   const [togglingTestimonial, setTogglingTestimonial] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [productDialogMode, setProductDialogMode] = useState<"create" | "edit">("edit");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [printingLabelOrderId, setPrintingLabelOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -517,8 +529,37 @@ const Admin = () => {
   };
 
   const openEdit = (product: any) => {
+    setProductDialogMode("edit");
     setEditingProduct(product);
     setEditDialogOpen(true);
+  };
+
+  const openCreateProduct = () => {
+    setProductDialogMode("create");
+    setEditingProduct(null);
+    setEditDialogOpen(true);
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setDeleteInProgress(true);
+    const id = productToDelete.id;
+    const { error } = await (supabase as any).from("products").delete().eq("id", id);
+    if (error) {
+      toast({
+        title: "No se pudo eliminar",
+        description: error.message.includes("foreign key")
+          ? "Este producto está vinculado a pedidos antiguos. En base de datos habría que usar ON DELETE SET NULL o conservar el producto."
+          : error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: "Producto eliminado" });
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setProductToDelete(null);
+    }
+    setDeleteInProgress(false);
   };
 
   const toggleFeatured = async (id: string, current: boolean) => {
@@ -693,6 +734,13 @@ const Admin = () => {
         setOrders((prev) => prev.map((item) => (item.id === order.id ? { ...item, correos_shipment_code: newShipmentCode } : item)));
         shipments = shipmentsForPrint;
         lastPreregisterData = preregisterRes.data;
+
+        const { error: trackingEmailErr } = await supabase.functions.invoke("send-customer-order-tracking", {
+          body: { orderId: order.id },
+        });
+        if (trackingEmailErr) {
+          console.warn("send-customer-order-tracking", trackingEmailErr);
+        }
       }
 
       const buildLabelRequestBody = (shipmentsArr: string[]) => ({
@@ -865,7 +913,20 @@ const Admin = () => {
 
         {/* Products */}
         <AnimatedSection delay={0.1}>
-          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Editar Productos</h2>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
+            <div>
+              <h2 className="font-playfair text-xl font-semibold text-carbon">Productos</h2>
+              <p className="text-carbon/40 text-sm mt-1">Crea, edita o elimina artículos del catálogo en Supabase.</p>
+            </div>
+            <Button
+              type="button"
+              onClick={openCreateProduct}
+              className="shrink-0 bg-gold hover:bg-gold/90 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo producto
+            </Button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {products.map((p) => (
               <div key={p.id} className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden group">
@@ -879,25 +940,64 @@ const Admin = () => {
                     <span className="text-carbon font-semibold">€{Number(p.price).toFixed(2)}</span>
                     <span className="text-xs text-carbon/50">Stock: {p.stock}</span>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openEdit(p)}
-                    className="w-full mt-3 border-gold/20 text-gold hover:bg-gold/5"
-                  >
-                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                    Editar
-                  </Button>
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEdit(p)}
+                      className="flex-1 border-gold/20 text-gold hover:bg-gold/5"
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setProductToDelete({ id: p.id, name: p.name })}
+                      className="border-red-200 text-red-600 hover:bg-red-50 shrink-0"
+                      aria-label={`Eliminar ${p.name}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </AnimatedSection>
 
+        <AlertDialog open={productToDelete !== null} onOpenChange={(open) => !open && setProductToDelete(null)}>
+          <AlertDialogContent className="bg-cream border-gold/20">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-playfair text-carbon">¿Eliminar producto?</AlertDialogTitle>
+              <AlertDialogDescription className="text-carbon/60">
+                Se borrará de forma permanente{" "}
+                <span className="font-medium text-carbon">{productToDelete?.name}</span>. No podrás deshacer esta acción.
+                Si el producto figura en líneas de pedido, la base de datos puede rechazar el borrado.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-gold/20">Cancelar</AlertDialogCancel>
+              <Button
+                variant="destructive"
+                onClick={() => void confirmDeleteProduct()}
+                disabled={deleteInProgress}
+              >
+                {deleteInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Eliminar
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <ProductEditDialog
           product={editingProduct}
+          mode={productDialogMode}
           open={editDialogOpen}
-          onOpenChange={setEditDialogOpen}
+          onOpenChange={(open) => {
+            setEditDialogOpen(open);
+            if (!open) setEditingProduct(null);
+          }}
           onSaved={refreshProducts}
         />
 

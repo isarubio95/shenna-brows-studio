@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { Buffer } from "node:buffer";
 import { decodeMerchantParameters, isMerchantSignatureValid } from "../_shared/redsys.ts";
+import { buildOrderConfirmationHtml } from "../_shared/orderConfirmationEmail.ts";
 
 const secretKey = Deno.env.get("REDSYS_SECRET_KEY")?.trim();
 const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
@@ -27,6 +28,7 @@ type MerchantShippingAddress = {
   postal_code?: string;
   city?: string;
   province?: string;
+  province_code?: string;
   phone?: string;
   country?: string;
 };
@@ -148,11 +150,14 @@ function shippingAddressFromPayload(a: MerchantShippingAddress | undefined): Rec
   const postal_code = pick(a as Record<string, unknown>, ["postal_code", "cp", "zip"]);
   const city = pick(a as Record<string, unknown>, ["city", "locality"]);
   const province = pick(a as Record<string, unknown>, ["province", "state"]);
+  const province_code = pick(a as Record<string, unknown>, ["province_code", "provinceCode"]);
   const phone = pick(a as Record<string, unknown>, ["phone", "phoneNumber"]);
   if (!name || !line1 || !postal_code || !city || !province || !phone) return null;
   const line2 = pick(a as Record<string, unknown>, ["line2"]);
   const country = pick(a as Record<string, unknown>, ["country"]) || "ESP";
-  return { name, line1, line2, postal_code, city, province, phone, country };
+  const base: Record<string, string> = { name, line1, line2, postal_code, city, province, phone, country };
+  if (province_code) base.province_code = province_code;
+  return base;
 }
 
 function pick(obj: Record<string, unknown>, keys: string[]): string {
@@ -303,89 +308,22 @@ async function sendOrderConfirmationEmail(args: {
   total: number;
   lines: Array<{ name: string; quantity: number; unitPrice: number }>;
   shippingAddress?: Record<string, string> | null;
+  correosShipmentCode?: string | null;
 }) {
   if (!resendApiKey) {
     console.warn("redsys_notify_resend_not_configured");
     return;
   }
 
-  const formatEur = (value: number) =>
-    Number(value || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
-  const escapeHtml = (value: string) =>
-    value
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-
-  const linesHtml = args.lines
-    .map(
-      (line) =>
-        `
-          <tr>
-            <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #0f172a;">
-              ${escapeHtml(line.name)}
-            </td>
-            <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; text-align: center; color: #334155;">
-              x${line.quantity}
-            </td>
-            <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; text-align: right; color: #0f172a;">
-              ${formatEur(line.unitPrice * line.quantity)}
-            </td>
-          </tr>
-        `,
-    )
-    .join("");
-
-  const html = `
-    <div style="background: #f8fafc; padding: 24px 12px; font-family: Arial, sans-serif; color: #1f2937;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden;">
-        <tr>
-          <td style="padding: 24px; background: #111827; color: #ffffff;">
-            <p style="margin: 0; font-size: 12px; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.85;">Shenna Brows Studio</p>
-            <h2 style="margin: 8px 0 0; font-size: 24px; line-height: 1.25;">Pago confirmado</h2>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 24px;">
-            <p style="margin: 0 0 12px; font-size: 15px; line-height: 1.5; color: #334155;">
-              Gracias por tu pedido. Hemos recibido el pago correctamente y ya estamos preparando tu compra.
-            </p>
-            <p style="margin: 0 0 18px; font-size: 14px; color: #475569;">
-              <strong>Referencia del pedido:</strong> ${escapeHtml(args.orderRef)}
-            </p>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
-              <thead>
-                <tr>
-                  <th align="left" style="padding: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Producto</th>
-                  <th align="center" style="padding: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Cant.</th>
-                  <th align="right" style="padding: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Importe</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${linesHtml}
-              </tbody>
-            </table>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 18px;">
-              <tr>
-                <td style="padding: 4px 0; color: #475569;">Subtotal</td>
-                <td style="padding: 4px 0; text-align: right; color: #0f172a;">${formatEur(args.subtotal)}</td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 0; color: #475569;">Envío</td>
-                <td style="padding: 4px 0; text-align: right; color: #0f172a;">${formatEur(args.shipping)}</td>
-              </tr>
-              <tr>
-                <td style="padding: 12px 0 0; font-weight: 700; color: #0f172a;">Total</td>
-                <td style="padding: 12px 0 0; text-align: right; font-weight: 700; color: #0f172a;">${formatEur(args.total)}</td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </div>
-  `;
+  const html = buildOrderConfirmationHtml({
+    variant: "paid",
+    orderRef: args.orderRef,
+    subtotal: args.subtotal,
+    shipping: args.shipping,
+    total: args.total,
+    lines: args.lines,
+    correosShipmentCode: args.correosShipmentCode,
+  });
 
   let ticketPdfBase64: string | null = null;
   try {
@@ -485,7 +423,7 @@ serve(async (req) => {
 
     const { data: existing } = await admin
       .from("orders")
-      .select("id, status, shipping_address, email, subtotal, shipping, total, pending_cart_snapshot")
+      .select("id, status, shipping_address, email, subtotal, shipping, total, pending_cart_snapshot, correos_shipment_code")
       .eq("stripe_session_id", dsOrder)
       .maybeSingle();
 
@@ -565,7 +503,7 @@ serve(async (req) => {
           })
           .eq("id", existing.id)
           .eq("status", "pending_payment")
-          .select("id");
+          .select("id, correos_shipment_code");
 
         if (upErr) {
           console.error("redsys_notify_pending_update", upErr);
@@ -575,6 +513,7 @@ serve(async (req) => {
           if (itemsErr) {
             console.error("redsys_notify_order_items", itemsErr);
           }
+          const row = updated[0] as { id?: string; correos_shipment_code?: string | null };
           await sendOrderConfirmationEmail({
             email: payload.email,
             orderRef: dsOrder,
@@ -583,6 +522,7 @@ serve(async (req) => {
             total,
             lines: buildEmailLines(),
             shippingAddress: keepAddress,
+            correosShipmentCode: row?.correos_shipment_code ?? (existing as { correos_shipment_code?: string | null }).correos_shipment_code ?? null,
           });
         } else {
           const { data: fresh } = await admin.from("orders").select("status").eq("id", existing.id).maybeSingle();
@@ -616,7 +556,7 @@ serve(async (req) => {
         stripe_session_id: dsOrder,
         shipping_address,
       })
-      .select("id")
+      .select("id, correos_shipment_code")
       .single();
 
     if (orderErr || !orderRow?.id) {
@@ -625,6 +565,7 @@ serve(async (req) => {
     }
 
     const orderId = orderRow.id as string;
+    const inserted = orderRow as { id: string; correos_shipment_code?: string | null };
     const orderItems = buildOrderItems(orderId);
 
     const { error: itemsErr } = await admin.from("order_items").insert(orderItems);
@@ -639,6 +580,7 @@ serve(async (req) => {
       total,
       lines: buildEmailLines(),
       shippingAddress: shipping_address,
+      correosShipmentCode: inserted.correos_shipment_code ?? null,
     });
 
     return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain" } });

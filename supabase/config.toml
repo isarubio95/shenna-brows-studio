@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.send-admin-email]
 verify_jwt = false
 
+[functions.send-customer-order-tracking]
+verify_jwt = false
+
 [functions.resend-forward-inbound]
 verify_jwt = false
 
