@@ -144,6 +144,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          is_pack: boolean
           materials: string | null
           materials_label: string | null
           name: string
@@ -161,6 +162,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_pack?: boolean
           materials?: string | null
           materials_label?: string | null
           name: string
@@ -178,6 +180,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_pack?: boolean
           materials?: string | null
           materials_label?: string | null
           name?: string

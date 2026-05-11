@@ -935,7 +935,14 @@ const Admin = () => {
                 </div>
                 <div className="p-4">
                   <h3 className="font-medium text-carbon">{p.name}</h3>
-                  <p className="text-xs text-carbon/40 mb-1">{p.category}</p>
+                  <p className="text-xs text-carbon/40 mb-1 flex flex-wrap items-center gap-2">
+                    <span>{p.category}</span>
+                    {p.is_pack ? (
+                      <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">
+                        Pack
+                      </span>
+                    ) : null}
+                  </p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-carbon font-semibold">€{Number(p.price).toFixed(2)}</span>
                     <span className="text-xs text-carbon/50">Stock: {p.stock}</span>

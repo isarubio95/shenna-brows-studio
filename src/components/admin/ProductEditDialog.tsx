@@ -90,6 +90,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         stock: 0,
         image_url: null,
         materials_label: "materiales",
+        is_pack: false,
       });
       setImageUrls([]);
       if (descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = "";
@@ -110,6 +111,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       stock: currentProduct.stock,
       image_url: currentProduct.image_url,
       materials_label: (currentProduct as any).materials_label || "materiales",
+      is_pack: currentProduct.is_pack ?? false,
     });
     setImageUrls(parseGalleryFromImageUrl(currentProduct.image_url));
   }, [currentProduct, mode, open]);
@@ -256,6 +258,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         price: Number(form.price) || 0,
         stock: Number(form.stock) || 0,
         image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+        is_pack: Boolean(form.is_pack),
       });
 
       if (error) {
@@ -283,6 +286,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         price: Number(form.price) || 0,
         stock: Number(form.stock) || 0,
         image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+        is_pack: Boolean(form.is_pack),
       })
       .eq("id", currentProduct.id);
 
@@ -445,6 +449,25 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 className="mt-1 bg-white border-gold/15"
               />
             </div>
+
+            <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-gold/15 bg-white/60 px-4 py-3">
+              <div className="min-w-0">
+                <Label htmlFor="is_pack" className="text-carbon/70 text-xs uppercase tracking-wider">
+                  Es pack (tienda)
+                </Label>
+                <p id="is_pack-hint" className="text-xs text-carbon/45 mt-1 leading-snug">
+                  Si está activo, el artículo se muestra solo en la sección Packs de la página Tienda, no junto al resto de productos sueltos.
+                </p>
+              </div>
+              <Switch
+                id="is_pack"
+                checked={Boolean(form.is_pack)}
+                onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_pack: checked }))}
+                className="shrink-0 data-[state=checked]:bg-gold"
+                aria-describedby="is_pack-hint"
+              />
+            </div>
+
             <div className="sm:col-span-2">
               <Label htmlFor="description" className="text-carbon/70 text-xs uppercase tracking-wider">
                 Descripción

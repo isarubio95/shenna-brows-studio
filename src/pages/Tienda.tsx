@@ -50,9 +50,11 @@ interface ProductCardProps {
   onOpenProduct: (slug: string) => void;
   onAddToCart: (product: Product) => void;
   addToCartDisabled: boolean;
+  /** Tarjeta resaltada para la sección de packs. */
+  featured?: boolean;
 }
 
-const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisabled }: ProductCardProps) => {
+const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisabled, featured }: ProductCardProps) => {
   const gallery = getProductImageGallery(product.image_url, product.slug);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -73,7 +75,11 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
       <motion.article
         whileHover={{ y: -8 }}
         transition={{ duration: 0.3 }}
-        className="h-full bg-white rounded-2xl overflow-hidden border border-gold/10 shadow-[0_6px_24px_rgba(0,0,0,0.05)] hover:shadow-[0_14px_40px_rgba(0,0,0,0.1)] transition-shadow duration-500 flex flex-col cursor-pointer"
+        className={`h-full rounded-2xl overflow-hidden border shadow-[0_6px_24px_rgba(0,0,0,0.05)] hover:shadow-[0_14px_40px_rgba(0,0,0,0.1)] transition-shadow duration-500 flex flex-col cursor-pointer ${
+          featured
+            ? "bg-[linear-gradient(145deg,#fffef8_0%,#ffffff_45%,#fff9ec_100%)] border-gold/35 ring-1 ring-gold/25"
+            : "bg-white border-gold/10"
+        }`}
         role="link"
         tabIndex={0}
         onClick={() => onOpenProduct(product.slug)}
@@ -85,6 +91,12 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
         }}
       >
         <Link to={`/${product.slug}`} className="relative block aspect-square bg-muted overflow-hidden">
+          {featured && (
+            <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-gold px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white shadow-md">
+              <Sparkles size={12} aria-hidden />
+              Pack
+            </span>
+          )}
           <img
             src={gallery[currentImageIndex]}
             alt={`${product.name} - Shenna Brows`}
@@ -190,6 +202,23 @@ const Tienda = () => {
       });
   }, []);
 
+  const { individualProducts, packProducts } = useMemo(() => {
+    const individuals: Product[] = [];
+    const packs: Product[] = [];
+    for (const p of products) {
+      (p.is_pack ? packs : individuals).push(p);
+    }
+    const byName = (a: Product, b: Product) => a.name.localeCompare(b.name, "es");
+    individuals.sort(byName);
+    packs.sort(byName);
+    return { individualProducts: individuals, packProducts: packs };
+  }, [products]);
+
+  const catalogForSeo = useMemo(
+    () => [...individualProducts, ...packProducts],
+    [individualProducts, packProducts],
+  );
+
   const jsonLd = useMemo(() => {
     const baseUrl = window.location.origin;
     return {
@@ -197,7 +226,7 @@ const Tienda = () => {
       "@type": "ItemList",
       name: "Catalogo Shenna Brows",
       description: SEO_DESCRIPTION,
-      itemListElement: products.map((product, index) => ({
+      itemListElement: catalogForSeo.map((product, index) => ({
         "@type": "ListItem",
         position: index + 1,
         item: {
@@ -216,7 +245,7 @@ const Tienda = () => {
         },
       })),
     };
-  }, [products]);
+  }, [catalogForSeo]);
 
   const handleAddToCart = (product: Product) => {
     addItem({
@@ -243,7 +272,7 @@ const Tienda = () => {
         <AnimatedSection>
           <div className="rounded-3xl border border-gold/20 bg-[radial-gradient(circle_at_top_right,rgba(197,160,89,0.18),transparent_40%),linear-gradient(to_bottom,#fffaf0,#ffffff)] p-8 md:p-12 shadow-[0_14px_45px_rgba(0,0,0,0.06)]">
             <p className="text-gold text-xs uppercase tracking-[0.28em] font-medium mb-4">Tienda oficial</p>
-            <h1 className="font-playfair text-4xl md:text-5xl lg:text-6xl text-carbon leading-tight">
+            <h1 className="font-playfair text-4xl md:text-5xl lg:text-5xl text-carbon leading-tight">
               Herramientas premium para unas cejas impecables
             </h1>
             <p className="text-carbon/70 max-w-2xl mt-5 text-base md:text-lg leading-relaxed">
@@ -251,20 +280,20 @@ const Tienda = () => {
               de alto nivel en cada aplicación.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-3">
-              <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-carbon/80 bg-white/80">
-                <ShieldCheck size={16} className="text-gold" />
+            <ul className="mt-8 flex flex-wrap gap-x-8 gap-y-2.5 text-sm text-carbon/70 list-none p-0 m-0">
+              <li className="inline-flex items-center gap-2.5">
+                <ShieldCheck size={17} className="text-gold shrink-0" aria-hidden />
                 Calidad profesional
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-carbon/80 bg-white/80">
-                <Truck size={16} className="text-gold" />
-                Envio rapido 24/72h
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 px-4 py-2 text-sm text-carbon/80 bg-white/80">
-                <Sparkles size={16} className="text-gold" />
-                Resultados de precision
-              </span>
-            </div>
+              </li>
+              <li className="inline-flex items-center gap-2.5">
+                <Truck size={17} className="text-gold shrink-0" aria-hidden />
+                Envío rápido 24/72h
+              </li>
+              <li className="inline-flex items-center gap-2.5">
+                <Sparkles size={17} className="text-gold shrink-0" aria-hidden />
+                Resultados de precisión
+              </li>
+            </ul>
 
             <Button
               asChild
@@ -278,15 +307,15 @@ const Tienda = () => {
 
       <section id="productos" className="container mx-auto px-6 mt-16">
         <AnimatedSection>
-          <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center text-carbon">Nuestra coleccion</h2>
+          <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center text-carbon">Productos</h2>
           <p className="text-center text-carbon/60 max-w-2xl mx-auto mt-4 mb-10">
             Elige la herramienta ideal para elevar tu tecnica y potenciar el resultado de cada diseno.
           </p>
         </AnimatedSection>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {loading ? (
-            Array.from({ length: 5 }).map((_, i) => (
+            Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="bg-white rounded-2xl overflow-hidden border border-gold/10">
                 <Skeleton className="aspect-square" />
                 <div className="p-6 space-y-3">
@@ -298,7 +327,7 @@ const Tienda = () => {
               </div>
             ))
           ) : (
-            products.map((product, i) => (
+            individualProducts.map((product, i) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -310,6 +339,60 @@ const Tienda = () => {
             ))
           )}
         </div>
+
+        {(loading || packProducts.length > 0) && (
+          <div id={loading ? undefined : "packs-destacados"} className="mt-20 md:mt-24">
+            <AnimatedSection>
+              <div className="text-center mb-10">
+                {loading ? (
+                  <div className="space-y-3 max-w-xl mx-auto">
+                    <Skeleton className="h-3 w-28 mx-auto rounded-full" />
+                    <Skeleton className="h-9 w-40 mx-auto" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-[85%] max-w-md mx-auto" />
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-gold text-xs uppercase tracking-[0.28em] font-medium mb-3">Destacados</p>
+                    <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon">Packs</h2>
+                    <p className="text-carbon/60 max-w-xl mx-auto mt-3 text-sm md:text-base">
+                      Combinaciones pensadas para quien quiere equiparse de una vez y ahorrar frente a la compra por separado.
+                    </p>
+                  </>
+                )}
+              </div>
+            </AnimatedSection>
+
+            <div className="rounded-3xl border border-gold/25 bg-[radial-gradient(ellipse_at_top,rgba(197,160,89,0.12),transparent_55%),linear-gradient(to_bottom,#fffdf8,#ffffff)] p-6 sm:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                {loading
+                  ? Array.from({ length: 2 }).map((_, i) => (
+                      <div key={`pack-skel-${i}`} className="bg-white/80 rounded-2xl overflow-hidden border border-gold/15">
+                        <Skeleton className="aspect-square" />
+                        <div className="p-6 space-y-3">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-6 w-40" />
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-10 w-full mt-4" />
+                        </div>
+                      </div>
+                    ))
+                  : packProducts.map((product, i) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        delay={i * 0.08}
+                        onOpenProduct={(nextSlug) => navigate(`/${nextSlug}`)}
+                        onAddToCart={handleAddToCart}
+                        addToCartDisabled={isAddToCartDisabled}
+                        featured
+                      />
+                    ))}
+              </div>
+            </div>
+          </div>
+        )}
+
       </section>
     </main>
   );

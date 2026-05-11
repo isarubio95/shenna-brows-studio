@@ -93,8 +93,6 @@ const Footer = () => {
             {[
               { label: "Inicio", to: "/" },
               { label: "Tienda", to: "/tienda" },
-              { label: "Pinzas", to: "/pinzas" },
-              { label: "Tijeras", to: "/tijeras" },
               { label: "Sobre mí", to: "/sobre-mi" },
             ].map((l) => (
               <li key={l.to}>
