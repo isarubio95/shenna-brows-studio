@@ -122,7 +122,7 @@ const Index = () => {
             <AnimatedSection delay={0.1} className="hidden lg:block w-full lg:w-[34%]">
               <div className="max-w-[320px] sm:max-w-[360px] mx-auto rounded-2xl overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.25)] border border-white/25 backdrop-blur-sm">
                 <video
-                  className="w-full aspect-[9/16] object-cover"
+                  className="w-full aspect-9/16 object-cover"
                   src="/video-presentacion2-vertical.mp4"
                   poster={videoPoster ?? undefined}
                   autoPlay
@@ -158,7 +158,7 @@ const Index = () => {
       </section>
 
       {/* Video móvil debajo del hero */}
-      <section className="lg:hidden relative w-full h-[100dvh] overflow-hidden">
+      <section className="lg:hidden relative w-full h-dvh overflow-hidden">
         <video
           className="w-full h-full object-cover"
           src="/video-presentacion2-vertical.mp4"
