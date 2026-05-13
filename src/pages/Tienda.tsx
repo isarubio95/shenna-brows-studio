@@ -364,7 +364,13 @@ const Tienda = () => {
             </AnimatedSection>
 
             <div className="rounded-3xl border border-gold/25 bg-[radial-gradient(ellipse_at_top,rgba(197,160,89,0.12),transparent_55%),linear-gradient(to_bottom,#fffdf8,#ffffff)] p-6 sm:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div
+                className={
+                  !loading && packProducts.length === 1
+                    ? "grid grid-cols-1 gap-8 max-w-lg mx-auto w-full"
+                    : "grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto"
+                }
+              >
                 {loading
                   ? Array.from({ length: 2 }).map((_, i) => (
                       <div key={`pack-skel-${i}`} className="bg-white/80 rounded-2xl overflow-hidden border border-gold/15">
