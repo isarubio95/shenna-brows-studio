@@ -60,7 +60,7 @@ const InstagramPostEmbed = ({ className = "" }: InstagramPostEmbedProps) => {
       </p>
       <div className="w-full max-w-[540px] rounded-2xl border border-gold/25 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden">
         <blockquote
-          className="instagram-media !m-0 !max-w-none w-full min-w-[280px] sm:min-w-[326px] border-0 shadow-none p-0 bg-transparent"
+          className="instagram-media m-0! max-w-none! w-full min-w-[280px] sm:min-w-[326px] border-0 shadow-none p-0 bg-transparent"
           data-instgrm-captioned
           data-instgrm-permalink={INSTAGRAM_PERMALINK}
           data-instgrm-version="14"

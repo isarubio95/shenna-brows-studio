@@ -34,7 +34,7 @@ const CeoSection = () => (
               <img
                 src={ceoImg}
                 alt="Alexandra – CEO & Fundadora de Shenna Brows"
-                className="w-full max-w-md object-cover aspect-[3/4]"
+                className="w-full max-w-md object-cover aspect-3/4"
                 loading="lazy"
               />
             </div>
