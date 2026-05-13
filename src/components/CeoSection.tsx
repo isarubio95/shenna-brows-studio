@@ -58,14 +58,14 @@ const CeoSection = () => (
 
             <p className="text-muted-foreground leading-relaxed">
               Alexandra es la mente creativa y la fuerza que impulsa cada
-              producto de Shenna Brows. Su obsesión por la perfección y su
+              producto de Shenna Brows. Su fijación por la perfección y su
               mirada artística definen el ADN de la marca.
             </p>
 
             <ul className="space-y-5 pt-2">
               {highlights.map(({ icon: Icon, title, text }) => (
                 <li key={title} className="flex gap-4">
-                  <div className="flex-shrink-0 mt-1 w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="shrink-0 mt-1 w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
                     <Icon className="w-4 h-4 text-primary" strokeWidth={1.8} />
                   </div>
                   <div>

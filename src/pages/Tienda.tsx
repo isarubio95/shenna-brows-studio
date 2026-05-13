@@ -273,11 +273,11 @@ const Tienda = () => {
           <div className="rounded-3xl border border-gold/20 bg-[radial-gradient(circle_at_top_right,rgba(197,160,89,0.18),transparent_40%),linear-gradient(to_bottom,#fffaf0,#ffffff)] p-8 md:p-12 shadow-[0_14px_45px_rgba(0,0,0,0.06)]">
             <p className="text-gold text-xs uppercase tracking-[0.28em] font-medium mb-4">Tienda oficial</p>
             <h1 className="font-playfair text-4xl md:text-5xl lg:text-5xl text-carbon leading-tight">
-              Herramientas premium para unas cejas impecables
+              Herramientas y productos premium para unas cejas impecables
             </h1>
             <p className="text-carbon/70 max-w-2xl mt-5 text-base md:text-lg leading-relaxed">
               Descubre la colección profesional de Shenna Brows. Productos diseñados para ofrecer precisión, control y resultados
-              de alto nivel en cada aplicación.
+              perfectos en cada aplicación.
             </p>
 
             <ul className="mt-8 flex flex-wrap gap-x-8 gap-y-2.5 text-sm text-carbon/70 list-none p-0 m-0">
