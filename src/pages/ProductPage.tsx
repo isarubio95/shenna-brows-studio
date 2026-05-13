@@ -336,7 +336,7 @@ const ProductPage = () => {
             <div className="max-md:-mx-6 max-md:px-6">
               <div
                 ref={relatedCarouselRef}
-                className="flex flex-row md:grid md:grid-cols-2 lg:grid-cols-4 md:max-w-5xl md:mx-auto gap-3 md:gap-4 overflow-x-auto md:overflow-x-visible overscroll-x-contain touch-pan-x snap-x snap-mandatory md:snap-none pb-1 md:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                className="flex flex-row md:grid md:grid-cols-2 lg:grid-cols-4 md:max-w-5xl md:mx-auto gap-3 md:gap-4 overflow-x-auto md:overflow-x-visible overscroll-x-contain touch-pan-x snap-x snap-mandatory md:snap-none pb-1 md:pb-0 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               >
                 {otherProducts.map((p) => (
                   <Link
