@@ -167,6 +167,7 @@ const ProductPage = () => {
 
   const descriptionItems = parseProductDescription(product.description);
   const gallery = getProductImageGallery(product.image_url, product.slug);
+  const outOfStock = Number(product.stock ?? 0) <= 0;
 
   return (
     <main className="min-h-screen bg-cream pt-32 pb-16">
@@ -177,8 +178,17 @@ const ProductPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
           <AnimatedSection>
             <div>
-              <div className="relative aspect-square rounded-2xl bg-white overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-                <img src={gallery[currentImageIndex]} alt={product.name} className="w-full h-full object-cover" />
+              <div className="relative aspect-square rounded-2xl bg-white overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)] ring-1 ring-black/4">
+                {outOfStock && (
+                  <span className="absolute right-3 top-3 z-10 rounded-full bg-carbon px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white shadow-md">
+                    Sin stock
+                  </span>
+                )}
+                <img
+                  src={gallery[currentImageIndex]}
+                  alt={product.name}
+                  className={`w-full h-full object-cover ${outOfStock ? "grayscale-[0.35] opacity-90" : ""}`}
+                />
                 {gallery.length > 1 && (
                   <>
                     <button
@@ -225,15 +235,41 @@ const ProductPage = () => {
               <p className="text-gold text-xs uppercase tracking-[0.3em] font-medium mb-3">{product.category}</p>
               <h1 className="font-playfair text-4xl md:text-5xl font-bold text-carbon mb-3">{product.name}</h1>
               <p className="text-carbon/50 text-lg italic mb-6">{product.tagline}</p>
-              <p className="font-playfair text-3xl font-bold text-carbon mb-8">€{Number(product.price).toFixed(2)}</p>
+              <p className="font-playfair text-3xl font-bold text-carbon mb-4">€{Number(product.price).toFixed(2)}</p>
+
+              {outOfStock && !isAddToCartDisabled && (
+                <p
+                  role="status"
+                  className="mb-6 max-w-lg rounded-xl border border-carbon/15 bg-carbon/4 px-4 py-3 text-sm leading-relaxed text-carbon/75"
+                >
+                  Este producto no tiene unidades disponibles en este momento. Puedes revisar la ficha para más
+                  información o volver más adelante.
+                </p>
+              )}
 
               <Button
                 onClick={handleAdd}
-                disabled={isAddToCartDisabled || product.stock <= 0}
-                className="bg-gold hover:bg-gold/90 text-white px-8 py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.4)] transition-all duration-300 w-full sm:w-auto mb-10"
+                disabled={isAddToCartDisabled || outOfStock}
+                className={
+                  outOfStock && !isAddToCartDisabled
+                    ? "border-carbon/20 bg-carbon/5 text-carbon/50 hover:bg-carbon/5 px-8 py-6 text-base tracking-wide rounded-full w-full sm:w-auto mb-10"
+                    : "bg-gold hover:bg-gold/90 text-white px-8 py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.4)] transition-all duration-300 w-full sm:w-auto mb-10"
+                }
+                variant={outOfStock && !isAddToCartDisabled ? "outline" : "default"}
               >
-                <ShoppingBag size={18} className="mr-2" />
-                {isAddToCartDisabled ? "Próximamente" : "Añadir al Carrito"}
+                {isAddToCartDisabled ? (
+                  <>
+                    <ShoppingBag size={18} className="mr-2" />
+                    Próximamente
+                  </>
+                ) : outOfStock ? (
+                  "Sin stock"
+                ) : (
+                  <>
+                    <ShoppingBag size={18} className="mr-2" />
+                    Añadir al Carrito
+                  </>
+                )}
               </Button>
 
               <div className="border-t border-gold/10 space-y-0">

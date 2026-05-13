@@ -57,6 +57,7 @@ interface ProductCardProps {
 const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisabled, featured }: ProductCardProps) => {
   const gallery = getProductImageGallery(product.image_url, product.slug);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const outOfStock = Number(product.stock ?? 0) <= 0;
 
   const goPrevImage = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -73,12 +74,14 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
   return (
     <AnimatedSection key={product.id} delay={delay} className="h-full">
       <motion.article
-        whileHover={{ y: -8 }}
+        whileHover={{ y: outOfStock ? -2 : -8 }}
         transition={{ duration: 0.3 }}
         className={`h-full rounded-2xl overflow-hidden border shadow-[0_6px_24px_rgba(0,0,0,0.05)] hover:shadow-[0_14px_40px_rgba(0,0,0,0.1)] transition-shadow duration-500 flex flex-col cursor-pointer ${
-          featured
-            ? "bg-[linear-gradient(145deg,#fffef8_0%,#ffffff_45%,#fff9ec_100%)] border-gold/35 ring-1 ring-gold/25"
-            : "bg-white border-gold/10"
+          outOfStock
+            ? "bg-cream/80 border-carbon/20 ring-1 ring-carbon/10 opacity-[0.97]"
+            : featured
+              ? "bg-[linear-gradient(145deg,#fffef8_0%,#ffffff_45%,#fff9ec_100%)] border-gold/35 ring-1 ring-gold/25"
+              : "bg-white border-gold/10"
         }`}
         role="link"
         tabIndex={0}
@@ -97,10 +100,17 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
               Pack
             </span>
           )}
+          {outOfStock && (
+            <span className="absolute right-3 top-3 z-10 rounded-full bg-carbon px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white shadow-md">
+              Sin stock
+            </span>
+          )}
           <img
             src={gallery[currentImageIndex]}
             alt={`${product.name} - Shenna Brows`}
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+            className={`w-full h-full object-cover transition-transform duration-700 ${
+              outOfStock ? "grayscale-[0.4] opacity-90" : "hover:scale-105"
+            }`}
             loading="lazy"
           />
           {gallery.length > 1 && (
@@ -150,21 +160,47 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
           </div>
 
           <div className="mt-5">
-            <p className="text-lg font-semibold text-carbon mb-4">€{Number(product.price).toFixed(2)}</p>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-4">
+              <p className={`text-lg font-semibold ${outOfStock ? "text-carbon/45" : "text-carbon"}`}>
+                €{Number(product.price).toFixed(2)}
+              </p>
+              {outOfStock && !addToCartDisabled && (
+                <span className="text-xs font-semibold uppercase tracking-wider text-carbon/55">No disponible</span>
+              )}
+            </div>
             <div className="flex">
               <Button
-                className="w-full bg-gold hover:bg-gold/90 text-white"
+                className={
+                  outOfStock && !addToCartDisabled
+                    ? "w-full border-carbon/20 bg-carbon/5 text-carbon/50 hover:bg-carbon/5"
+                    : "w-full bg-gold hover:bg-gold/90 text-white"
+                }
+                variant={outOfStock && !addToCartDisabled ? "outline" : "default"}
                 onClick={(e) => {
                   e.stopPropagation();
                   onAddToCart(product);
                 }}
-                disabled={addToCartDisabled || product.stock <= 0}
+                disabled={addToCartDisabled || outOfStock}
               >
-                <span className="relative mr-2 inline-flex">
-                  <ShoppingCart size={16} />
-                  <Plus size={11} className="absolute -top-1 -right-1" />
-                </span>
-                {addToCartDisabled ? "Próximamente" : "Añadir"}
+                {addToCartDisabled ? (
+                  <>
+                    <span className="relative mr-2 inline-flex">
+                      <ShoppingCart size={16} />
+                      <Plus size={11} className="absolute -top-1 -right-1" />
+                    </span>
+                    Próximamente
+                  </>
+                ) : outOfStock ? (
+                  "Sin stock"
+                ) : (
+                  <>
+                    <span className="relative mr-2 inline-flex">
+                      <ShoppingCart size={16} />
+                      <Plus size={11} className="absolute -top-1 -right-1" />
+                    </span>
+                    Añadir
+                  </>
+                )}
               </Button>
             </div>
           </div>
