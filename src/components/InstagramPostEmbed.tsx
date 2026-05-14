@@ -10,7 +10,7 @@ const EMBED_SCRIPT_SRC = "https://www.instagram.com/embed.js";
 
 /** Permalink oficial de la publicación (embed de Instagram). */
 const INSTAGRAM_PERMALINK =
-  "https://www.instagram.com/p/DXyrqqulDqX/?utm_source=ig_embed&utm_campaign=loading";
+  "https://www.instagram.com/p/DYKtxbAFJup/?utm_source=ig_embed&utm_campaign=loading";
 
 type InstagramPostEmbedProps = {
   className?: string;
