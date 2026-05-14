@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, ImageIcon, Plus, X, Bold, Italic, List, ListOrdered, Link as LinkIcon } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { normalizeHex, parseColorVariants, type ColorVariant } from "@/lib/color-variants";
+import { cn } from "@/lib/utils";
 
 type Product = Tables<"products">;
 
@@ -35,6 +36,31 @@ const slugify = (raw: string): string => {
     .replace(/^-+|-+$/g, "");
   return s.length > 0 ? s : "producto";
 };
+
+/** Slug de URL: prioriza la etiqueta dorada (category); si está vacía, el nombre del producto. */
+const productSlugFromForm = (category: string | null | undefined, name: string | null | undefined) => {
+  const cat = (category ?? "").trim();
+  const nm = (name ?? "").trim();
+  return slugify(cat || nm || "producto");
+};
+
+const slugPreviewDiffersFromStored = (
+  storedSlug: string,
+  category: string | null | undefined,
+  name: string | null | undefined
+) => storedSlug !== productSlugFromForm(category, name);
+
+type SlugConflict = { slug: string; otherProductName: string };
+
+async function fetchConflictingProductBySlug(
+  slug: string,
+  excludeProductId?: string
+): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await (supabase as any).from("products").select("id, name").eq("slug", slug);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as { id: string; name: string }[];
+  return rows.find((row) => row.id !== excludeProductId) ?? null;
+}
 
 const BUCKET = "product-images";
 const SUPABASE_URL = "https://vanhsuisvxvclxdgutaw.supabase.co";
@@ -78,13 +104,24 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const [isDragging, setIsDragging] = useState(false);
   const [colorVariantRows, setColorVariantRows] = useState<ColorVariantFormRow[]>([]);
   const descriptionEditorRef = useRef<HTMLDivElement>(null);
+  const [slugConflict, setSlugConflict] = useState<SlugConflict | null>(null);
+  const [slugChecking, setSlugChecking] = useState(false);
 
   const currentProduct = product;
   useEffect(() => {
+    if (open) return;
+    setSlugConflict(null);
+    setSlugChecking(false);
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
+    setSlugConflict(null);
+    setSlugChecking(false);
     if (mode === "create") {
       setMaterialItems([""]);
       setForm({
+        category: "",
         name: "",
         tagline: "",
         description: "",
@@ -107,6 +144,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       : [""];
     setMaterialItems(items.length > 0 ? items : [""]);
     setForm({
+      category: currentProduct.category,
       name: currentProduct.name,
       tagline: currentProduct.tagline,
       description: currentProduct.description,
@@ -126,6 +164,21 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const updateField = (field: keyof Product, value: string | number) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
+
+  const verifySlugOnBlur = useCallback(async () => {
+    setSlugChecking(true);
+    try {
+      const slug = productSlugFromForm(form.category, form.name);
+      const excludeId = mode === "edit" && currentProduct ? currentProduct.id : undefined;
+      const row = await fetchConflictingProductBySlug(slug, excludeId);
+      setSlugConflict(row ? { slug, otherProductName: row.name } : null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Error desconocido";
+      toast({ title: "No se pudo comprobar la URL", description: message, variant: "destructive" });
+    } finally {
+      setSlugChecking(false);
+    }
+  }, [form.category, form.name, mode, currentProduct, toast]);
 
   useEffect(() => {
     if (!descriptionEditorRef.current) return;
@@ -226,7 +279,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       setUploading(true);
       try {
         const ext = file.name.split(".").pop() || "jpg";
-        const nameForSlug = (form.name || "").trim();
+        const nameForSlug = (form.category || "").trim() || (form.name || "").trim();
         const slugBase =
           mode === "create"
             ? (nameForSlug ? slugify(nameForSlug) : `borrador-${Date.now()}`)
@@ -252,7 +305,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         setUploading(false);
       }
     },
-    [currentProduct, form.name, mode, toast]
+    [currentProduct, form.category, form.name, mode, toast]
   );
 
   const handleDrop = useCallback(
@@ -327,12 +380,38 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         toast({ title: "Falta el nombre", description: "Indica un nombre para el producto.", variant: "destructive" });
         return;
       }
-      const slugFinal = slugify(name);
+      const categoryTrim = (form.category || "").trim();
+      if (!categoryTrim) {
+        toast({
+          title: "Falta la etiqueta de tipo",
+          description: "Indica el texto pequeño dorado (por ejemplo «Espuma»); con él se genera la URL del producto.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const slugFinal = productSlugFromForm(form.category, name);
+      let conflicting: { id: string; name: string } | null;
+      try {
+        conflicting = await fetchConflictingProductBySlug(slugFinal);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Error desconocido";
+        toast({ title: "No se pudo comprobar la URL", description: message, variant: "destructive" });
+        return;
+      }
+      if (conflicting) {
+        setSlugConflict({ slug: slugFinal, otherProductName: conflicting.name });
+        toast({
+          title: "URL duplicada",
+          description: `La ruta /${slugFinal} ya está en uso por «${conflicting.name}». Cambia la etiqueta dorada o el nombre.`,
+          variant: "destructive",
+        });
+        return;
+      }
       setSaving(true);
       const { error } = await (supabase as any).from("products").insert({
         name,
         slug: slugFinal,
-        category: "otros",
+        category: categoryTrim,
         tagline: form.tagline || "",
         description: normalizedDescription || null,
         materials: materialsString || null,
@@ -357,11 +436,32 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     }
 
     if (!currentProduct) return;
+    const categoryTrim = (form.category || "").trim() || "otros";
+    const slugFinal = productSlugFromForm(form.category, form.name);
+    let conflictingEdit: { id: string; name: string } | null;
+    try {
+      conflictingEdit = await fetchConflictingProductBySlug(slugFinal, currentProduct.id);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Error desconocido";
+      toast({ title: "No se pudo comprobar la URL", description: message, variant: "destructive" });
+      return;
+    }
+    if (conflictingEdit) {
+      setSlugConflict({ slug: slugFinal, otherProductName: conflictingEdit.name });
+      toast({
+        title: "URL duplicada",
+        description: `La ruta /${slugFinal} ya está en uso por «${conflictingEdit.name}». Cambia la etiqueta dorada o el nombre.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     const { error } = await (supabase as any)
       .from("products")
       .update({
         name: form.name,
+        category: categoryTrim,
+        slug: slugFinal,
         tagline: form.tagline || "",
         description: normalizedDescription,
         materials: materialsString,
@@ -389,7 +489,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     imageUrls[0] ||
     (currentProduct
       ? getProductImageUrl(currentProduct.image_url, currentProduct.slug)
-      : getProductImageUrl(form.image_url, slugify((form.name || "").trim() || "nuevo")));
+      : getProductImageUrl(form.image_url, productSlugFromForm(form.category, form.name)));
   const canAddMaterial = materialItems.length === 0 || (materialItems[materialItems.length - 1]?.trim() ?? "") !== "";
 
   const applyFormat = (command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") => {
@@ -513,14 +613,67 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           {/* Text Fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
+              <Label htmlFor="category" className="text-carbon/70 text-xs uppercase tracking-wider">
+                Etiqueta dorada (tipo)
+              </Label>
+              <Input
+                id="category"
+                value={form.category || ""}
+                onChange={(e) => {
+                  setSlugConflict(null);
+                  updateField("category", e.target.value);
+                }}
+                onBlur={() => void verifySlugOnBlur()}
+                placeholder="Ej. Espuma, Pinzas…"
+                className={cn(
+                  "mt-1 bg-white border-gold/15",
+                  slugConflict && "border-destructive focus-visible:ring-destructive/30"
+                )}
+                aria-invalid={slugConflict ? true : undefined}
+                aria-describedby={
+                  slugConflict ? "slug-conflict-msg" : slugChecking ? "slug-checking-msg" : undefined
+                }
+              />
+              {slugChecking ? (
+                <p id="slug-checking-msg" className="text-xs text-carbon/50 mt-1">
+                  Comprobando si la ruta está libre…
+                </p>
+              ) : null}
+              {slugConflict ? (
+                <p id="slug-conflict-msg" role="alert" className="text-sm text-destructive mt-2 font-medium">
+                  La ruta <span className="font-mono">/{slugConflict.slug}</span> ya está en uso por el producto «
+                  {slugConflict.otherProductName}». Cambia la etiqueta o el nombre y vuelve a comprobar al salir del
+                  campo.
+                </p>
+              ) : null}
+              <p className="text-xs text-carbon/45 mt-1.5 leading-snug">
+                Texto pequeño en dorado sobre la ficha. Al guardar, la ruta del producto será{" "}
+                <span className="font-mono text-carbon/70">/{productSlugFromForm(form.category, form.name)}</span>
+                {mode === "edit" && currentProduct && slugPreviewDiffersFromStored(currentProduct.slug, form.category, form.name) ? (
+                  <span className="block mt-1 text-amber-800/90">
+                    La URL cambiará respecto a la actual (/{currentProduct.slug}). Los enlaces antiguos dejarán de funcionar.
+                  </span>
+                ) : null}
+              </p>
+            </div>
+            <div className="sm:col-span-2">
               <Label htmlFor="name" className="text-carbon/70 text-xs uppercase tracking-wider">
                 Nombre
               </Label>
               <Input
                 id="name"
                 value={form.name || ""}
-                onChange={(e) => updateField("name", e.target.value)}
-                className="mt-1 bg-white border-gold/15"
+                onChange={(e) => {
+                  setSlugConflict(null);
+                  updateField("name", e.target.value);
+                }}
+                onBlur={() => void verifySlugOnBlur()}
+                className={cn(
+                  "mt-1 bg-white border-gold/15",
+                  slugConflict && "border-destructive focus-visible:ring-destructive/30"
+                )}
+                aria-invalid={slugConflict ? true : undefined}
+                aria-describedby={slugConflict ? "slug-conflict-msg" : undefined}
               />
             </div>
             <div className="sm:col-span-2">
@@ -795,7 +948,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           {/* Save */}
           <Button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || !!slugConflict || slugChecking}
             className="w-full bg-gold hover:bg-gold/90 text-white h-11 text-sm font-medium"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
