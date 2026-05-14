@@ -1,11 +1,12 @@
 import { useParams, Link } from "react-router-dom";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
 import { ShoppingBag, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImageGallery, getProductImageUrl } from "@/lib/product-images";
+import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import { motion } from "framer-motion";
 
 type DescriptionItem = { content: string; format: "text" | "html" };
@@ -54,6 +55,26 @@ const ProductPage = () => {
   const [otherProducts, setOtherProducts] = useState<CatalogProduct[]>([]);
   const relatedCarouselRef = useRef<HTMLDivElement>(null);
   const [relatedCarouselPage, setRelatedCarouselPage] = useState(0);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+
+  const colorVariants = useMemo(() => parseColorVariants(product?.color_variants), [product?.color_variants]);
+
+  useEffect(() => {
+    if (colorVariants.length > 0) {
+      setSelectedVariantId((prev) => {
+        if (prev && colorVariants.some((v) => v.id === prev)) return prev;
+        return colorVariants[0].id;
+      });
+    } else {
+      setSelectedVariantId(null);
+    }
+  }, [product?.id, colorVariants]);
+
+  const selectedColorVariant: ColorVariant | null = useMemo(() => {
+    if (colorVariants.length === 0) return null;
+    const found = colorVariants.find((v) => v.id === selectedVariantId);
+    return found ?? colorVariants[0] ?? null;
+  }, [colorVariants, selectedVariantId]);
 
   const syncRelatedCarouselPage = useCallback(() => {
     const root = relatedCarouselRef.current;
@@ -149,20 +170,24 @@ const ProductPage = () => {
   }
 
   const handleAdd = () => {
-    addItem({
-      id: product.id,
-      name: product.name,
-      slug: product.slug,
-      category: product.category,
-      price: Number(product.price),
-      stock: product.stock,
-      image_url: product.image_url,
-      description: product.description,
-      materials: product.materials,
-      shipping_info: product.shipping_info,
-      tagline: product.tagline,
-      stripe_price_id: product.stripe_price_id,
-    });
+    const variantForCart = colorVariants.length > 0 ? selectedColorVariant : null;
+    addItem(
+      {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        category: product.category,
+        price: Number(product.price),
+        stock: product.stock,
+        image_url: product.image_url,
+        description: product.description,
+        materials: product.materials,
+        shipping_info: product.shipping_info,
+        tagline: product.tagline,
+        stripe_price_id: product.stripe_price_id ?? "",
+      },
+      variantForCart
+    );
   };
 
   const descriptionItems = parseProductDescription(product.description);
@@ -236,6 +261,44 @@ const ProductPage = () => {
               <h1 className="font-playfair text-4xl md:text-5xl font-bold text-carbon mb-3">{product.name}</h1>
               <p className="text-carbon/50 text-lg italic mb-6">{product.tagline}</p>
               <p className="font-playfair text-3xl font-bold text-carbon mb-4">€{Number(product.price).toFixed(2)}</p>
+
+              {colorVariants.length > 0 && selectedColorVariant && (
+                <div className="mb-6 space-y-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-carbon text-sm font-medium tracking-wide">Color</span>
+                    <div className="flex flex-wrap gap-2" role="listbox" aria-label="Elegir color">
+                      {colorVariants.map((v) => {
+                        const selected = v.id === selectedColorVariant.id;
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            title={v.name}
+                            onClick={() => setSelectedVariantId(v.id)}
+                            className={`h-9 w-9 rounded-full border-2 transition shadow-sm shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+                              selected ? "border-gold ring-2 ring-gold/35 scale-105" : "border-white ring-1 ring-carbon/15 hover:ring-gold/40"
+                            }`}
+                            style={{ backgroundColor: v.hex }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <p className="flex flex-wrap items-center gap-2 text-sm text-carbon/80">
+                    <span
+                      className="inline-block h-4 w-4 rounded-full border border-carbon/15 shadow-inner shrink-0"
+                      style={{ backgroundColor: selectedColorVariant.hex }}
+                      aria-hidden
+                    />
+                    <span>
+                      Color elegido: <span className="font-medium text-carbon">{selectedColorVariant.name}</span>
+                    </span>
+                    <span className="text-carbon/45 font-mono text-xs">({selectedColorVariant.hex})</span>
+                  </p>
+                </div>
+              )}
 
               {outOfStock && !isAddToCartDisabled && (
                 <p

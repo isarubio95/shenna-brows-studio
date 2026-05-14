@@ -10,8 +10,11 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, ImageIcon, Plus, X, Bold, Italic, List, ListOrdered, Link as LinkIcon } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { normalizeHex, parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 
 type Product = Tables<"products">;
+
+type ColorVariantFormRow = ColorVariant & { hexDraft: string | null };
 
 interface ProductEditDialogProps {
   product: Product | null;
@@ -73,6 +76,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [colorVariantRows, setColorVariantRows] = useState<ColorVariantFormRow[]>([]);
   const descriptionEditorRef = useRef<HTMLDivElement>(null);
 
   const currentProduct = product;
@@ -93,6 +97,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         is_pack: false,
       });
       setImageUrls([]);
+      setColorVariantRows([]);
       if (descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = "";
       return;
     }
@@ -114,6 +119,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       is_pack: currentProduct.is_pack ?? false,
     });
     setImageUrls(parseGalleryFromImageUrl(currentProduct.image_url));
+    const parsed = parseColorVariants(currentProduct.color_variants);
+    setColorVariantRows(parsed.map((v) => ({ ...v, hexDraft: null })));
   }, [currentProduct, mode, open]);
 
   const updateField = (field: keyof Product, value: string | number) => {
@@ -152,6 +159,66 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     }
     setMaterialItems((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const addColorVariantRow = () => {
+    setColorVariantRows((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: "", hex: "#B8956A", hexDraft: null },
+    ]);
+  };
+
+  const removeColorVariantRow = (index: number) => {
+    setColorVariantRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateColorVariantName = (index: number, name: string) => {
+    setColorVariantRows((prev) => {
+      const next = [...prev];
+      if (next[index]) next[index] = { ...next[index], name };
+      return next;
+    });
+  };
+
+  const updateColorVariantFromPicker = (index: number, hexFromPicker: string) => {
+    const n = normalizeHex(hexFromPicker);
+    if (!n) return;
+    setColorVariantRows((prev) => {
+      const next = [...prev];
+      if (next[index]) next[index] = { ...next[index], hex: n, hexDraft: null };
+      return next;
+    });
+  };
+
+  const updateColorVariantHexDraft = (index: number, draft: string) => {
+    setColorVariantRows((prev) => {
+      const next = [...prev];
+      if (next[index]) next[index] = { ...next[index], hexDraft: draft };
+      return next;
+    });
+  };
+
+  const commitColorVariantHexInput = (index: number) => {
+    let invalid = false;
+    setColorVariantRows((prev) => {
+      const row = prev[index];
+      if (!row) return prev;
+      const n = normalizeHex(row.hexDraft ?? row.hex);
+      if (!n) {
+        invalid = true;
+        return prev.map((r, i) => (i === index ? { ...r, hexDraft: null } : r));
+      }
+      return prev.map((r, i) => (i === index ? { ...r, hex: n, hexDraft: null } : r));
+    });
+    if (invalid) {
+      toast({
+        title: "Código de color no válido",
+        description: "Usa formato hexadecimal, por ejemplo #D4A5A5 o #RGB.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const colorPickerValue = (row: ColorVariantFormRow) => normalizeHex(row.hexDraft ?? row.hex) ?? row.hex;
 
   const uploadImage = useCallback(
     async (file: File) => {
@@ -238,6 +305,22 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     const materialsString = materialItems.filter((m) => m.trim()).join("\n");
     const normalizedDescription = normalizeDescriptionHtml(String(form.description || ""));
 
+    const colorVariantsPayload: ColorVariant[] = [];
+    for (const r of colorVariantRows) {
+      const name = r.name.trim();
+      const hex = normalizeHex(r.hexDraft ?? r.hex);
+      if (!name && !hex) continue;
+      if (!name || !hex) {
+        toast({
+          title: "Variantes de color incompletas",
+          description: "Cada variante necesita nombre y un color válido (#RRGGBB), o elimina la fila.",
+          variant: "destructive",
+        });
+        return;
+      }
+      colorVariantsPayload.push({ id: r.id, name, hex });
+    }
+
     if (mode === "create") {
       const name = (form.name || "").trim();
       if (!name) {
@@ -259,6 +342,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         stock: Number(form.stock) || 0,
         image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         is_pack: Boolean(form.is_pack),
+        color_variants: colorVariantsPayload,
       });
 
       if (error) {
@@ -287,6 +371,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         stock: Number(form.stock) || 0,
         image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         is_pack: Boolean(form.is_pack),
+        color_variants: colorVariantsPayload,
       })
       .eq("id", currentProduct.id);
 
@@ -592,6 +677,81 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 <Plus size={14} className="mr-1" />
                 Añadir {isComposicion ? 'ingrediente' : 'material'}
               </Button>
+            </div>
+
+            {/* Variantes de color */}
+            <div className="sm:col-span-2 rounded-xl border border-gold/15 bg-white/60 p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <Label className="text-carbon/70 text-xs uppercase tracking-wider">Variantes de color</Label>
+                  <p className="text-xs text-carbon/45 mt-1 leading-snug">
+                    Opcional. En la tienda se muestran como círculos para elegir color. Usa el selector o escribe el código hex.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addColorVariantRow}
+                  className="shrink-0 border-gold/20 text-gold hover:bg-gold/5"
+                >
+                  <Plus size={14} className="mr-1" />
+                  Añadir variante
+                </Button>
+              </div>
+              {colorVariantRows.length === 0 ? (
+                <p className="text-sm text-carbon/40 italic">Sin variantes. El producto se vende sin elegir color.</p>
+              ) : (
+                <div className="space-y-3">
+                  {colorVariantRows.map((row, index) => (
+                    <div
+                      key={row.id}
+                      className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end p-3 rounded-lg border border-gold/10 bg-white/80"
+                    >
+                      <div className="flex-1 min-w-[140px]">
+                        <Label className="text-[10px] uppercase tracking-wider text-carbon/50">Nombre visible</Label>
+                        <Input
+                          value={row.name}
+                          onChange={(e) => updateColorVariantName(index, e.target.value)}
+                          placeholder="Ej. Rosa empolvado"
+                          className="mt-1 bg-white border-gold/15 text-sm"
+                        />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <div>
+                          <Label className="text-[10px] uppercase tracking-wider text-carbon/50">Selector</Label>
+                          <input
+                            type="color"
+                            aria-label={`Color para ${row.name || "variante"}`}
+                            value={colorPickerValue(row)}
+                            onChange={(e) => updateColorVariantFromPicker(index, e.target.value)}
+                            className="mt-1 h-10 w-14 cursor-pointer rounded-md border border-gold/20 bg-white p-0.5"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-[120px] sm:w-36">
+                          <Label className="text-[10px] uppercase tracking-wider text-carbon/50">Código hex</Label>
+                          <Input
+                            value={row.hexDraft ?? row.hex}
+                            onChange={(e) => updateColorVariantHexDraft(index, e.target.value)}
+                            onBlur={() => commitColorVariantHexInput(index)}
+                            placeholder="#RRGGBB"
+                            spellCheck={false}
+                            className="mt-1 bg-white border-gold/15 text-sm font-mono"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeColorVariantRow(index)}
+                          className="text-carbon/30 hover:text-red-400 transition-colors p-2 shrink-0"
+                          aria-label="Quitar variante"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="sm:col-span-2">

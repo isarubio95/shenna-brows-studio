@@ -23,7 +23,39 @@ type CheckoutProductRow = {
   name: string;
   price: unknown;
   stock: number | null;
+  color_variants: unknown;
 };
+
+type ParsedColorVariant = { id: string; name: string; hex: string };
+
+function normalizeHexStrict(raw: string): string | null {
+  let s = (raw || "").trim();
+  if (!s) return null;
+  if (!s.startsWith("#")) s = `#${s}`;
+  const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(s);
+  if (!m) return null;
+  const body = m[1];
+  if (body.length === 3) {
+    const [a, b, c] = body.split("");
+    return `#${a}${a}${b}${b}${c}${c}`.toUpperCase();
+  }
+  return `#${body.toUpperCase()}`;
+}
+
+function parseColorVariantsFromDb(raw: unknown): ParsedColorVariant[] {
+  if (!raw || !Array.isArray(raw)) return [];
+  const out: ParsedColorVariant[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const id = String(o.id ?? "").trim();
+    const name = String(o.name ?? "").trim();
+    const hex = normalizeHexStrict(String(o.hex ?? ""));
+    if (!id || !name || !hex) continue;
+    out.push({ id, name, hex });
+  }
+  return out;
+}
 
 function getRedsysEnv(): "test" | "production" {
   const v = (Deno.env.get("REDSYS_ENV") || "test").toLowerCase();
@@ -104,7 +136,7 @@ serve(async (req) => {
     const terminalPadded = terminal.length >= 3 ? terminal : terminal.padStart(3, "0");
 
     const { items, customerEmail, turnstileToken, shippingAddress } = await req.json() as {
-      items?: Array<{ productId: string; quantity: number }>;
+      items?: Array<{ productId: string; quantity: number; colorVariantId?: string }>;
       customerEmail?: string;
       turnstileToken?: string;
       shippingAddress?: Record<string, unknown>;
@@ -138,7 +170,7 @@ serve(async (req) => {
     const productIds = [...new Set(items.map((i) => String(i.productId)))];
     const { data: products, error: productsError } = await admin
       .from("products")
-      .select("id, name, price, stock")
+      .select("id, name, price, stock, color_variants")
       .in("id", productIds);
 
     if (productsError || !products?.length) {
@@ -152,12 +184,17 @@ serve(async (req) => {
     const productRows = products as CheckoutProductRow[];
     const byId = new Map(productRows.map((p) => [String(p.id), p]));
     let subtotalEur = 0;
-    const resolvedLines: Array<{ productId: string; name: string; quantity: number; unitPrice: number }> = [];
+    const resolvedLines: Array<{
+      productId: string;
+      name: string;
+      quantity: number;
+      unitPrice: number;
+    }> = [];
 
     for (const line of items) {
       const pid = String(line.productId);
       const qty = Math.floor(Number(line.quantity));
-      const p = byId.get(pid);
+      const p = byId.get(pid) as CheckoutProductRow | undefined;
       if (!p || qty < 1) {
         return new Response(JSON.stringify({ error: "Línea de carrito inválida" }), {
           status: 400,
@@ -172,7 +209,28 @@ serve(async (req) => {
       }
       const unit = Number(p.price);
       subtotalEur += unit * qty;
-      resolvedLines.push({ productId: pid, name: String(p.name), quantity: qty, unitPrice: unit });
+
+      const colorVariants = parseColorVariantsFromDb(p.color_variants);
+      const variantIdRaw = line.colorVariantId != null ? String(line.colorVariantId).trim() : "";
+      let displayName = String(p.name);
+      if (colorVariants.length > 0) {
+        if (!variantIdRaw) {
+          return new Response(
+            JSON.stringify({ error: `Debes elegir un color para: ${p.name}` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        const chosen = colorVariants.find((v) => v.id === variantIdRaw);
+        if (!chosen) {
+          return new Response(JSON.stringify({ error: "Color de producto no válido" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        displayName = `${String(p.name)} — ${chosen.name}`;
+      }
+
+      resolvedLines.push({ productId: pid, name: displayName, quantity: qty, unitPrice: unit });
     }
 
     const trim = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
@@ -240,7 +298,11 @@ serve(async (req) => {
     const merchantOrder = generateMerchantOrder();
 
     const pendingCartSnapshot = {
-      lines: resolvedLines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+      lines: resolvedLines.map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+        productDisplayName: l.name,
+      })),
     };
 
     const { error: pendingOrderErr } = await admin.from("orders").insert({
@@ -259,7 +321,11 @@ serve(async (req) => {
 
     const merchantDataPayload = {
       email,
-      lines: resolvedLines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+      lines: resolvedLines.map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+        productDisplayName: l.name,
+      })),
       shippingEur,
       subtotalEur,
       shippingAddress: normalizedShipping,
