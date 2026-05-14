@@ -782,20 +782,26 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
 
             {/* Materials / Composición section */}
             <div className="sm:col-span-2">
-              <div className="flex items-center justify-between mb-2">
+              <div className={`flex items-center mb-2 ${form.is_pack ? "" : "justify-between"}`}>
                 <Label className="text-carbon/70 text-xs uppercase tracking-wider">
-                  {isComposicion ? 'Composición' : 'Materiales'}
+                  {form.is_pack
+                    ? '¿Qué incluye este pack?'
+                    : isComposicion
+                      ? 'Composición'
+                      : 'Materiales'}
                 </Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-carbon/40">Materiales</span>
-                  <Switch
-                    checked={isComposicion}
-                    onCheckedChange={(checked) =>
-                      setForm((prev) => ({ ...prev, materials_label: checked ? 'composicion' : 'materiales' }))
-                    }
-                  />
-                  <span className="text-xs text-carbon/40">Composición</span>
-                </div>
+                {!form.is_pack ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-carbon/40">Materiales</span>
+                    <Switch
+                      checked={isComposicion}
+                      onCheckedChange={(checked) =>
+                        setForm((prev) => ({ ...prev, materials_label: checked ? 'composicion' : 'materiales' }))
+                      }
+                    />
+                    <span className="text-xs text-carbon/40">Composición</span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -805,7 +811,13 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                     <Input
                       value={item}
                       onChange={(e) => handleMaterialChange(index, e.target.value)}
-                      placeholder={isComposicion ? `Ingrediente ${index + 1}` : `Material ${index + 1}`}
+                      placeholder={
+                        form.is_pack
+                          ? `Ítem ${index + 1}`
+                          : isComposicion
+                            ? `Ingrediente ${index + 1}`
+                            : `Material ${index + 1}`
+                      }
                       className="bg-white border-gold/15 text-sm"
                     />
                     <button

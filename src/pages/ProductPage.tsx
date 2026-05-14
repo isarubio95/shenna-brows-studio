@@ -358,7 +358,11 @@ const ProductPage = () => {
                 </section>
                 <section className="border-b border-gold/10 py-5">
                   <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">
-                    {product.materials_label === 'composicion' ? 'Composición' : 'Materiales'}
+                    {product.is_pack
+                      ? '¿Qué incluye este pack?'
+                      : product.materials_label === 'composicion'
+                        ? 'Composición'
+                        : 'Materiales'}
                   </h3>
                   {product.materials ? (
                     <ul className="space-y-2">
