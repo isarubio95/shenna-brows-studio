@@ -33,7 +33,7 @@ const CartDrawer = () => {
                   key={item.lineId}
                   className="flex gap-4 p-3 rounded-lg bg-white/50 border border-gold/5"
                 >
-                  <div className="w-16 h-16 rounded-md bg-muted flex-shrink-0 overflow-hidden">
+                  <div className="w-16 h-16 rounded-md bg-muted shrink-0 overflow-hidden">
                     <img
                       src={getProductImageUrl(item.product.image_url, item.product.slug)}
                       alt={item.product.name}
