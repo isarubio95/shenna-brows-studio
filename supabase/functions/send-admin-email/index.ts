@@ -5,6 +5,13 @@ import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLi
 const RESEND_API = "https://api.resend.com";
 const FROM_ADDRESS = "Shenna Brows <info@shennabrows.com>";
 const NEWSLETTER_AUDIENCE = "newsletter";
+/** Resend default team limit is 5 req/s; stay under it to avoid 429 on parallel bursts. */
+const MIN_MS_BETWEEN_RESEND_CALLS = 220;
+const MAX_429_RETRIES = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -145,50 +152,68 @@ serve(async (req) => {
       });
     }
 
-    // Send emails in batches of 10
+    // One Resend API call per recipient, sequentially throttled (parallel bursts hit 5 req/s limit → 429).
     const results: { email: string; success: boolean; error?: string }[] = [];
-    const batchSize = 10;
+    let lastResendCallAt = 0;
 
-    for (let i = 0; i < finalRecipients.length; i += batchSize) {
-      const batch = finalRecipients.slice(i, i + batchSize);
-      const promises = batch.map(async (email: string) => {
-        try {
-          const sendBody: Record<string, unknown> = {
-            from: FROM_ADDRESS,
-            to: [email],
-            subject,
-            html,
-          };
+    const sendOne = async (email: string): Promise<{ success: boolean; error?: string }> => {
+      const sendBody: Record<string, unknown> = {
+        from: FROM_ADDRESS,
+        to: [email],
+        subject,
+        html,
+      };
 
-          if (attachments?.length > 0) {
-            sendBody.attachments = attachments.map((att: { filename: string; content: string; content_type: string }) => ({
-              filename: att.filename,
-              content: att.content,
-              content_type: att.content_type,
-            }));
-          }
+      if (attachments?.length > 0) {
+        sendBody.attachments = attachments.map((att: { filename: string; content: string; content_type: string }) => ({
+          filename: att.filename,
+          content: att.content,
+          content_type: att.content_type,
+        }));
+      }
 
-          const res = await fetch(`${RESEND_API}/emails`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(sendBody),
-          });
+      for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+        const now = Date.now();
+        const wait = Math.max(0, MIN_MS_BETWEEN_RESEND_CALLS - (now - lastResendCallAt));
+        if (wait > 0) await sleep(wait);
+        lastResendCallAt = Date.now();
 
-          if (!res.ok) {
-            const errText = await res.text();
-            results.push({ email, success: false, error: errText });
-          } else {
-            await res.json();
-            results.push({ email, success: true });
-          }
-        } catch (e) {
-          results.push({ email, success: false, error: e instanceof Error ? e.message : String(e) });
+        const res = await fetch(`${RESEND_API}/emails`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(sendBody),
+        });
+
+        if (res.status === 429 && attempt < MAX_429_RETRIES) {
+          await res.text().catch(() => "");
+          const retryAfter = Number(res.headers.get("retry-after"));
+          const backoffMs = Number.isFinite(retryAfter) && retryAfter > 0
+            ? retryAfter * 1000
+            : 1000 * (attempt + 1);
+          await sleep(backoffMs);
+          continue;
         }
-      });
-      await Promise.all(promises);
+
+        if (!res.ok) {
+          const errText = await res.text();
+          return { success: false, error: errText };
+        }
+        await res.json();
+        return { success: true };
+      }
+      return { success: false, error: "Too many retries after rate limit" };
+    };
+
+    for (const email of finalRecipients) {
+      try {
+        const outcome = await sendOne(email);
+        results.push({ email, ...outcome });
+      } catch (e) {
+        results.push({ email, success: false, error: e instanceof Error ? e.message : String(e) });
+      }
     }
 
     const sent = results.filter((r) => r.success).length;
