@@ -10,8 +10,12 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, ImageIcon, Plus, X, Bold, Italic, List, ListOrdered, Link as LinkIcon } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { normalizeHex, parseColorVariants, type ColorVariant } from "@/lib/color-variants";
+import { cn } from "@/lib/utils";
 
 type Product = Tables<"products">;
+
+type ColorVariantFormRow = ColorVariant & { hexDraft: string | null };
 
 interface ProductEditDialogProps {
   product: Product | null;
@@ -32,6 +36,31 @@ const slugify = (raw: string): string => {
     .replace(/^-+|-+$/g, "");
   return s.length > 0 ? s : "producto";
 };
+
+/** Slug de URL: prioriza la etiqueta dorada (category); si está vacía, el nombre del producto. */
+const productSlugFromForm = (category: string | null | undefined, name: string | null | undefined) => {
+  const cat = (category ?? "").trim();
+  const nm = (name ?? "").trim();
+  return slugify(cat || nm || "producto");
+};
+
+const slugPreviewDiffersFromStored = (
+  storedSlug: string,
+  category: string | null | undefined,
+  name: string | null | undefined
+) => storedSlug !== productSlugFromForm(category, name);
+
+type SlugConflict = { slug: string; otherProductName: string };
+
+async function fetchConflictingProductBySlug(
+  slug: string,
+  excludeProductId?: string
+): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await (supabase as any).from("products").select("id, name").eq("slug", slug);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as { id: string; name: string }[];
+  return rows.find((row) => row.id !== excludeProductId) ?? null;
+}
 
 const BUCKET = "product-images";
 const SUPABASE_URL = "https://vanhsuisvxvclxdgutaw.supabase.co";
@@ -73,14 +102,26 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [colorVariantRows, setColorVariantRows] = useState<ColorVariantFormRow[]>([]);
   const descriptionEditorRef = useRef<HTMLDivElement>(null);
+  const [slugConflict, setSlugConflict] = useState<SlugConflict | null>(null);
+  const [slugChecking, setSlugChecking] = useState(false);
 
   const currentProduct = product;
   useEffect(() => {
+    if (open) return;
+    setSlugConflict(null);
+    setSlugChecking(false);
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
+    setSlugConflict(null);
+    setSlugChecking(false);
     if (mode === "create") {
       setMaterialItems([""]);
       setForm({
+        category: "",
         name: "",
         tagline: "",
         description: "",
@@ -93,6 +134,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         is_pack: false,
       });
       setImageUrls([]);
+      setColorVariantRows([]);
       if (descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = "";
       return;
     }
@@ -102,6 +144,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       : [""];
     setMaterialItems(items.length > 0 ? items : [""]);
     setForm({
+      category: currentProduct.category,
       name: currentProduct.name,
       tagline: currentProduct.tagline,
       description: currentProduct.description,
@@ -114,11 +157,28 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       is_pack: currentProduct.is_pack ?? false,
     });
     setImageUrls(parseGalleryFromImageUrl(currentProduct.image_url));
+    const parsed = parseColorVariants(currentProduct.color_variants);
+    setColorVariantRows(parsed.map((v) => ({ ...v, hexDraft: null })));
   }, [currentProduct, mode, open]);
 
   const updateField = (field: keyof Product, value: string | number) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
+
+  const verifySlugOnBlur = useCallback(async () => {
+    setSlugChecking(true);
+    try {
+      const slug = productSlugFromForm(form.category, form.name);
+      const excludeId = mode === "edit" && currentProduct ? currentProduct.id : undefined;
+      const row = await fetchConflictingProductBySlug(slug, excludeId);
+      setSlugConflict(row ? { slug, otherProductName: row.name } : null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Error desconocido";
+      toast({ title: "No se pudo comprobar la URL", description: message, variant: "destructive" });
+    } finally {
+      setSlugChecking(false);
+    }
+  }, [form.category, form.name, mode, currentProduct, toast]);
 
   useEffect(() => {
     if (!descriptionEditorRef.current) return;
@@ -153,13 +213,73 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     setMaterialItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const addColorVariantRow = () => {
+    setColorVariantRows((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: "", hex: "#B8956A", hexDraft: null },
+    ]);
+  };
+
+  const removeColorVariantRow = (index: number) => {
+    setColorVariantRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateColorVariantName = (index: number, name: string) => {
+    setColorVariantRows((prev) => {
+      const next = [...prev];
+      if (next[index]) next[index] = { ...next[index], name };
+      return next;
+    });
+  };
+
+  const updateColorVariantFromPicker = (index: number, hexFromPicker: string) => {
+    const n = normalizeHex(hexFromPicker);
+    if (!n) return;
+    setColorVariantRows((prev) => {
+      const next = [...prev];
+      if (next[index]) next[index] = { ...next[index], hex: n, hexDraft: null };
+      return next;
+    });
+  };
+
+  const updateColorVariantHexDraft = (index: number, draft: string) => {
+    setColorVariantRows((prev) => {
+      const next = [...prev];
+      if (next[index]) next[index] = { ...next[index], hexDraft: draft };
+      return next;
+    });
+  };
+
+  const commitColorVariantHexInput = (index: number) => {
+    let invalid = false;
+    setColorVariantRows((prev) => {
+      const row = prev[index];
+      if (!row) return prev;
+      const n = normalizeHex(row.hexDraft ?? row.hex);
+      if (!n) {
+        invalid = true;
+        return prev.map((r, i) => (i === index ? { ...r, hexDraft: null } : r));
+      }
+      return prev.map((r, i) => (i === index ? { ...r, hex: n, hexDraft: null } : r));
+    });
+    if (invalid) {
+      toast({
+        title: "Código de color no válido",
+        description: "Usa formato hexadecimal, por ejemplo #D4A5A5 o #RGB.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const colorPickerValue = (row: ColorVariantFormRow) => normalizeHex(row.hexDraft ?? row.hex) ?? row.hex;
+
   const uploadImage = useCallback(
     async (file: File) => {
       if (mode !== "create" && !currentProduct) return;
       setUploading(true);
       try {
         const ext = file.name.split(".").pop() || "jpg";
-        const nameForSlug = (form.name || "").trim();
+        const nameForSlug = (form.category || "").trim() || (form.name || "").trim();
         const slugBase =
           mode === "create"
             ? (nameForSlug ? slugify(nameForSlug) : `borrador-${Date.now()}`)
@@ -185,7 +305,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         setUploading(false);
       }
     },
-    [currentProduct, form.name, mode, toast]
+    [currentProduct, form.category, form.name, mode, toast]
   );
 
   const handleDrop = useCallback(
@@ -238,18 +358,60 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     const materialsString = materialItems.filter((m) => m.trim()).join("\n");
     const normalizedDescription = normalizeDescriptionHtml(String(form.description || ""));
 
+    const colorVariantsPayload: ColorVariant[] = [];
+    for (const r of colorVariantRows) {
+      const name = r.name.trim();
+      const hex = normalizeHex(r.hexDraft ?? r.hex);
+      if (!name && !hex) continue;
+      if (!name || !hex) {
+        toast({
+          title: "Variantes de color incompletas",
+          description: "Cada variante necesita nombre y un color válido (#RRGGBB), o elimina la fila.",
+          variant: "destructive",
+        });
+        return;
+      }
+      colorVariantsPayload.push({ id: r.id, name, hex });
+    }
+
     if (mode === "create") {
       const name = (form.name || "").trim();
       if (!name) {
         toast({ title: "Falta el nombre", description: "Indica un nombre para el producto.", variant: "destructive" });
         return;
       }
-      const slugFinal = slugify(name);
+      const categoryTrim = (form.category || "").trim();
+      if (!categoryTrim) {
+        toast({
+          title: "Falta la etiqueta de tipo",
+          description: "Indica el texto pequeño dorado (por ejemplo «Espuma»); con él se genera la URL del producto.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const slugFinal = productSlugFromForm(form.category, name);
+      let conflicting: { id: string; name: string } | null;
+      try {
+        conflicting = await fetchConflictingProductBySlug(slugFinal);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Error desconocido";
+        toast({ title: "No se pudo comprobar la URL", description: message, variant: "destructive" });
+        return;
+      }
+      if (conflicting) {
+        setSlugConflict({ slug: slugFinal, otherProductName: conflicting.name });
+        toast({
+          title: "URL duplicada",
+          description: `La ruta /${slugFinal} ya está en uso por «${conflicting.name}». Cambia la etiqueta dorada o el nombre.`,
+          variant: "destructive",
+        });
+        return;
+      }
       setSaving(true);
       const { error } = await (supabase as any).from("products").insert({
         name,
         slug: slugFinal,
-        category: "otros",
+        category: categoryTrim,
         tagline: form.tagline || "",
         description: normalizedDescription || null,
         materials: materialsString || null,
@@ -259,6 +421,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         stock: Number(form.stock) || 0,
         image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         is_pack: Boolean(form.is_pack),
+        color_variants: colorVariantsPayload,
       });
 
       if (error) {
@@ -273,11 +436,32 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     }
 
     if (!currentProduct) return;
+    const categoryTrim = (form.category || "").trim() || "otros";
+    const slugFinal = productSlugFromForm(form.category, form.name);
+    let conflictingEdit: { id: string; name: string } | null;
+    try {
+      conflictingEdit = await fetchConflictingProductBySlug(slugFinal, currentProduct.id);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Error desconocido";
+      toast({ title: "No se pudo comprobar la URL", description: message, variant: "destructive" });
+      return;
+    }
+    if (conflictingEdit) {
+      setSlugConflict({ slug: slugFinal, otherProductName: conflictingEdit.name });
+      toast({
+        title: "URL duplicada",
+        description: `La ruta /${slugFinal} ya está en uso por «${conflictingEdit.name}». Cambia la etiqueta dorada o el nombre.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     const { error } = await (supabase as any)
       .from("products")
       .update({
         name: form.name,
+        category: categoryTrim,
+        slug: slugFinal,
         tagline: form.tagline || "",
         description: normalizedDescription,
         materials: materialsString,
@@ -287,6 +471,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         stock: Number(form.stock) || 0,
         image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         is_pack: Boolean(form.is_pack),
+        color_variants: colorVariantsPayload,
       })
       .eq("id", currentProduct.id);
 
@@ -304,7 +489,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     imageUrls[0] ||
     (currentProduct
       ? getProductImageUrl(currentProduct.image_url, currentProduct.slug)
-      : getProductImageUrl(form.image_url, slugify((form.name || "").trim() || "nuevo")));
+      : getProductImageUrl(form.image_url, productSlugFromForm(form.category, form.name)));
   const canAddMaterial = materialItems.length === 0 || (materialItems[materialItems.length - 1]?.trim() ?? "") !== "";
 
   const applyFormat = (command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") => {
@@ -428,14 +613,67 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           {/* Text Fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
+              <Label htmlFor="category" className="text-carbon/70 text-xs uppercase tracking-wider">
+                Etiqueta dorada (tipo)
+              </Label>
+              <Input
+                id="category"
+                value={form.category || ""}
+                onChange={(e) => {
+                  setSlugConflict(null);
+                  updateField("category", e.target.value);
+                }}
+                onBlur={() => void verifySlugOnBlur()}
+                placeholder="Ej. Espuma, Pinzas…"
+                className={cn(
+                  "mt-1 bg-white border-gold/15",
+                  slugConflict && "border-destructive focus-visible:ring-destructive/30"
+                )}
+                aria-invalid={slugConflict ? true : undefined}
+                aria-describedby={
+                  slugConflict ? "slug-conflict-msg" : slugChecking ? "slug-checking-msg" : undefined
+                }
+              />
+              {slugChecking ? (
+                <p id="slug-checking-msg" className="text-xs text-carbon/50 mt-1">
+                  Comprobando si la ruta está libre…
+                </p>
+              ) : null}
+              {slugConflict ? (
+                <p id="slug-conflict-msg" role="alert" className="text-sm text-destructive mt-2 font-medium">
+                  La ruta <span className="font-mono">/{slugConflict.slug}</span> ya está en uso por el producto «
+                  {slugConflict.otherProductName}». Cambia la etiqueta o el nombre y vuelve a comprobar al salir del
+                  campo.
+                </p>
+              ) : null}
+              <p className="text-xs text-carbon/45 mt-1.5 leading-snug">
+                Texto pequeño en dorado sobre la ficha. Al guardar, la ruta del producto será{" "}
+                <span className="font-mono text-carbon/70">/{productSlugFromForm(form.category, form.name)}</span>
+                {mode === "edit" && currentProduct && slugPreviewDiffersFromStored(currentProduct.slug, form.category, form.name) ? (
+                  <span className="block mt-1 text-amber-800/90">
+                    La URL cambiará respecto a la actual (/{currentProduct.slug}). Los enlaces antiguos dejarán de funcionar.
+                  </span>
+                ) : null}
+              </p>
+            </div>
+            <div className="sm:col-span-2">
               <Label htmlFor="name" className="text-carbon/70 text-xs uppercase tracking-wider">
                 Nombre
               </Label>
               <Input
                 id="name"
                 value={form.name || ""}
-                onChange={(e) => updateField("name", e.target.value)}
-                className="mt-1 bg-white border-gold/15"
+                onChange={(e) => {
+                  setSlugConflict(null);
+                  updateField("name", e.target.value);
+                }}
+                onBlur={() => void verifySlugOnBlur()}
+                className={cn(
+                  "mt-1 bg-white border-gold/15",
+                  slugConflict && "border-destructive focus-visible:ring-destructive/30"
+                )}
+                aria-invalid={slugConflict ? true : undefined}
+                aria-describedby={slugConflict ? "slug-conflict-msg" : undefined}
               />
             </div>
             <div className="sm:col-span-2">
@@ -544,20 +782,26 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
 
             {/* Materials / Composición section */}
             <div className="sm:col-span-2">
-              <div className="flex items-center justify-between mb-2">
+              <div className={`flex items-center mb-2 ${form.is_pack ? "" : "justify-between"}`}>
                 <Label className="text-carbon/70 text-xs uppercase tracking-wider">
-                  {isComposicion ? 'Composición' : 'Materiales'}
+                  {form.is_pack
+                    ? '¿Qué incluye este pack?'
+                    : isComposicion
+                      ? 'Composición'
+                      : 'Materiales'}
                 </Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-carbon/40">Materiales</span>
-                  <Switch
-                    checked={isComposicion}
-                    onCheckedChange={(checked) =>
-                      setForm((prev) => ({ ...prev, materials_label: checked ? 'composicion' : 'materiales' }))
-                    }
-                  />
-                  <span className="text-xs text-carbon/40">Composición</span>
-                </div>
+                {!form.is_pack ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-carbon/40">Materiales</span>
+                    <Switch
+                      checked={isComposicion}
+                      onCheckedChange={(checked) =>
+                        setForm((prev) => ({ ...prev, materials_label: checked ? 'composicion' : 'materiales' }))
+                      }
+                    />
+                    <span className="text-xs text-carbon/40">Composición</span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -567,7 +811,13 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                     <Input
                       value={item}
                       onChange={(e) => handleMaterialChange(index, e.target.value)}
-                      placeholder={isComposicion ? `Ingrediente ${index + 1}` : `Material ${index + 1}`}
+                      placeholder={
+                        form.is_pack
+                          ? `Ítem ${index + 1}`
+                          : isComposicion
+                            ? `Ingrediente ${index + 1}`
+                            : `Material ${index + 1}`
+                      }
                       className="bg-white border-gold/15 text-sm"
                     />
                     <button
@@ -592,6 +842,81 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 <Plus size={14} className="mr-1" />
                 Añadir {isComposicion ? 'ingrediente' : 'material'}
               </Button>
+            </div>
+
+            {/* Variantes de color */}
+            <div className="sm:col-span-2 rounded-xl border border-gold/15 bg-white/60 p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <Label className="text-carbon/70 text-xs uppercase tracking-wider">Variantes de color</Label>
+                  <p className="text-xs text-carbon/45 mt-1 leading-snug">
+                    Opcional. En la tienda se muestran como círculos para elegir color. Usa el selector o escribe el código hex.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addColorVariantRow}
+                  className="shrink-0 border-gold/20 text-gold hover:bg-gold/5"
+                >
+                  <Plus size={14} className="mr-1" />
+                  Añadir variante
+                </Button>
+              </div>
+              {colorVariantRows.length === 0 ? (
+                <p className="text-sm text-carbon/40 italic">Sin variantes. El producto se vende sin elegir color.</p>
+              ) : (
+                <div className="space-y-3">
+                  {colorVariantRows.map((row, index) => (
+                    <div
+                      key={row.id}
+                      className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end p-3 rounded-lg border border-gold/10 bg-white/80"
+                    >
+                      <div className="flex-1 min-w-[140px]">
+                        <Label className="text-[10px] uppercase tracking-wider text-carbon/50">Nombre visible</Label>
+                        <Input
+                          value={row.name}
+                          onChange={(e) => updateColorVariantName(index, e.target.value)}
+                          placeholder="Ej. Rosa empolvado"
+                          className="mt-1 bg-white border-gold/15 text-sm"
+                        />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <div>
+                          <Label className="text-[10px] uppercase tracking-wider text-carbon/50">Selector</Label>
+                          <input
+                            type="color"
+                            aria-label={`Color para ${row.name || "variante"}`}
+                            value={colorPickerValue(row)}
+                            onChange={(e) => updateColorVariantFromPicker(index, e.target.value)}
+                            className="mt-1 h-10 w-14 cursor-pointer rounded-md border border-gold/20 bg-white p-0.5"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-[120px] sm:w-36">
+                          <Label className="text-[10px] uppercase tracking-wider text-carbon/50">Código hex</Label>
+                          <Input
+                            value={row.hexDraft ?? row.hex}
+                            onChange={(e) => updateColorVariantHexDraft(index, e.target.value)}
+                            onBlur={() => commitColorVariantHexInput(index)}
+                            placeholder="#RRGGBB"
+                            spellCheck={false}
+                            className="mt-1 bg-white border-gold/15 text-sm font-mono"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeColorVariantRow(index)}
+                          className="text-carbon/30 hover:text-red-400 transition-colors p-2 shrink-0"
+                          aria-label="Quitar variante"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="sm:col-span-2">
@@ -635,7 +960,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           {/* Save */}
           <Button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || !!slugConflict || slugChecking}
             className="w-full bg-gold hover:bg-gold/90 text-white h-11 text-sm font-medium"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

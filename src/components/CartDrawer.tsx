@@ -30,10 +30,10 @@ const CartDrawer = () => {
             <div className="flex-1 overflow-y-auto space-y-4 py-4">
               {items.map((item) => (
                 <div
-                  key={item.product.id}
+                  key={item.lineId}
                   className="flex gap-4 p-3 rounded-lg bg-white/50 border border-gold/5"
                 >
-                  <div className="w-16 h-16 rounded-md bg-muted flex-shrink-0 overflow-hidden">
+                  <div className="w-16 h-16 rounded-md bg-muted shrink-0 overflow-hidden">
                     <img
                       src={getProductImageUrl(item.product.image_url, item.product.slug)}
                       alt={item.product.name}
@@ -42,19 +42,29 @@ const CartDrawer = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-medium text-carbon truncate">{item.product.name}</h4>
+                    {item.colorVariant ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className="h-3.5 w-3.5 shrink-0 rounded-full border border-carbon/15 shadow-sm"
+                          style={{ backgroundColor: item.colorVariant.hex }}
+                          title={item.colorVariant.hex}
+                        />
+                        <span className="text-xs text-carbon/55 truncate">{item.colorVariant.name}</span>
+                      </div>
+                    ) : null}
                     <p className="text-sm text-gold font-semibold mt-0.5">
                       €{item.product.price.toFixed(2)}
                     </p>
                     <div className="flex items-center gap-2 mt-2">
                       <button
-                        onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                        onClick={() => updateQuantity(item.lineId, item.quantity - 1)}
                         className="w-6 h-6 flex items-center justify-center rounded border border-carbon/10 text-carbon/50 hover:border-gold hover:text-gold transition-colors"
                       >
                         <Minus size={12} />
                       </button>
                       <span className="text-sm font-medium text-carbon w-6 text-center">{item.quantity}</span>
                       <button
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
                         className="w-6 h-6 flex items-center justify-center rounded border border-carbon/10 text-carbon/50 hover:border-gold hover:text-gold transition-colors"
                       >
                         <Plus size={12} />
@@ -62,7 +72,7 @@ const CartDrawer = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => removeItem(item.product.id)}
+                    onClick={() => removeItem(item.lineId)}
                     className="text-carbon/30 hover:text-destructive transition-colors self-start"
                   >
                     <Trash2 size={16} />

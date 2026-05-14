@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { Product } from "@/data/products";
+import { cartLineId, type ColorVariant } from "@/lib/color-variants";
 
 export interface CartItem {
+  lineId: string;
   product: Product;
+  colorVariant: ColorVariant | null;
   quantity: number;
 }
 
@@ -12,9 +15,9 @@ interface CartContextType {
   isAddToCartDisabled: boolean;
   openCart: () => void;
   closeCart: () => void;
-  addItem: (product: Product) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addItem: (product: Product, colorVariant?: ColorVariant | null) => void;
+  removeItem: (lineId: string) => void;
+  updateQuantity: (lineId: string, quantity: number) => void;
   clearCart: () => void;
   totalItems: number;
   totalPrice: number;
@@ -30,32 +33,36 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openCart = useCallback(() => setIsOpen(true), []);
   const closeCart = useCallback(() => setIsOpen(false), []);
 
-  const addItem = useCallback((product: Product) => {
+  const addItem = useCallback((product: Product, colorVariant?: ColorVariant | null) => {
     if (IS_STORE_UNDER_CONSTRUCTION) return;
 
+    const variant = colorVariant ?? product.selectedColorVariant ?? null;
+    const lineId = cartLineId(product.id, variant?.id ?? null);
+
     setItems((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
+      const existing = prev.find((i) => i.lineId === lineId);
       if (existing) {
         return prev.map((i) =>
-          i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.lineId === lineId ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      const { selectedColorVariant: _s, ...rest } = product;
+      return [...prev, { lineId, product: { ...rest, selectedColorVariant: null }, colorVariant: variant, quantity: 1 }];
     });
     setIsOpen(true);
   }, []);
 
-  const removeItem = useCallback((productId: string) => {
-    setItems((prev) => prev.filter((i) => i.product.id !== productId));
+  const removeItem = useCallback((lineId: string) => {
+    setItems((prev) => prev.filter((i) => i.lineId !== lineId));
   }, []);
 
-  const updateQuantity = useCallback((productId: string, quantity: number) => {
+  const updateQuantity = useCallback((lineId: string, quantity: number) => {
     if (quantity <= 0) {
-      setItems((prev) => prev.filter((i) => i.product.id !== productId));
+      setItems((prev) => prev.filter((i) => i.lineId !== lineId));
       return;
     }
     setItems((prev) =>
-      prev.map((i) => (i.product.id === productId ? { ...i, quantity } : i))
+      prev.map((i) => (i.lineId === lineId ? { ...i, quantity } : i))
     );
   }, []);
 

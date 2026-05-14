@@ -35,7 +35,7 @@ type MerchantShippingAddress = {
 
 type MerchantPayload = {
   email: string;
-  lines: Array<{ productId: string; quantity: number }>;
+  lines: Array<{ productId: string; quantity: number; productDisplayName?: string }>;
   shippingEur: number;
   subtotalEur: number;
   shippingAddress?: MerchantShippingAddress;
@@ -58,10 +58,18 @@ function parseMerchantPayloadJson(json: string): MerchantPayload | null {
       ? linesRaw.filter((x): x is { productId?: string; quantity?: number } => x != null && typeof x === "object")
       : [];
     const normalizedLines = lines
-      .map((x) => ({
-        productId: String(x.productId ?? (x as Record<string, unknown>).product_id ?? ""),
-        quantity: Math.floor(Number(x.quantity) || 0),
-      }))
+      .map((x) => {
+        const rec = x as Record<string, unknown>;
+        const displayRaw = rec.productDisplayName ?? rec.product_display_name;
+        const productDisplayName = typeof displayRaw === "string" && displayRaw.trim()
+          ? String(displayRaw).trim()
+          : undefined;
+        return {
+          productId: String(x.productId ?? rec.product_id ?? ""),
+          quantity: Math.floor(Number(x.quantity) || 0),
+          ...(productDisplayName ? { productDisplayName } : {}),
+        };
+      })
       .filter((x) => x.productId && x.quantity > 0);
     if (typeof email !== "string" || !email.trim() || !normalizedLines.length) return null;
     return {
@@ -101,15 +109,24 @@ type PendingOrderRow = {
 };
 
 function payloadFromPendingRow(row: PendingOrderRow): MerchantPayload | null {
-  const snap = row.pending_cart_snapshot as { lines?: Array<{ productId?: unknown; quantity?: unknown }> } | null;
+  const snap = row.pending_cart_snapshot as {
+    lines?: Array<{ productId?: unknown; quantity?: unknown; productDisplayName?: unknown; product_display_name?: unknown }>;
+  } | null;
   const rawLines = snap?.lines;
   const email = row.email != null ? String(row.email).trim().toLowerCase() : "";
   if (!email || !Array.isArray(rawLines) || !rawLines.length) return null;
   const lines = rawLines
-    .map((l) => ({
-      productId: String(l?.productId ?? ""),
-      quantity: Math.floor(Number(l?.quantity) || 0),
-    }))
+    .map((l) => {
+      const displayRaw = l?.productDisplayName ?? l?.product_display_name;
+      const productDisplayName = typeof displayRaw === "string" && displayRaw.trim()
+        ? String(displayRaw).trim()
+        : undefined;
+      return {
+        productId: String(l?.productId ?? ""),
+        quantity: Math.floor(Number(l?.quantity) || 0),
+        ...(productDisplayName ? { productDisplayName } : {}),
+      };
+    })
     .filter((l) => l.productId && l.quantity > 0);
   if (!lines.length) return null;
   return {
@@ -469,11 +486,12 @@ serve(async (req) => {
     const buildOrderItems = (orderId: string) =>
       payload.lines.map((line) => {
         const unit = priceById.get(String(line.productId)) ?? 0;
-        const name = nameById.get(String(line.productId)) ?? "Producto";
+        const fallbackName = nameById.get(String(line.productId)) ?? "Producto";
+        const display = line.productDisplayName?.trim() || fallbackName;
         return {
           order_id: orderId,
           product_id: line.productId,
-          product_name: String(name),
+          product_name: String(display),
           quantity: line.quantity,
           unit_price: unit,
         };
@@ -482,7 +500,8 @@ serve(async (req) => {
     const buildEmailLines = () =>
       payload.lines.map((line) => {
         const unitPrice = priceById.get(String(line.productId)) ?? 0;
-        const name = nameById.get(String(line.productId)) ?? "Producto";
+        const fallbackName = nameById.get(String(line.productId)) ?? "Producto";
+        const name = line.productDisplayName?.trim() || fallbackName;
         return { name, quantity: line.quantity, unitPrice };
       });
 
