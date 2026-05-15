@@ -423,6 +423,11 @@ serve(async (req) => {
       return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain" } });
     }
 
+    const processedPayMethod = pick(decoded, ["Ds_ProcessedPayMethod", "DS_PROCESSEDPAYMETHOD"]);
+    if (processedPayMethod) {
+      console.log("redsys_notify_authorized", { dsResponse, processedPayMethod });
+    }
+
     const dsOrder = pick(decoded, ["Ds_Order", "DS_ORDER"]);
     const dsAuthCode = pick(decoded, [
       "Ds_AuthorisationCode",

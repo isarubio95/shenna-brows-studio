@@ -56,8 +56,7 @@ const Checkout = () => {
   const canQuoteShipping = shippingEur != null;
   const total = totalPrice + (shippingEur ?? 0);
 
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitPayment = async (payMethod?: string) => {
     if (!email) {
       toast({ title: "Introduce tu email", variant: "destructive" });
       return;
@@ -119,6 +118,7 @@ const Checkout = () => {
           customerEmail: email,
           shippingAddress: ship,
           turnstileToken: cloudflareProtectionEnabled ? turnstileToken : "",
+          ...(payMethod ? { payMethod } : { payMethods: "all" }),
         },
       });
       if (error) throw error;
@@ -161,6 +161,16 @@ const Checkout = () => {
       setTurnstileToken("");
       setLoading(false);
     }
+  };
+
+  const handlePayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitPayment();
+  };
+
+  const handleBizumPayment = (e: React.MouseEvent) => {
+    e.preventDefault();
+    void submitPayment("z");
   };
 
   if (items.length === 0) {
@@ -310,27 +320,38 @@ const Checkout = () => {
                 </div>
               </div>
 
-              <p className="text-xs text-carbon/40">
-                Serás redirigido a la pasarela segura de pago con tarjeta (Redsys / TPV virtual). La dirección se guardará
-                con tu pedido para el envío.
+              <p className="text-xs text-carbon/40 leading-relaxed">
+                Serás redirigido a la pasarela segura de Redsys (tarjeta; Apple Pay en Safari si el banco lo tiene activo).
+                Para Bizum, usa el botón dedicado. La dirección se guardará con tu pedido para el envío.
               </p>
 
-              <Button
-                type="submit"
-                disabled={loading || isCooldownActive || !canQuoteShipping}
-                className="w-full bg-gold hover:bg-gold/90 text-white py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] mt-4"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Procesando...
-                  </>
-                ) : canQuoteShipping ? (
-                  `Pagar €${total.toFixed(2)}`
-                ) : (
-                  "Selecciona provincia para continuar"
-                )}
-              </Button>
+              <div className="space-y-3 mt-4">
+                <Button
+                  type="submit"
+                  disabled={loading || isCooldownActive || !canQuoteShipping}
+                  className="w-full bg-gold hover:bg-gold/90 text-white py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)]"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : canQuoteShipping ? (
+                    `Pagar €${total.toFixed(2)}`
+                  ) : (
+                    "Selecciona provincia para continuar"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading || isCooldownActive || !canQuoteShipping}
+                  onClick={handleBizumPayment}
+                  className="w-full border-gold/30 text-carbon hover:bg-gold/5 py-5 text-sm tracking-wide rounded-full"
+                >
+                  Pagar con Bizum
+                </Button>
+              </div>
               {isCooldownActive ? (
                 <p className="text-xs text-center text-carbon/60">
                   Espera {cooldownSeconds}s antes de volver a intentar.

@@ -5,9 +5,11 @@ import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLi
 import { sha256Hex, verifyTurnstileToken } from "../_shared/security.ts";
 import {
   createMerchantSignature,
+  applyRedsysPayMethods,
   encodeMerchantParameters,
   formatAmount12,
   redsysRealizarPagoUrl,
+  resolveRedsysPayMethods,
   type RedsysMerchantParams,
 } from "../_shared/redsys.ts";
 import { normalizeProvinceCode, shippingEurForShippingAddress } from "../_shared/shipping.ts";
@@ -135,12 +137,26 @@ serve(async (req) => {
 
     const terminalPadded = terminal.length >= 3 ? terminal : terminal.padStart(3, "0");
 
-    const { items, customerEmail, turnstileToken, shippingAddress } = await req.json() as {
+    const body = await req.json() as {
       items?: Array<{ productId: string; quantity: number; colorVariantId?: string }>;
       customerEmail?: string;
       turnstileToken?: string;
       shippingAddress?: Record<string, unknown>;
+      payMethod?: string;
+      payMethods?: string;
     };
+    const { items, customerEmail, turnstileToken, shippingAddress } = body;
+
+    let payMethodsFilter: string;
+    try {
+      payMethodsFilter = resolveRedsysPayMethods(body.payMethods ?? body.payMethod);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Método de pago no válido";
+      return new Response(JSON.stringify({ error: msg }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const turnstileValid = await verifyTurnstileToken(String(turnstileToken || ""), ip);
     if (!turnstileValid) {
@@ -348,20 +364,23 @@ serve(async (req) => {
     };
     const merchantDataB64 = Buffer.from(JSON.stringify(merchantDataPayload), "utf8").toString("base64");
 
-    const merchantParams: RedsysMerchantParams = {
-      Ds_Merchant_Amount: formatAmount12(amountMinor),
-      Ds_Merchant_Order: merchantOrder,
-      Ds_Merchant_MerchantCode: merchantCode,
-      Ds_Merchant_Currency: currency,
-      Ds_Merchant_TransactionType: "0",
-      Ds_Merchant_Terminal: terminalPadded,
-      Ds_Merchant_MerchantURL: notifyUrl,
-      Ds_Merchant_UrlOK: `${origin}/payment-success`,
-      Ds_Merchant_UrlKO: `${origin}/payment-ko`,
-      Ds_Merchant_ConsumerLanguage: "001",
-      Ds_Merchant_MerchantData: merchantDataB64,
-      Ds_Merchant_ProductDescription: "Shenna Brows Studio",
-    };
+    const merchantParams = applyRedsysPayMethods(
+      {
+        Ds_Merchant_Amount: formatAmount12(amountMinor),
+        Ds_Merchant_Order: merchantOrder,
+        Ds_Merchant_MerchantCode: merchantCode,
+        Ds_Merchant_Currency: currency,
+        Ds_Merchant_TransactionType: "0",
+        Ds_Merchant_Terminal: terminalPadded,
+        Ds_Merchant_MerchantURL: notifyUrl,
+        Ds_Merchant_UrlOK: `${origin}/payment-success`,
+        Ds_Merchant_UrlKO: `${origin}/payment-ko`,
+        Ds_Merchant_ConsumerLanguage: "001",
+        Ds_Merchant_MerchantData: merchantDataB64,
+        Ds_Merchant_ProductDescription: "Shenna Brows Studio",
+      },
+      payMethodsFilter,
+    );
 
     const dsMerchantParameters = encodeMerchantParameters(merchantParams);
     const dsSignature = createMerchantSignature(secretKey, merchantOrder, dsMerchantParameters);

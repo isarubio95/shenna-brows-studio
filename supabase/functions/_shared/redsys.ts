@@ -5,6 +5,68 @@ import forge from "npm:node-forge@1.3.1";
 /** Parámetros enviados en Ds_MerchantParameters (JSON → Base64). Valores como cadenas según TPV Redsys. */
 export type RedsysMerchantParams = Record<string, string>;
 
+/** Valores admitidos en Ds_Merchant_PayMethods (redirección). Ver documentación Redsys / TPV Virtual. */
+export const REDSYS_PAY_METHOD_TOKENS = ["card", "z"] as const;
+
+/** Bizum en redirección exige `z` aislado; mezclarlo con `card` bloquea el resto en muchos terminales. */
+export const REDSYS_BIZUM_PAY_METHOD = "z";
+
+/**
+ * Pago principal por redirección: solo `card`.
+ * Con Apple Pay dado de alta en el terminal, Redsys puede mostrarlo en la pantalla de tarjeta.
+ */
+export const DEFAULT_REDSYS_PAY_METHODS = "card";
+
+const ALLOWED_PAY_METHOD_SET = new Set<string>(REDSYS_PAY_METHOD_TOKENS);
+
+/**
+ * Resuelve Ds_Merchant_PayMethods. En redirección, omitir el campo suele mostrar solo tarjeta;
+ * hay que enviar la lista explícita de métodos contratados en el terminal.
+ */
+export function resolveRedsysPayMethods(requested?: string | null): string {
+  const envDefault = Deno.env.get("REDSYS_PAY_METHODS")?.trim();
+  const raw = requested?.trim();
+
+  if (!raw) {
+    return envDefault || DEFAULT_REDSYS_PAY_METHODS;
+  }
+  const normalized = raw.toLowerCase();
+  if (normalized === "all" || normalized === "default") {
+    return DEFAULT_REDSYS_PAY_METHODS;
+  }
+  if (normalized === "xpay" || normalized === "wallets" || normalized === "google") {
+    throw new Error(
+      "Ese método de pago no está disponible. Usa «Pagar» (tarjeta) o «Pagar con Bizum».",
+    );
+  }
+
+  const tokens = raw
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  if (!tokens.length) {
+    return envDefault || DEFAULT_REDSYS_PAY_METHODS;
+  }
+  for (const token of tokens) {
+    if (!ALLOWED_PAY_METHOD_SET.has(token)) {
+      throw new Error(`Método de pago Redsys no válido: ${token}`);
+    }
+  }
+  return tokens.join(",");
+}
+
+export function applyRedsysPayMethods(
+  params: RedsysMerchantParams,
+  payMethods: string,
+): RedsysMerchantParams {
+  const out = { ...params };
+  for (const key of Object.keys(out)) {
+    if (key.toLowerCase() === "ds_merchant_paymethods") delete out[key];
+  }
+  out.Ds_Merchant_PayMethods = payMethods;
+  return out;
+}
+
 export function zeroPadUtf8(value: string, blockSize: number): Buffer {
   const buf = Buffer.from(String(value), "utf8");
   const rem = buf.length % blockSize;
