@@ -1,6 +1,6 @@
 /** Plantilla HTML del correo de confirmación de pedido (pago y/o seguimiento Correos). */
 
-export type OrderConfirmationVariant = "paid" | "tracking";
+export type OrderConfirmationVariant = "paid" | "tracking" | "shipped";
 
 export type OrderConfirmationLine = { name: string; quantity: number; unitPrice: number };
 
@@ -32,13 +32,22 @@ export function buildOrderConfirmationHtml(args: {
   correosShipmentCode?: string | null;
 }): string {
   const isTrackingVariant = args.variant === "tracking";
+  const isShippedVariant = args.variant === "shipped";
   const code = String(args.correosShipmentCode ?? "").trim();
   const hasTracking = Boolean(code);
 
-  const title = isTrackingVariant ? "Seguimiento Correos" : "Pago confirmado";
-  const lead = isTrackingVariant
-    ? "Tu pedido ya tiene número de seguimiento de Correos. Puedes localizar el envío en la web de Correos. Incluimos también el resumen de la compra."
-    : "Gracias por tu pedido. Hemos recibido el pago correctamente y ya estamos preparando tu compra.";
+  const title = isShippedVariant
+    ? "Tu pedido ya ha sido enviado"
+    : isTrackingVariant
+      ? "Seguimiento Correos"
+      : "Pago confirmado";
+  const lead = isShippedVariant
+    ? hasTracking
+      ? "Tu pedido ya está en camino. Puedes seguir el envío en Correos con el número de abajo. Incluimos el resumen de tu compra."
+      : "Tu pedido ya está en camino hacia la dirección de envío. Incluimos el resumen de tu compra."
+    : isTrackingVariant
+      ? "Tu pedido ya tiene número de seguimiento de Correos. Puedes localizar el envío en la web de Correos. Incluimos también el resumen de la compra."
+      : "Gracias por tu pedido. Hemos recibido el pago correctamente y ya estamos preparando tu compra.";
 
   const linesHtml = args.lines
     .map(

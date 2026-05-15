@@ -12,12 +12,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Eye, RotateCcw, Package, MessageSquareQuote, CheckCircle2, X } from "lucide-react";
+import { Loader2, Eye, RotateCcw, Package, MessageSquareQuote, CheckCircle2, X, Ban } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   RETURN_REASON_LABELS,
   RETURN_STATUS_LABELS,
   canRequestReturn,
+  canCancelOrder,
   type ReturnReason,
   type ReturnRequestStatus,
 } from "@/lib/returns";
@@ -28,6 +29,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   pending_payment: { label: "Pago en curso", variant: "secondary" },
   shipped: { label: "Enviado", variant: "outline" },
   delivered: { label: "Entregado", variant: "default" },
+  cancelled: { label: "Cancelado", variant: "destructive" },
 };
 
 const MONTHS = [
@@ -53,9 +55,11 @@ const Account = () => {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
   const [returnReason, setReturnReason] = useState<ReturnReason>("defective");
   const [returnNote, setReturnNote] = useState("");
+  const [cancelNote, setCancelNote] = useState("");
   const [filterMonth, setFilterMonth] = useState("all");
   const [filterYear, setFilterYear] = useState("all");
   const [testimonialText, setTestimonialText] = useState("");
@@ -171,6 +175,37 @@ const Account = () => {
     },
   });
 
+  const cancelOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!returnOrderId) throw new Error("Pedido no seleccionado");
+      const { data, error } = await supabase.functions.invoke("cancel-order", {
+        body: {
+          orderId: returnOrderId,
+          customerNote: cancelNote.trim() || undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Pedido cancelado",
+        description: "Te hemos enviado un correo de confirmación. El reembolso se tramitará en breve.",
+      });
+      setCancelDialogOpen(false);
+      setCancelNote("");
+      setReturnOrderId(null);
+      queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "No se pudo cancelar el pedido",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const { data: myTestimonial } = useQuery({
     queryKey: ["my-testimonial", user?.id],
     queryFn: async () => {
@@ -224,6 +259,12 @@ const Account = () => {
     setReturnReason("defective");
     setReturnNote("");
     setReturnDialogOpen(true);
+  };
+
+  const openCancelDialog = (orderId: string) => {
+    setReturnOrderId(orderId);
+    setCancelNote("");
+    setCancelDialogOpen(true);
   };
 
   return (
@@ -293,6 +334,7 @@ const Account = () => {
                     const returnReq = returnByOrderId.get(order.id);
                     const refundStatus = (order as { refund_status?: string }).refund_status ?? "none";
                     const canReturn = canRequestReturn(order.status, refundStatus) && !returnReq;
+                    const canCancel = canCancelOrder(order.status, refundStatus) && !returnReq;
                     return (
                       <TableRow key={order.id}>
                         <TableCell className="font-mono text-xs text-muted-foreground">
@@ -323,8 +365,12 @@ const Account = () => {
                             <Badge variant="outline" className="text-xs">
                               {RETURN_STATUS_LABELS[returnReq.status]}
                             </Badge>
+                          ) : canCancel ? (
+                            <span className="text-xs text-muted-foreground">Cancelación disponible</span>
                           ) : canReturn ? (
-                            <span className="text-xs text-muted-foreground">Disponible</span>
+                            <span className="text-xs text-muted-foreground">Devolución disponible</span>
+                          ) : order.status === "cancelled" ? (
+                            <span className="text-xs text-muted-foreground">Cancelado</span>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
@@ -342,6 +388,16 @@ const Account = () => {
                             >
                               <Eye size={16} />
                             </Button>
+                            {canCancel ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openCancelDialog(order.id)}
+                                title="Cancelar pedido"
+                              >
+                                <Ban size={16} />
+                              </Button>
+                            ) : null}
                             {canReturn ? (
                               <Button
                                 variant="ghost"
@@ -373,7 +429,7 @@ const Account = () => {
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            Puedes solicitar devolución en pedidos pagados, enviados o entregados. Consulta la{" "}
+            Puedes cancelar el pedido mientras no esté enviado. Tras el envío, solo podrás solicitar devolución según la{" "}
             <a href="/politica-devoluciones" className="text-primary underline">
               política de devoluciones
             </a>
@@ -497,6 +553,40 @@ const Account = () => {
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-playfair">Cancelar pedido</DialogTitle>
+            <DialogDescription>
+              Tu pedido aún no ha sido enviado. Al cancelar, tramitaremos el reembolso del importe pagado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm text-muted-foreground">Motivo (opcional)</Label>
+              <Textarea
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                placeholder="Cuéntanos por qué cancelas…"
+                className="mt-1"
+                maxLength={2000}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>Volver</Button>
+            <Button
+              variant="destructive"
+              onClick={() => cancelOrderMutation.mutate()}
+              disabled={cancelOrderMutation.isPending}
+            >
+              {cancelOrderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar cancelación
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
         <DialogContent>

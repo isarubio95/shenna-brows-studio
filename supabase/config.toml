@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.generate-order-ticket]
 verify_jwt = false
+
+[functions.mark-order-shipped]
+verify_jwt = false
+
+[functions.cancel-order]
+verify_jwt = false

@@ -30,7 +30,20 @@ export const ACTIVE_RETURN_STATUSES: ReturnRequestStatus[] = [
   "product_received",
 ];
 
-export const ELIGIBLE_ORDER_STATUSES = new Set(["paid", "shipped", "delivered"]);
+/** Pedidos enviados por el admin: solo entonces el cliente puede solicitar devolución */
+export const ELIGIBLE_RETURN_ORDER_STATUSES = new Set(["shipped", "delivered"]);
+
+export function canCancelOrder(orderStatus: string, refundStatus: string | null | undefined): boolean {
+  if (orderStatus !== "paid") return false;
+  if (refundStatus && refundStatus !== "none") return false;
+  return true;
+}
+
+export function canRequestReturn(orderStatus: string, refundStatus: string | null | undefined): boolean {
+  if (!ELIGIBLE_RETURN_ORDER_STATUSES.has(orderStatus)) return false;
+  if (refundStatus && refundStatus !== "none") return false;
+  return true;
+}
 
 export function getRedsysCanalesUrl(): string {
   const env = (import.meta.env.VITE_REDSYS_ENV as string | undefined)?.toLowerCase();
@@ -38,10 +51,4 @@ export function getRedsysCanalesUrl(): string {
   return isProd
     ? "https://canales.redsys.es/lacaixa"
     : "https://sis-t.redsys.es:25443/canales/";
-}
-
-export function canRequestReturn(orderStatus: string, refundStatus: string | null | undefined): boolean {
-  if (!ELIGIBLE_ORDER_STATUSES.has(orderStatus)) return false;
-  if (refundStatus && refundStatus !== "none") return false;
-  return true;
 }

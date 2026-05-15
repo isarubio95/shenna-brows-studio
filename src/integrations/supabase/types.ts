@@ -68,6 +68,7 @@ export type Database = {
           pending_cart_snapshot: Json | null
           redsys_auth_code: string | null
           refund_status: string
+          shipped_at: string | null
           shipping: number | null
           shipping_address: Json | null
           status: string
@@ -84,6 +85,7 @@ export type Database = {
           pending_cart_snapshot?: Json | null
           redsys_auth_code?: string | null
           refund_status?: string
+          shipped_at?: string | null
           shipping?: number | null
           shipping_address?: Json | null
           status?: string
@@ -100,6 +102,7 @@ export type Database = {
           pending_cart_snapshot?: Json | null
           redsys_auth_code?: string | null
           refund_status?: string
+          shipped_at?: string | null
           shipping?: number | null
           shipping_address?: Json | null
           status?: string

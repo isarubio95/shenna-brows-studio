@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
-import { buildReturnAdminNotifyHtml } from "../_shared/returnEmails.ts";
+import { buildOrderCancelAdminNotifyHtml, buildOrderCancelCustomerHtml } from "../_shared/orderCancelEmails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,19 +9,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const VALID_REASONS = new Set(["defective", "wrong_product", "changed_mind", "other"]);
-const ELIGIBLE_ORDER_STATUSES = new Set(["shipped", "delivered"]);
-const ACTIVE_RETURN_STATUSES = new Set(["requested", "approved", "product_received"]);
-
 const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim();
 const resendFrom =
   Deno.env.get("RESEND_FROM_ADDRESS")?.trim() || "Shenna Brows <info@shennabrows.com>";
-const adminNotifyEmail = Deno.env.get("ADMIN_NOTIFY_EMAIL")?.trim() || "info@shennabrows.com";
+const adminNotifyEmail =
+  Deno.env.get("ADMIN_NOTIFY_EMAIL")?.trim() || "shennabrows@hotmail.com";
 
-async function sendResendEmail(to: string, subject: string, html: string): Promise<void> {
+async function sendResendEmail(to: string, subject: string, html: string): Promise<boolean> {
   if (!resendApiKey) {
-    console.warn("submit_return_request_resend_not_configured");
-    return;
+    console.warn("cancel_order_resend_not_configured");
+    return false;
   }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -32,9 +29,10 @@ async function sendResendEmail(to: string, subject: string, html: string): Promi
     body: JSON.stringify({ from: resendFrom, to: [to], subject, html }),
   });
   if (!res.ok) {
-    const text = await res.text();
-    console.error("submit_return_request_resend_error", text);
+    console.error("cancel_order_resend_error", await res.text());
+    return false;
   }
+  return true;
 }
 
 serve(async (req) => {
@@ -51,7 +49,7 @@ serve(async (req) => {
 
   const ip = getClientIp(req);
   const ipLimit = await applyRateLimit({
-    endpoint: "submit-return-request",
+    endpoint: "cancel-order",
     kind: "ip",
     key: ip,
     limit: 10,
@@ -96,7 +94,7 @@ serve(async (req) => {
   const userId = claimsData.claims.sub as string;
 
   const userLimit = await applyRateLimit({
-    endpoint: "submit-return-request",
+    endpoint: "cancel-order",
     kind: "identity",
     key: userId,
     limit: 5,
@@ -109,7 +107,7 @@ serve(async (req) => {
     });
   }
 
-  let body: { orderId?: string; reason?: string; customerNote?: string };
+  let body: { orderId?: string; customerNote?: string };
   try {
     body = await req.json();
   } catch {
@@ -120,11 +118,10 @@ serve(async (req) => {
   }
 
   const orderId = String(body.orderId || "").trim();
-  const reason = String(body.reason || "").trim();
   const customerNote = String(body.customerNote || "").trim().slice(0, 2000) || null;
 
-  if (!orderId || !VALID_REASONS.has(reason)) {
-    return new Response(JSON.stringify({ error: "Datos de solicitud inválidos" }), {
+  if (!orderId) {
+    return new Response(JSON.stringify({ error: "Datos inválidos" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -134,7 +131,7 @@ serve(async (req) => {
 
   const { data: order, error: orderErr } = await admin
     .from("orders")
-    .select("id, email, status, total, user_id, stripe_session_id, refund_status")
+    .select("id, email, status, total, user_id, stripe_session_id, refund_status, shipped_at")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -162,19 +159,25 @@ serve(async (req) => {
   }
 
   const status = String(order.status || "");
-  if (status === "paid") {
+  if (status === "cancelled") {
+    return new Response(JSON.stringify({ error: "Este pedido ya está cancelado" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (status === "shipped" || status === "delivered" || order.shipped_at) {
     return new Response(
       JSON.stringify({
-        error: "Tu pedido aún no ha sido enviado. Puedes cancelarlo directamente desde tu cuenta.",
+        error: "El pedido ya ha sido enviado. Solicita una devolución desde tu cuenta.",
       }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
-  if (!ELIGIBLE_ORDER_STATUSES.has(status)) {
-    return new Response(
-      JSON.stringify({ error: "Este pedido no admite devoluciones en su estado actual" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+  if (status !== "paid") {
+    return new Response(JSON.stringify({ error: "Este pedido no se puede cancelar en su estado actual" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   if (String(order.refund_status || "none") !== "none") {
@@ -184,59 +187,50 @@ serve(async (req) => {
     });
   }
 
-  const { data: existingActive } = await admin
-    .from("return_requests")
-    .select("id, status")
-    .eq("order_id", orderId)
-    .in("status", [...ACTIVE_RETURN_STATUSES])
-    .maybeSingle();
+  const { error: updateErr } = await admin
+    .from("orders")
+    .update({ status: "cancelled" })
+    .eq("id", orderId);
 
-  if (existingActive) {
-    return new Response(JSON.stringify({ error: "Ya existe una solicitud activa para este pedido" }), {
-      status: 409,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  const requestedAmount = Number(order.total ?? 0);
-
-  const { data: inserted, error: insertErr } = await admin
-    .from("return_requests")
-    .insert({
-      order_id: orderId,
-      user_id: userId,
-      reason,
-      customer_note: customerNote,
-      status: "requested",
-      requested_amount: requestedAmount,
-    })
-    .select("id")
-    .single();
-
-  if (insertErr || !inserted) {
-    console.error("submit_return_request_insert", insertErr);
-    return new Response(JSON.stringify({ error: "No se pudo registrar la solicitud" }), {
+  if (updateErr) {
+    console.error("cancel_order_update", updateErr);
+    return new Response(JSON.stringify({ error: "No se pudo cancelar el pedido" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const html = buildReturnAdminNotifyHtml({
+  const total = Number(order.total ?? 0);
+  const redsysOrder = (order.stripe_session_id as string | null) ?? null;
+
+  const adminHtml = buildOrderCancelAdminNotifyHtml({
     orderId,
     orderEmail: orderEmail || userEmail,
-    redsysOrder: (order.stripe_session_id as string | null) ?? null,
-    reason,
+    redsysOrder,
+    total,
     customerNote,
-    requestedAmount,
+  });
+  const customerHtml = buildOrderCancelCustomerHtml({
+    orderIdShort: orderId.slice(0, 8),
+    total,
   });
 
   await sendResendEmail(
     adminNotifyEmail,
-    `[Shenna] Nueva solicitud de devolución — pedido ${orderId.slice(0, 8)}`,
-    html,
+    `[Shenna] Pedido cancelado por el cliente — ${orderId.slice(0, 8)}`,
+    adminHtml,
   );
 
-  return new Response(JSON.stringify({ ok: true, returnRequestId: inserted.id }), {
+  const notifyEmail = orderEmail || userEmail;
+  if (notifyEmail) {
+    await sendResendEmail(
+      notifyEmail,
+      "Tu pedido ha sido cancelado — Shenna Brows",
+      customerHtml,
+    );
+  }
+
+  return new Response(JSON.stringify({ ok: true, status: "cancelled" }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });

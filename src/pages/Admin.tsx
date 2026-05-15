@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronDown, ChevronRight, FileDown, Loader2, Package, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FileDown, Loader2, Package, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
@@ -33,6 +33,7 @@ const statusColors: Record<string, string> = {
   pending_payment: "bg-amber-100 text-amber-800",
   paid: "bg-green-100 text-green-700",
   shipped: "bg-blue-100 text-blue-700",
+  cancelled: "bg-gray-100 text-gray-600",
 };
 
 const statusLabels: Record<string, string> = {
@@ -41,6 +42,7 @@ const statusLabels: Record<string, string> = {
   paid: "Pagado",
   shipped: "Enviado",
   delivered: "Entregado",
+  cancelled: "Cancelado",
 };
 
 const PAID_ORDER_STATUSES = new Set(["paid", "shipped", "delivered"]);
@@ -712,8 +714,10 @@ const Admin = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<{ id: string; email: string } | null>(null);
+  const [orderToShip, setOrderToShip] = useState<{ id: string; email: string } | null>(null);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [orderDeleteInProgress, setOrderDeleteInProgress] = useState(false);
+  const [shippingOrderInProgress, setShippingOrderInProgress] = useState(false);
   const [printingLabelOrderId, setPrintingLabelOrderId] = useState<string | null>(null);
   const [downloadingTicketOrderId, setDownloadingTicketOrderId] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -884,6 +888,35 @@ const Admin = () => {
       setOrderToDelete(null);
     }
     setOrderDeleteInProgress(false);
+  };
+
+  const confirmMarkOrderShipped = async () => {
+    if (!orderToShip) return;
+    setShippingOrderInProgress(true);
+    const id = orderToShip.id;
+    const { data, error } = await supabase.functions.invoke("mark-order-shipped", {
+      body: { orderId: id },
+    });
+    if (error || data?.error) {
+      toast({
+        title: "No se pudo marcar como enviado",
+        description: data?.error || error?.message || "Error desconocido",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Pedido enviado",
+        description: "El cliente recibirá un correo de confirmación de envío.",
+      });
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === id ? { ...o, status: "shipped", shipped_at: data.shippedAt ?? new Date().toISOString() } : o,
+        ),
+      );
+      queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+      setOrderToShip(null);
+    }
+    setShippingOrderInProgress(false);
   };
 
   const toggleFeatured = async (id: string, current: boolean) => {
@@ -1099,12 +1132,6 @@ const Admin = () => {
         shipments = shipmentsForPrint;
         lastPreregisterData = preregisterRes.data;
 
-        const { error: trackingEmailErr } = await supabase.functions.invoke("send-customer-order-tracking", {
-          body: { orderId: order.id },
-        });
-        if (trackingEmailErr) {
-          console.warn("send-customer-order-tracking", trackingEmailErr);
-        }
       }
 
       const buildLabelRequestBody = (shipmentsArr: string[]) => ({
@@ -1271,6 +1298,18 @@ const Admin = () => {
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex items-center justify-end gap-2">
+                          {o.status === "paid" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setOrderToShip({ id: o.id, email: o.email })}
+                              className="border-sky-200 text-sky-700 hover:bg-sky-50"
+                              aria-label={`Marcar pedido de ${o.email} como enviado`}
+                            >
+                              <Truck className="h-4 w-4 mr-1.5" />
+                              Pedido enviado
+                            </Button>
+                          )}
                           {PAID_ORDER_STATUSES.has(o.status) && (
                             <Button
                               size="sm"
@@ -1516,6 +1555,36 @@ const Admin = () => {
             ))}
           </div>
         </AnimatedSection>
+
+        <AlertDialog open={orderToShip !== null} onOpenChange={(open) => !open && setOrderToShip(null)}>
+          <AlertDialogContent className="bg-cream border-gold/20">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-playfair text-carbon">¿Confirmar envío del pedido?</AlertDialogTitle>
+              <AlertDialogDescription className="text-carbon/60 space-y-2">
+                <span>
+                  Se marcará como <strong>enviado</strong> el pedido de{" "}
+                  <span className="font-medium text-carbon">{orderToShip?.email}</span>{" "}
+                  (<span className="font-mono text-xs">{orderToShip?.id.slice(0, 8)}</span>).
+                </span>
+                <span className="block">
+                  El cliente recibirá un correo avisando del envío y dejará de poder cancelar el pedido; solo podrá
+                  solicitar devolución.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-gold/20">Cancelar</AlertDialogCancel>
+              <Button
+                onClick={() => void confirmMarkOrderShipped()}
+                disabled={shippingOrderInProgress}
+                className="bg-sky-600 hover:bg-sky-700 text-white"
+              >
+                {shippingOrderInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Confirmar envío
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={orderToDelete !== null} onOpenChange={(open) => !open && setOrderToDelete(null)}>
           <AlertDialogContent className="bg-cream border-gold/20">
