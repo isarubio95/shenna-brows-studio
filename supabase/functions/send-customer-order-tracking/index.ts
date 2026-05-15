@@ -172,7 +172,7 @@ serve(async (req) => {
     body: JSON.stringify({
       from: resendFromAddress,
       to: [email],
-      subject: "Confirmación de pedido (seguimiento Correos) - Shenna Brows Studio",
+      subject: "Confirmación de pedido (seguimiento Correos) - Shenna Brows",
       html,
     }),
   });

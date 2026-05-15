@@ -491,7 +491,9 @@ const Admin = () => {
   const [productDialogMode, setProductDialogMode] = useState<"create" | "edit">("edit");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<{ id: string; email: string } | null>(null);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
+  const [orderDeleteInProgress, setOrderDeleteInProgress] = useState(false);
   const [printingLabelOrderId, setPrintingLabelOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -560,6 +562,27 @@ const Admin = () => {
       setProductToDelete(null);
     }
     setDeleteInProgress(false);
+  };
+
+  const confirmDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    setOrderDeleteInProgress(true);
+    const id = orderToDelete.id;
+    await (supabase as any).from("order_items").delete().eq("order_id", id);
+    const { error } = await (supabase as any).from("orders").delete().eq("id", id);
+    if (error) {
+      toast({
+        title: "No se pudo eliminar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: "Pedido eliminado" });
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+      queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+      setOrderToDelete(null);
+    }
+    setOrderDeleteInProgress(false);
   };
 
   const toggleFeatured = async (id: string, current: boolean) => {
@@ -858,7 +881,7 @@ const Admin = () => {
                     <TableHead className="text-carbon/60">Total</TableHead>
                     <TableHead className="text-carbon/60">Estado</TableHead>
                     <TableHead className="text-carbon/60">Fecha</TableHead>
-                    <TableHead className="text-carbon/60 text-right">Etiqueta</TableHead>
+                    <TableHead className="text-carbon/60 text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -874,22 +897,33 @@ const Admin = () => {
                       </TableCell>
                       <TableCell className="text-carbon/60 text-sm">{new Date(o.created_at).toLocaleDateString("es-ES")}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handlePrintLabel(o)}
-                          disabled={printingLabelOrderId === o.id}
-                          className="border-gold/20 text-gold hover:bg-gold/5"
-                        >
-                          {printingLabelOrderId === o.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Printer className="h-4 w-4 mr-1.5" />
-                              Imprimir
-                            </>
-                          )}
-                        </Button>
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePrintLabel(o)}
+                            disabled={printingLabelOrderId === o.id}
+                            className="border-gold/20 text-gold hover:bg-gold/5"
+                          >
+                            {printingLabelOrderId === o.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Printer className="h-4 w-4 mr-1.5" />
+                                Imprimir
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setOrderToDelete({ id: o.id, email: o.email })}
+                            className="border-red-200 text-red-600 hover:bg-red-50"
+                            aria-label={`Eliminar pedido de ${o.email}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -972,6 +1006,37 @@ const Admin = () => {
             ))}
           </div>
         </AnimatedSection>
+
+        <AlertDialog open={orderToDelete !== null} onOpenChange={(open) => !open && setOrderToDelete(null)}>
+          <AlertDialogContent className="bg-cream border-gold/20">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-playfair text-carbon">¿Eliminar pedido?</AlertDialogTitle>
+              <AlertDialogDescription className="text-carbon/60 space-y-2">
+                <p>
+                  El pedido de{" "}
+                  <span className="font-medium text-carbon">{orderToDelete?.email}</span>{" "}
+                  (<span className="font-mono text-xs">{orderToDelete?.id.slice(0, 8)}</span>) desaparecerá de la base
+                  de datos de forma permanente.
+                </p>
+                <p className="font-medium text-carbon">
+                  Esto no devolverá el dinero al cliente. Si hubo un pago, deberás gestionar el reembolso por tu cuenta
+                  (por ejemplo en Redsys).
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-gold/20">Cancelar</AlertDialogCancel>
+              <Button
+                variant="destructive"
+                onClick={() => void confirmDeleteOrder()}
+                disabled={orderDeleteInProgress}
+              >
+                {orderDeleteInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Eliminar pedido
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={productToDelete !== null} onOpenChange={(open) => !open && setProductToDelete(null)}>
           <AlertDialogContent className="bg-cream border-gold/20">

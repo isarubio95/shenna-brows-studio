@@ -366,7 +366,7 @@ async function sendOrderConfirmationEmail(args: {
     body: JSON.stringify({
       from: resendFromAddress,
       to: [args.email],
-      subject: "Confirmacion de pedido - Shenna Brows Studio",
+      subject: "Confirmacion de pedido - Shenna Brows",
       html,
       ...(ticketPdfBase64
         ? {
