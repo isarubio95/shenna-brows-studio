@@ -189,6 +189,8 @@ serve(async (req) => {
       name: string;
       quantity: number;
       unitPrice: number;
+      colorVariantId: string | null;
+      variantName: string | null;
     }> = [];
 
     for (const line of items) {
@@ -213,6 +215,7 @@ serve(async (req) => {
       const colorVariants = parseColorVariantsFromDb(p.color_variants);
       const variantIdRaw = line.colorVariantId != null ? String(line.colorVariantId).trim() : "";
       let displayName = String(p.name);
+      let variantName: string | null = null;
       if (colorVariants.length > 0) {
         if (!variantIdRaw) {
           return new Response(
@@ -227,10 +230,18 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+        variantName = chosen.name;
         displayName = `${String(p.name)} — ${chosen.name}`;
       }
 
-      resolvedLines.push({ productId: pid, name: displayName, quantity: qty, unitPrice: unit });
+      resolvedLines.push({
+        productId: pid,
+        name: displayName,
+        quantity: qty,
+        unitPrice: unit,
+        colorVariantId: variantIdRaw || null,
+        variantName,
+      });
     }
 
     const trim = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
@@ -304,6 +315,8 @@ serve(async (req) => {
         name: l.name,
         productDisplayName: l.name,
         unitPrice: l.unitPrice,
+        ...(l.colorVariantId ? { colorVariantId: l.colorVariantId } : {}),
+        ...(l.variantName ? { variantName: l.variantName } : {}),
       })),
     };
 
@@ -327,6 +340,7 @@ serve(async (req) => {
         productId: l.productId,
         quantity: l.quantity,
         productDisplayName: l.name,
+        ...(l.colorVariantId ? { colorVariantId: l.colorVariantId } : {}),
       })),
       shippingEur,
       subtotalEur,

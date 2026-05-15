@@ -16,6 +16,7 @@ import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
 import { getProductImageUrl } from "@/lib/product-images";
+import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -41,15 +42,55 @@ const statusLabels: Record<string, string> = {
   delivered: "Entregado",
 };
 
-const PRODUCT_VARIANT_SEP = " — ";
+const PRODUCT_VARIANT_SEPS = [" — ", " – ", " - "] as const;
 
 const parseProductLineName = (productName: string): { name: string; variant: string | null } => {
-  const idx = productName.lastIndexOf(PRODUCT_VARIANT_SEP);
-  if (idx === -1) return { name: productName, variant: null };
-  return {
-    name: productName.slice(0, idx).trim(),
-    variant: productName.slice(idx + PRODUCT_VARIANT_SEP.length).trim() || null,
-  };
+  for (const sep of PRODUCT_VARIANT_SEPS) {
+    const idx = productName.lastIndexOf(sep);
+    if (idx === -1) continue;
+    const variant = productName.slice(idx + sep.length).trim();
+    return {
+      name: productName.slice(0, idx).trim(),
+      variant: variant || null,
+    };
+  }
+  return { name: productName, variant: null };
+};
+
+type ProductCatalogEntry = {
+  name: string;
+  variants: ColorVariant[];
+};
+
+const resolveVariantForLine = (
+  line: Record<string, unknown>,
+  variantFromName: string | null,
+  productCatalogById: Map<string, ProductCatalogEntry>,
+): { name: string | null; hex: string | null } => {
+  const explicitName = readStringField(line, [
+    "variantName",
+    "variant_name",
+    "colorVariantName",
+    "color_variant_name",
+  ]);
+  if (explicitName) {
+    const productId = readStringField(line, ["productId", "product_id"]);
+    const variantId = readStringField(line, ["colorVariantId", "color_variant_id", "variantId", "variant_id"]);
+    const hex =
+      productId && variantId
+        ? productCatalogById.get(productId)?.variants.find((v) => v.id === variantId)?.hex ?? null
+        : null;
+    return { name: explicitName, hex };
+  }
+
+  if (variantFromName) return { name: variantFromName, hex: null };
+
+  const variantId = readStringField(line, ["colorVariantId", "color_variant_id", "variantId", "variant_id"]);
+  const productId = readStringField(line, ["productId", "product_id"]);
+  if (!variantId || !productId) return { name: null, hex: null };
+
+  const chosen = productCatalogById.get(productId)?.variants.find((v) => v.id === variantId);
+  return chosen ? { name: chosen.name, hex: chosen.hex } : { name: null, hex: null };
 };
 
 const formatShippingAddressLines = (addr: unknown): string[] => {
@@ -79,6 +120,7 @@ const formatShippingAddressLines = (addr: unknown): string[] => {
 type DisplayOrderLine = {
   name: string;
   variant: string | null;
+  variantHex: string | null;
   quantity: number;
   unitPrice: number | null;
 };
@@ -139,51 +181,71 @@ const resolveOrderItemDisplayName = (
   return stored || "Producto";
 };
 
+const toDisplayOrderLine = (
+  line: Record<string, unknown>,
+  display: string,
+  productCatalogById: Map<string, ProductCatalogEntry>,
+  quantity: number,
+  unitPrice: number | null,
+): DisplayOrderLine => {
+  const { name, variant: variantFromName } = parseProductLineName(display);
+  const resolved = resolveVariantForLine(line, variantFromName, productCatalogById);
+  return {
+    name,
+    variant: resolved.name ?? variantFromName,
+    variantHex: resolved.hex,
+    quantity,
+    unitPrice,
+  };
+};
+
 const mapSnapshotLines = (
   snap: { lines?: Array<Record<string, unknown>> },
   productNameById: Map<string, string>,
+  productCatalogById: Map<string, ProductCatalogEntry>,
 ): DisplayOrderLine[] =>
   (snap.lines ?? []).map((line) => {
     const display = resolveLineDisplayName(line, productNameById);
-    const { name, variant } = parseProductLineName(display);
     const unitPriceRaw = line.unitPrice ?? line.unit_price;
-    return {
-      name,
-      variant,
-      quantity: Number(line.quantity) || 1,
-      unitPrice: unitPriceRaw != null ? Number(unitPriceRaw) : null,
-    };
+    return toDisplayOrderLine(
+      line,
+      display,
+      productCatalogById,
+      Number(line.quantity) || 1,
+      unitPriceRaw != null ? Number(unitPriceRaw) : null,
+    );
   });
 
 const getDisplayOrderLines = (
   order: Record<string, unknown>,
   items: unknown[] | undefined,
   productNameById: Map<string, string>,
+  productCatalogById: Map<string, ProductCatalogEntry>,
 ): DisplayOrderLine[] => {
   const status = String(order.status ?? "");
   const snap = parsePendingCartSnapshot(order.pending_cart_snapshot);
   const isPending = status === "pending_payment" || status === "pending";
 
   if (isPending && snap?.lines?.length) {
-    return mapSnapshotLines(snap, productNameById);
+    return mapSnapshotLines(snap, productNameById, productCatalogById);
   }
 
   if (items && items.length > 0) {
     return items.map((raw) => {
       const item = raw as Record<string, unknown>;
       const display = resolveOrderItemDisplayName(item, productNameById);
-      const { name, variant } = parseProductLineName(display);
-      return {
-        name,
-        variant,
-        quantity: Number(item.quantity) || 1,
-        unitPrice: item.unit_price != null ? Number(item.unit_price) : null,
-      };
+      return toDisplayOrderLine(
+        item,
+        display,
+        productCatalogById,
+        Number(item.quantity) || 1,
+        item.unit_price != null ? Number(item.unit_price) : null,
+      );
     });
   }
 
   if (snap?.lines?.length) {
-    return mapSnapshotLines(snap, productNameById);
+    return mapSnapshotLines(snap, productNameById, productCatalogById);
   }
   return [];
 };
@@ -654,13 +716,25 @@ const Admin = () => {
   const [orderItemsCache, setOrderItemsCache] = useState<Record<string, unknown[]>>({});
   const [loadingOrderItemsId, setLoadingOrderItemsId] = useState<string | null>(null);
 
-  const productNameById = useMemo(() => {
-    const map = new Map<string, string>();
+  const productCatalogById = useMemo(() => {
+    const map = new Map<string, ProductCatalogEntry>();
     for (const p of products) {
-      if (p?.id && p?.name) map.set(String(p.id), String(p.name));
+      if (!p?.id) continue;
+      map.set(String(p.id), {
+        name: String(p.name ?? ""),
+        variants: parseColorVariants(p.color_variants),
+      });
     }
     return map;
   }, [products]);
+
+  const productNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [id, entry] of productCatalogById) {
+      if (entry.name) map.set(id, entry.name);
+    }
+    return map;
+  }, [productCatalogById]);
 
   const toggleOrderDetails = async (orderId: string) => {
     if (expandedOrderId === orderId) {
@@ -1102,7 +1176,12 @@ const Admin = () => {
                   {orders.map((o) => {
                     const isExpanded = expandedOrderId === o.id;
                     const isLoadingItems = loadingOrderItemsId === o.id;
-                    const displayLines = getDisplayOrderLines(o, orderItemsCache[o.id], productNameById);
+                    const displayLines = getDisplayOrderLines(
+                      o,
+                      orderItemsCache[o.id],
+                      productNameById,
+                      productCatalogById,
+                    );
                     const addressLines = formatShippingAddressLines(o.shipping_address);
                     const hasCorreosCode = Boolean(o.correos_shipment_code?.trim());
 
@@ -1235,7 +1314,16 @@ const Admin = () => {
                                           <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-carbon truncate">{line.name}</p>
                                             {line.variant && (
-                                              <p className="text-xs text-carbon/50">Variante: {line.variant}</p>
+                                              <p className="text-xs text-carbon/50 flex items-center gap-1.5">
+                                                {line.variantHex && (
+                                                  <span
+                                                    className="inline-block w-3 h-3 rounded-full border border-gold/25 shrink-0"
+                                                    style={{ backgroundColor: line.variantHex }}
+                                                    aria-hidden
+                                                  />
+                                                )}
+                                                <span>Variante: {line.variant}</span>
+                                              </p>
                                             )}
                                             <p className="text-xs text-carbon/40">Cantidad: {line.quantity}</p>
                                           </div>
