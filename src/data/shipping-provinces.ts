@@ -22,8 +22,33 @@ export function shippingZoneForProvinceCode(code: string): ShippingZoneKey | nul
   return "peninsula";
 }
 
-export function getShippingEurForProvinceCode(code: string | undefined | null): number | null {
+const LA_RIOJA_PROVINCE_CODE = "26";
+
+/** Normaliza localidad para comparar (sin acentos, minúsculas). */
+export function normalizeShippingCity(city: string): string {
+  return city
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+/** Envío gratuito: provincia La Rioja (26) y localidad Logroño. */
+export function qualifiesForFreeLogronoShipping(
+  provinceCode: string | undefined | null,
+  city: string | undefined | null,
+): boolean {
+  const code = (provinceCode ?? "").trim().toUpperCase();
+  if (code !== LA_RIOJA_PROVINCE_CODE) return false;
+  return normalizeShippingCity(city ?? "") === "logrono";
+}
+
+export function getShippingEurForProvinceCode(
+  code: string | undefined | null,
+  city?: string | undefined | null,
+): number | null {
   if (!code) return null;
+  if (qualifiesForFreeLogronoShipping(code, city)) return 0;
   const z = shippingZoneForProvinceCode(code);
   return z ? SHIPPING_RATES_EUR[z] : null;
 }
@@ -113,4 +138,4 @@ export function getProvinceOptionsGrouped(): Array<{ ccaa: string; provinces: Pr
 }
 
 export const SHIPPING_PRICE_LEGEND =
-  "Península y ciudades autónomas (salvo Canarias/Baleares) 7 € · Illes Balears 10 € · Canarias 15 € · Portugal 11 €.";
+  "Península y ciudades autónomas (salvo Canarias/Baleares) 7 € · Illes Balears 10 € · Canarias 15 € · Portugal 11 € · Envío gratuito en Logroño (La Rioja).";

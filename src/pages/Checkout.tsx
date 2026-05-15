@@ -52,7 +52,7 @@ const Checkout = () => {
   const isCooldownActive = cooldownMs > 0;
 
   const provinceGroups = useMemo(() => getProvinceOptionsGrouped(), []);
-  const shippingEur = getShippingEurForProvinceCode(shipping.province_code);
+  const shippingEur = getShippingEurForProvinceCode(shipping.province_code, shipping.city);
   const canQuoteShipping = shippingEur != null;
   const total = totalPrice + (shippingEur ?? 0);
 
@@ -62,7 +62,7 @@ const Checkout = () => {
       toast({ title: "Introduce tu email", variant: "destructive" });
       return;
     }
-    const quoted = getShippingEurForProvinceCode(shipping.province_code.trim());
+    const quoted = getShippingEurForProvinceCode(shipping.province_code.trim(), shipping.city.trim());
     if (!shipping.province_code.trim() || quoted == null) {
       toast({
         title: "Elige tu provincia",
@@ -384,7 +384,11 @@ const Checkout = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-carbon/60">Envío</span>
                   <span className="text-carbon">
-                    {canQuoteShipping ? `€${shippingEur!.toFixed(2)}` : "—"}
+                    {canQuoteShipping
+                      ? shippingEur === 0
+                        ? "Gratis"
+                        : `€${shippingEur!.toFixed(2)}`
+                      : "—"}
                   </span>
                 </div>
                 {!canQuoteShipping ? (

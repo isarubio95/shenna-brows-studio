@@ -10,7 +10,7 @@ import {
   redsysRealizarPagoUrl,
   type RedsysMerchantParams,
 } from "../_shared/redsys.ts";
-import { normalizeProvinceCode, shippingEurForNormalizedProvinceCode } from "../_shared/shipping.ts";
+import { normalizeProvinceCode, shippingEurForShippingAddress } from "../_shared/shipping.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -262,7 +262,7 @@ serve(async (req) => {
       );
     }
 
-    const shippingEur = shippingEurForNormalizedProvinceCode(provinceCodeNorm);
+    const shippingEur = shippingEurForShippingAddress(provinceCodeNorm, shipCity);
     if (shippingEur == null) {
       return new Response(JSON.stringify({ error: "Código de provincia de envío no válido" }), {
         status: 400,
@@ -301,7 +301,9 @@ serve(async (req) => {
       lines: resolvedLines.map((l) => ({
         productId: l.productId,
         quantity: l.quantity,
+        name: l.name,
         productDisplayName: l.name,
+        unitPrice: l.unitPrice,
       })),
     };
 

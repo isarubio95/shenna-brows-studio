@@ -1,8 +1,0 @@
-<Link to={`/${product.slug}`} className="relative block aspect-square bg-muted overflow-hidden">
-<Link to={`/${product.slug}`} className="relative block aspect-square bg-white overflow-hidden">
-
-className={`aspect-square rounded-lg overflow-hidden border transition ${
-className={`aspect-square rounded-lg overflow-hidden border bg-white transition ${
-
-<img src={imageUrl} alt={`${product.name} miniatura ${index + 1}`} className="w-full h-full object-cover" />
-<img src={imageUrl} alt={`${product.name} miniatura ${index + 1}`} className="w-full h-full object-contain bg-white" />

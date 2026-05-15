@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Package, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
@@ -31,6 +31,161 @@ const statusColors: Record<string, string> = {
   pending_payment: "bg-amber-100 text-amber-800",
   paid: "bg-green-100 text-green-700",
   shipped: "bg-blue-100 text-blue-700",
+};
+
+const statusLabels: Record<string, string> = {
+  pending: "Pendiente",
+  pending_payment: "Pago pendiente",
+  paid: "Pagado",
+  shipped: "Enviado",
+  delivered: "Entregado",
+};
+
+const PRODUCT_VARIANT_SEP = " — ";
+
+const parseProductLineName = (productName: string): { name: string; variant: string | null } => {
+  const idx = productName.lastIndexOf(PRODUCT_VARIANT_SEP);
+  if (idx === -1) return { name: productName, variant: null };
+  return {
+    name: productName.slice(0, idx).trim(),
+    variant: productName.slice(idx + PRODUCT_VARIANT_SEP.length).trim() || null,
+  };
+};
+
+const formatShippingAddressLines = (addr: unknown): string[] => {
+  if (!addr || typeof addr !== "object") return [];
+  const raw = addr as Record<string, unknown>;
+  const lines: string[] = [];
+  const name = readStringField(raw, ["name", "full_name", "fullName", "recipient", "recipient_name"]);
+  const line1 = readStringField(raw, ["line1", "address", "street", "address1"]);
+  const line2 = readStringField(raw, ["line2", "address2"]);
+  const city = readStringField(raw, ["city", "locality", "town"]);
+  const province = readStringField(raw, ["province", "state", "region"]);
+  const postal = readStringField(raw, ["postal_code", "zip", "cp", "postcode"]);
+  const phone = readStringField(raw, ["phone", "contactPhone", "phoneNumber"]);
+  const country = readStringField(raw, ["country", "country_code"]);
+  if (name) lines.push(name);
+  if (line1) lines.push(line1);
+  if (line2) lines.push(line2);
+  const cityLine = [postal, city, province].filter(Boolean).join(" ");
+  if (cityLine) lines.push(cityLine);
+  if (phone) lines.push(`Tel: ${phone}`);
+  if (country && !["ES", "ESP", "724", "SPAIN"].includes(country.toUpperCase())) {
+    lines.push(country);
+  }
+  return lines;
+};
+
+type DisplayOrderLine = {
+  name: string;
+  variant: string | null;
+  quantity: number;
+  unitPrice: number | null;
+};
+
+const parsePendingCartSnapshot = (raw: unknown): { lines?: Array<Record<string, unknown>> } | null => {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return typeof parsed === "object" && parsed !== null
+        ? (parsed as { lines?: Array<Record<string, unknown>> })
+        : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw === "object") return raw as { lines?: Array<Record<string, unknown>> };
+  return null;
+};
+
+const resolveLineDisplayName = (
+  line: Record<string, unknown>,
+  productNameById: Map<string, string>,
+): string => {
+  const fromFields = readStringField(line, [
+    "productDisplayName",
+    "product_display_name",
+    "name",
+    "productName",
+    "product_name",
+    "displayName",
+    "display_name",
+  ]);
+  if (fromFields) return fromFields;
+
+  const productId = readStringField(line, ["productId", "product_id"]);
+  if (productId) {
+    const catalogName = productNameById.get(productId);
+    if (catalogName) return catalogName;
+  }
+
+  return "Producto";
+};
+
+const resolveOrderItemDisplayName = (
+  item: Record<string, unknown>,
+  productNameById: Map<string, string>,
+): string => {
+  const stored = readStringField(item, ["product_name", "productName"]);
+  if (stored && stored !== "Producto") return stored;
+
+  const productId = readStringField(item, ["product_id", "productId"]);
+  if (productId) {
+    const catalogName = productNameById.get(productId);
+    if (catalogName) return catalogName;
+  }
+
+  return stored || "Producto";
+};
+
+const mapSnapshotLines = (
+  snap: { lines?: Array<Record<string, unknown>> },
+  productNameById: Map<string, string>,
+): DisplayOrderLine[] =>
+  (snap.lines ?? []).map((line) => {
+    const display = resolveLineDisplayName(line, productNameById);
+    const { name, variant } = parseProductLineName(display);
+    const unitPriceRaw = line.unitPrice ?? line.unit_price;
+    return {
+      name,
+      variant,
+      quantity: Number(line.quantity) || 1,
+      unitPrice: unitPriceRaw != null ? Number(unitPriceRaw) : null,
+    };
+  });
+
+const getDisplayOrderLines = (
+  order: Record<string, unknown>,
+  items: unknown[] | undefined,
+  productNameById: Map<string, string>,
+): DisplayOrderLine[] => {
+  const status = String(order.status ?? "");
+  const snap = parsePendingCartSnapshot(order.pending_cart_snapshot);
+  const isPending = status === "pending_payment" || status === "pending";
+
+  if (isPending && snap?.lines?.length) {
+    return mapSnapshotLines(snap, productNameById);
+  }
+
+  if (items && items.length > 0) {
+    return items.map((raw) => {
+      const item = raw as Record<string, unknown>;
+      const display = resolveOrderItemDisplayName(item, productNameById);
+      const { name, variant } = parseProductLineName(display);
+      return {
+        name,
+        variant,
+        quantity: Number(item.quantity) || 1,
+        unitPrice: item.unit_price != null ? Number(item.unit_price) : null,
+      };
+    });
+  }
+
+  if (snap?.lines?.length) {
+    return mapSnapshotLines(snap, productNameById);
+  }
+  return [];
 };
 
 const getEnvNumber = (raw: string | undefined, fallback: number): number => {
@@ -495,6 +650,59 @@ const Admin = () => {
   const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [orderDeleteInProgress, setOrderDeleteInProgress] = useState(false);
   const [printingLabelOrderId, setPrintingLabelOrderId] = useState<string | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [orderItemsCache, setOrderItemsCache] = useState<Record<string, unknown[]>>({});
+  const [loadingOrderItemsId, setLoadingOrderItemsId] = useState<string | null>(null);
+
+  const productNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of products) {
+      if (p?.id && p?.name) map.set(String(p.id), String(p.name));
+    }
+    return map;
+  }, [products]);
+
+  const toggleOrderDetails = async (orderId: string) => {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+      return;
+    }
+    setExpandedOrderId(orderId);
+
+    const order = orders.find((o) => o.id === orderId);
+    const isPending =
+      order?.status === "pending_payment" || order?.status === "pending";
+
+    if (isPending && !order?.pending_cart_snapshot) {
+      const { data: freshOrder } = await (supabase as any)
+        .from("orders")
+        .select("pending_cart_snapshot")
+        .eq("id", orderId)
+        .maybeSingle();
+      if (freshOrder?.pending_cart_snapshot) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === orderId ? { ...o, pending_cart_snapshot: freshOrder.pending_cart_snapshot } : o,
+          ),
+        );
+      }
+    }
+
+    if (orderItemsCache[orderId] !== undefined) return;
+
+    setLoadingOrderItemsId(orderId);
+    const { data, error } = await supabase.from("order_items").select("*").eq("order_id", orderId);
+    setLoadingOrderItemsId(null);
+    if (error) {
+      toast({
+        title: "No se pudieron cargar los productos",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    setOrderItemsCache((prev) => ({ ...prev, [orderId]: data || [] }));
+  };
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -579,6 +787,12 @@ const Admin = () => {
     } else {
       toast({ title: "Pedido eliminado" });
       setOrders((prev) => prev.filter((o) => o.id !== id));
+      setExpandedOrderId((prev) => (prev === id ? null : prev));
+      setOrderItemsCache((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["my-orders"] });
       setOrderToDelete(null);
     }
@@ -885,18 +1099,45 @@ const Admin = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders.map((o) => (
-                    <TableRow key={o.id} className="border-b border-gold/5">
-                      <TableCell className="font-mono text-xs text-carbon/70">{o.id.slice(0, 8)}</TableCell>
+                  {orders.map((o) => {
+                    const isExpanded = expandedOrderId === o.id;
+                    const isLoadingItems = loadingOrderItemsId === o.id;
+                    const displayLines = getDisplayOrderLines(o, orderItemsCache[o.id], productNameById);
+                    const addressLines = formatShippingAddressLines(o.shipping_address);
+                    const hasCorreosCode = Boolean(o.correos_shipment_code?.trim());
+
+                    return (
+                      <Fragment key={o.id}>
+                        <TableRow
+                          className={`border-b border-gold/5 cursor-pointer transition-colors hover:bg-gold/[0.03] ${isExpanded ? "bg-gold/[0.04]" : ""}`}
+                          onClick={() => toggleOrderDetails(o.id)}
+                          aria-expanded={isExpanded}
+                        >
+                          <TableCell className="font-mono text-xs text-carbon/70">
+                            <span className="inline-flex items-center gap-1.5">
+                              {isExpanded ? (
+                                <ChevronDown className="h-3.5 w-3.5 text-gold shrink-0" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5 text-carbon/30 shrink-0" />
+                              )}
+                              {o.id.slice(0, 8)}
+                            </span>
+                          </TableCell>
                       <TableCell className="text-carbon text-sm">{o.email}</TableCell>
                       <TableCell className="text-carbon font-medium">€{Number(o.total).toFixed(2)}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={statusColors[o.status] || "bg-gray-100 text-gray-700"}>
-                          {o.status}
+                          {statusLabels[o.status] || o.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-carbon/60 text-sm">{new Date(o.created_at).toLocaleDateString("es-ES")}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-carbon/60 text-sm">
+                        {new Date(o.created_at).toLocaleDateString("es-ES", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex items-center justify-end gap-2">
                           <Button
                             size="sm"
@@ -926,7 +1167,112 @@ const Admin = () => {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                        {isExpanded && (
+                          <TableRow className="border-b border-gold/10 bg-cream/40">
+                            <TableCell colSpan={6} className="p-0">
+                              <div className="px-5 py-5 space-y-5">
+                                <div className="grid gap-5 sm:grid-cols-2">
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-widest text-carbon/40 mb-1">ID completo</p>
+                                    <p className="font-mono text-xs text-carbon/80 break-all">{o.id}</p>
+                                    {o.stripe_session_id && (
+                                      <p className="text-xs text-carbon/50 mt-2">
+                                        Ref. pago: <span className="font-mono">{o.stripe_session_id}</span>
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-widest text-carbon/40 mb-1">Fecha y hora</p>
+                                    <p className="text-sm text-carbon">
+                                      {new Date(o.created_at).toLocaleString("es-ES")}
+                                    </p>
+                                    {hasCorreosCode && (
+                                      <p className="text-xs text-carbon/50 mt-2">
+                                        Envío Correos: <span className="font-mono">{o.correos_shipment_code}</span>
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {addressLines.length > 0 ? (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-widest text-carbon/40 mb-2">
+                                      Dirección de envío
+                                    </p>
+                                    <div className="text-sm text-carbon space-y-0.5">
+                                      {addressLines.map((line, i) => (
+                                        <p key={i}>{line}</p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-carbon/40 italic">Sin dirección de envío registrada</p>
+                                )}
+
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-widest text-carbon/40 mb-2">Productos</p>
+                                  {isLoadingItems ? (
+                                    <div className="flex items-center gap-2 text-sm text-carbon/50 py-2">
+                                      <Loader2 className="h-4 w-4 animate-spin text-gold" />
+                                      Cargando líneas del pedido…
+                                    </div>
+                                  ) : displayLines.length === 0 ? (
+                                    <p className="text-sm text-carbon/40 italic">
+                                      {o.status === "pending_payment" || o.status === "pending"
+                                        ? "El pedido aún no tiene líneas confirmadas"
+                                        : "No hay productos en este pedido"}
+                                    </p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {displayLines.map((line, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center gap-3 bg-white/80 rounded-lg border border-gold/10 p-3"
+                                        >
+                                          <div className="w-9 h-9 bg-cream rounded flex items-center justify-center shrink-0">
+                                            <Package className="h-4 w-4 text-gold/70" />
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-carbon truncate">{line.name}</p>
+                                            {line.variant && (
+                                              <p className="text-xs text-carbon/50">Variante: {line.variant}</p>
+                                            )}
+                                            <p className="text-xs text-carbon/40">Cantidad: {line.quantity}</p>
+                                          </div>
+                                          {line.unitPrice != null && (
+                                            <p className="text-sm font-medium text-carbon shrink-0">
+                                              €{(line.unitPrice * line.quantity).toFixed(2)}
+                                            </p>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="border-t border-gold/10 pt-4 max-w-xs ml-auto space-y-1.5">
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-carbon/50">Subtotal</span>
+                                    <span className="text-carbon">€{Number(o.subtotal ?? 0).toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-carbon/50">Gastos de envío</span>
+                                    <span className="text-carbon">€{Number(o.shipping ?? 0).toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between font-medium pt-2 border-t border-gold/10">
+                                    <span className="text-carbon">Total</span>
+                                    <span className="font-playfair text-lg text-carbon">
+                                      €{Number(o.total ?? 0).toFixed(2)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
