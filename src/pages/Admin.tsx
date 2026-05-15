@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronDown, ChevronRight, Loader2, Package, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FileDown, Loader2, Package, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
@@ -42,6 +42,8 @@ const statusLabels: Record<string, string> = {
   shipped: "Enviado",
   delivered: "Entregado",
 };
+
+const PAID_ORDER_STATUSES = new Set(["paid", "shipped", "delivered"]);
 
 const PRODUCT_VARIANT_SEPS = [" — ", " – ", " - "] as const;
 
@@ -713,6 +715,7 @@ const Admin = () => {
   const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [orderDeleteInProgress, setOrderDeleteInProgress] = useState(false);
   const [printingLabelOrderId, setPrintingLabelOrderId] = useState<string | null>(null);
+  const [downloadingTicketOrderId, setDownloadingTicketOrderId] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [orderItemsCache, setOrderItemsCache] = useState<Record<string, unknown[]>>({});
   const [loadingOrderItemsId, setLoadingOrderItemsId] = useState<string | null>(null);
@@ -851,12 +854,21 @@ const Admin = () => {
     if (!orderToDelete) return;
     setOrderDeleteInProgress(true);
     const id = orderToDelete.id;
-    await (supabase as any).from("order_items").delete().eq("order_id", id);
-    const { error } = await (supabase as any).from("orders").delete().eq("id", id);
+    const { data: deletedRows, error } = await (supabase as any)
+      .from("orders")
+      .delete()
+      .eq("id", id)
+      .select("id");
     if (error) {
       toast({
         title: "No se pudo eliminar",
         description: error.message,
+        variant: "destructive",
+      });
+    } else if (!deletedRows?.length) {
+      toast({
+        title: "No se pudo eliminar",
+        description: "El pedido no se eliminó en la base de datos. Comprueba permisos o recarga la página.",
         variant: "destructive",
       });
     } else {
@@ -915,6 +927,46 @@ const Admin = () => {
     const url = URL.createObjectURL(blob);
     openAndPrint(url, popup);
     setTimeout(() => URL.revokeObjectURL(url), 10000);
+  };
+
+  const downloadBase64Pdf = (base64: string, filename: string) => {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  };
+
+  const handleDownloadTicket = async (order: { id: string }) => {
+    setDownloadingTicketOrderId(order.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-order-ticket", {
+        body: { orderId: order.id },
+      });
+      if (error) throw error;
+      const payload = data as { pdfBase64?: string; filename?: string; error?: string } | null;
+      if (payload?.error) throw new Error(payload.error);
+      const pdfBase64 = payload?.pdfBase64;
+      if (!pdfBase64) throw new Error("No se recibió el PDF");
+      const filename = payload.filename?.trim() || `ticket-${order.id.slice(0, 8)}.pdf`;
+      downloadBase64Pdf(pdfBase64, filename);
+      toast({ title: "Factura descargada" });
+    } catch (e) {
+      toast({
+        title: "No se pudo descargar la factura",
+        description: e instanceof Error ? e.message : "Error desconocido",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingTicketOrderId(null);
+    }
   };
 
   const extractAndPrintLabel = (payload: unknown, popup?: Window | null) => {
@@ -1219,6 +1271,25 @@ const Admin = () => {
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex items-center justify-end gap-2">
+                          {PAID_ORDER_STATUSES.has(o.status) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDownloadTicket(o)}
+                              disabled={downloadingTicketOrderId === o.id}
+                              className="border-gold/20 text-gold hover:bg-gold/5"
+                              aria-label={`Descargar factura de ${o.email}`}
+                            >
+                              {downloadingTicketOrderId === o.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <FileDown className="h-4 w-4 mr-1.5" />
+                                  Factura
+                                </>
+                              )}
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
