@@ -424,6 +424,12 @@ serve(async (req) => {
     }
 
     const dsOrder = pick(decoded, ["Ds_Order", "DS_ORDER"]);
+    const dsAuthCode = pick(decoded, [
+      "Ds_AuthorisationCode",
+      "DS_AUTHORISATIONCODE",
+      "Ds_AuthorizationCode",
+      "DS_AUTHORIZATIONCODE",
+    ]);
     if (!dsOrder) {
       console.warn("redsys_notify_missing_order_or_data");
       return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain" } });
@@ -519,6 +525,7 @@ serve(async (req) => {
             total,
             shipping_address: keepAddress ?? existing.shipping_address,
             pending_cart_snapshot: null,
+            ...(dsAuthCode ? { redsys_auth_code: dsAuthCode } : {}),
           })
           .eq("id", existing.id)
           .eq("status", "pending_payment")
@@ -574,6 +581,7 @@ serve(async (req) => {
         total,
         stripe_session_id: dsOrder,
         shipping_address,
+        ...(dsAuthCode ? { redsys_auth_code: dsAuthCode } : {}),
       })
       .select("id, correos_shipment_code")
       .single();

@@ -3,7 +3,7 @@ import AnimatedSection from "@/components/AnimatedSection";
 const sections = [
   {
     title: "Derecho de desistimiento",
-    text: "Tienes 14 días naturales desde la recepción del producto para desistir de la compra, sin necesidad de justificación. Debes informarnos de tu decisión de forma clara (por ejemplo, por email a info@shennabrows.com) antes de que finalice ese plazo.",
+    text: "Tienes 14 días naturales desde la recepción del producto para desistir de la compra, sin necesidad de justificación. Puedes iniciar la solicitud desde Mi cuenta (sección Pedidos) o escribirnos a info@shennabrows.com antes de que finalice ese plazo.",
   },
   {
     title: "Devolución del producto",
@@ -19,7 +19,7 @@ const sections = [
   },
   {
     title: "Contacto",
-    text: "Para iniciar una devolución o resolver cualquier duda, escríbenos a info@shennabrows.com indicando tu número de pedido y el motivo. Te responderemos con las instrucciones concretas para completar la devolución.",
+    text: "Para iniciar una devolución, entra en Mi cuenta y usa el botón de devolución en el pedido correspondiente, o escríbenos a info@shennabrows.com con tu número de pedido. Te responderemos con las instrucciones para enviar el producto y, una vez recibido y comprobado, tramitaremos el reembolso en la tarjeta.",
   },
 ];
 

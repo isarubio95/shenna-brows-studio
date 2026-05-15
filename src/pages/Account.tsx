@@ -9,11 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Eye, RotateCcw, Package, MessageSquareQuote, CheckCircle2 } from "lucide-react";
+import { Loader2, Eye, RotateCcw, Package, MessageSquareQuote, CheckCircle2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  RETURN_REASON_LABELS,
+  RETURN_STATUS_LABELS,
+  canRequestReturn,
+  type ReturnReason,
+  type ReturnRequestStatus,
+} from "@/lib/returns";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   paid: { label: "Pagado", variant: "default" },
@@ -31,6 +38,14 @@ const MONTHS = [
   { value: "10", label: "Octubre" }, { value: "11", label: "Noviembre" }, { value: "12", label: "Diciembre" },
 ];
 
+type ReturnRequestRow = {
+  id: string;
+  order_id: string;
+  status: ReturnRequestStatus;
+  reason: string;
+  created_at: string;
+};
+
 const Account = () => {
   const { user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -39,7 +54,7 @@ const Account = () => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
-  const [returnReason, setReturnReason] = useState("defective");
+  const [returnReason, setReturnReason] = useState<ReturnReason>("defective");
   const [returnNote, setReturnNote] = useState("");
   const [filterMonth, setFilterMonth] = useState("all");
   const [filterYear, setFilterYear] = useState("all");
@@ -58,6 +73,27 @@ const Account = () => {
     },
     enabled: !!user,
   });
+
+  const { data: returnRequests = [] } = useQuery({
+    queryKey: ["my-return-requests", user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("return_requests")
+        .select("id, order_id, status, reason, created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as ReturnRequestRow[];
+    },
+    enabled: !!user,
+  });
+
+  const returnByOrderId = useMemo(() => {
+    const map = new Map<string, ReturnRequestRow>();
+    for (const r of returnRequests) {
+      if (!map.has(r.order_id)) map.set(r.order_id, r);
+    }
+    return map;
+  }, [returnRequests]);
 
   const availableYears = useMemo(() => {
     const years = new Set(orders.map((o) => new Date(o.created_at!).getFullYear()));
@@ -87,16 +123,54 @@ const Account = () => {
 
   const returnMutation = useMutation({
     mutationFn: async () => {
-      await new Promise((r) => setTimeout(r, 800));
+      if (!returnOrderId) throw new Error("Pedido no seleccionado");
+      const { data, error } = await supabase.functions.invoke("submit-return-request", {
+        body: {
+          orderId: returnOrderId,
+          reason: returnReason,
+          customerNote: returnNote.trim() || undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
-      toast({ title: "Solicitud recibida", description: "Nos pondremos en contacto contigo pronto." });
+      toast({
+        title: "Solicitud recibida",
+        description: "Revisaremos tu petición y te avisaremos por correo.",
+      });
       setReturnDialogOpen(false);
       setReturnNote("");
+      setReturnOrderId(null);
+      queryClient.invalidateQueries({ queryKey: ["my-return-requests"] });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "No se pudo enviar la solicitud",
+        description: err.message,
+        variant: "destructive",
+      });
     },
   });
 
-  // Testimonial: fetch user's existing testimonial
+  const cancelReturnMutation = useMutation({
+    mutationFn: async (returnRequestId: string) => {
+      const { error } = await (supabase as any)
+        .from("return_requests")
+        .update({ status: "cancelled" })
+        .eq("id", returnRequestId)
+        .eq("status", "requested");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Solicitud cancelada" });
+      queryClient.invalidateQueries({ queryKey: ["my-return-requests"] });
+    },
+    onError: () => {
+      toast({ title: "No se pudo cancelar", variant: "destructive" });
+    },
+  });
+
   const { data: myTestimonial } = useQuery({
     queryKey: ["my-testimonial", user?.id],
     queryFn: async () => {
@@ -145,6 +219,13 @@ const Account = () => {
     : 0;
   const testimonialCooldownActive = testimonialCooldownMs > 0;
 
+  const openReturnDialog = (orderId: string) => {
+    setReturnOrderId(orderId);
+    setReturnReason("defective");
+    setReturnNote("");
+    setReturnDialogOpen(true);
+  };
+
   return (
     <main className="min-h-screen bg-background pt-28 pb-16">
       <div className="container mx-auto px-6 max-w-5xl">
@@ -157,7 +238,6 @@ const Account = () => {
           </p>
         </AnimatedSection>
 
-        {/* Filters */}
         <AnimatedSection delay={0.05}>
           <div className="flex flex-wrap gap-3 mb-6">
             <Select value={filterMonth} onValueChange={setFilterMonth}>
@@ -184,7 +264,6 @@ const Account = () => {
           </div>
         </AnimatedSection>
 
-        {/* Orders Table */}
         <AnimatedSection delay={0.1}>
           <div className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
             {isLoading ? (
@@ -203,6 +282,7 @@ const Account = () => {
                     <TableHead>Pedido</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead>Devolución</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -210,6 +290,9 @@ const Account = () => {
                 <TableBody>
                   {filteredOrders.map((order) => {
                     const cfg = statusConfig[order.status] || { label: order.status, variant: "outline" as const };
+                    const returnReq = returnByOrderId.get(order.id);
+                    const refundStatus = (order as { refund_status?: string }).refund_status ?? "none";
+                    const canReturn = canRequestReturn(order.status, refundStatus) && !returnReq;
                     return (
                       <TableRow key={order.id}>
                         <TableCell className="font-mono text-xs text-muted-foreground">
@@ -231,6 +314,21 @@ const Account = () => {
                             {cfg.label}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          {refundStatus === "full" || refundStatus === "partial" ? (
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                              Reembolsado
+                            </Badge>
+                          ) : returnReq ? (
+                            <Badge variant="outline" className="text-xs">
+                              {RETURN_STATUS_LABELS[returnReq.status]}
+                            </Badge>
+                          ) : canReturn ? (
+                            <span className="text-xs text-muted-foreground">Disponible</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-medium">
                           €{(order.total ?? 0).toFixed(2)}
                         </TableCell>
@@ -244,19 +342,27 @@ const Account = () => {
                             >
                               <Eye size={16} />
                             </Button>
-                            {(order.status === "delivered") && (
+                            {canReturn ? (
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => {
-                                  setReturnOrderId(order.id);
-                                  setReturnDialogOpen(true);
-                                }}
-                                title="Devolver"
+                                onClick={() => openReturnDialog(order.id)}
+                                title="Solicitar devolución"
                               >
                                 <RotateCcw size={16} />
                               </Button>
-                            )}
+                            ) : null}
+                            {returnReq?.status === "requested" ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => cancelReturnMutation.mutate(returnReq.id)}
+                                disabled={cancelReturnMutation.isPending}
+                                title="Cancelar solicitud"
+                              >
+                                <X size={16} />
+                              </Button>
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -266,9 +372,15 @@ const Account = () => {
               </Table>
             )}
           </div>
+          <p className="text-xs text-muted-foreground mt-3">
+            Puedes solicitar devolución en pedidos pagados, enviados o entregados. Consulta la{" "}
+            <a href="/politica-devoluciones" className="text-primary underline">
+              política de devoluciones
+            </a>
+            .
+          </p>
         </AnimatedSection>
 
-        {/* Testimonial Section */}
         <AnimatedSection delay={0.15}>
           <div className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-8 mt-10">
             <div className="flex items-center gap-3 mb-6">
@@ -321,7 +433,6 @@ const Account = () => {
         </AnimatedSection>
       </div>
 
-      {/* Order Detail Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="sm:max-w-lg overflow-y-auto">
           <SheetHeader>
@@ -333,6 +444,14 @@ const Account = () => {
                 <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">ID</p>
                 <p className="font-mono text-sm">{selectedOrder.id}</p>
               </div>
+              {returnByOrderId.get(selectedOrder.id) ? (
+                <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
+                  <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Devolución</p>
+                  <p className="text-sm font-medium">
+                    {RETURN_STATUS_LABELS[returnByOrderId.get(selectedOrder.id)!.status]}
+                  </p>
+                </div>
+              ) : null}
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2">Productos</p>
                 <div className="space-y-3">
@@ -379,23 +498,28 @@ const Account = () => {
         </SheetContent>
       </Sheet>
 
-      {/* Return Dialog */}
       <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="font-playfair">Solicitar Devolución</DialogTitle>
+            <DialogTitle className="font-playfair">Solicitar devolución</DialogTitle>
+            <DialogDescription>
+              Tienes 14 días desde la recepción para desistir. Revisaremos tu solicitud antes de indicarte cómo
+              enviar el producto.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
               <Label className="text-sm text-muted-foreground">Motivo</Label>
-              <Select value={returnReason} onValueChange={setReturnReason}>
+              <Select value={returnReason} onValueChange={(v) => setReturnReason(v as ReturnReason)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="wrong_size">Talla incorrecta</SelectItem>
-                  <SelectItem value="defective">Defectuoso</SelectItem>
-                  <SelectItem value="other">Otro</SelectItem>
+                  {(Object.keys(RETURN_REASON_LABELS) as ReturnReason[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {RETURN_REASON_LABELS[key]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -406,6 +530,7 @@ const Account = () => {
                 onChange={(e) => setReturnNote(e.target.value)}
                 placeholder="Cuéntanos más detalles…"
                 className="mt-1"
+                maxLength={2000}
               />
             </div>
           </div>
@@ -414,7 +539,7 @@ const Account = () => {
             <Button
               onClick={() => returnMutation.mutate()}
               disabled={returnMutation.isPending}
-              className="bg-primary text-primary-foreground"
+              className="bg-primary text-primary-foreground mb-3"
             >
               {returnMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Enviar solicitud

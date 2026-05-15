@@ -1,0 +1,235 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
+import { buildReturnAdminNotifyHtml } from "../_shared/returnEmails.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+const VALID_REASONS = new Set(["defective", "wrong_product", "changed_mind", "other"]);
+const ELIGIBLE_ORDER_STATUSES = new Set(["paid", "shipped", "delivered"]);
+const ACTIVE_RETURN_STATUSES = new Set(["requested", "approved", "product_received"]);
+
+const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim();
+const resendFrom =
+  Deno.env.get("RESEND_FROM_ADDRESS")?.trim() || "Shenna Brows <info@shennabrows.com>";
+const adminNotifyEmail = Deno.env.get("ADMIN_NOTIFY_EMAIL")?.trim() || "info@shennabrows.com";
+
+async function sendResendEmail(to: string, subject: string, html: string): Promise<void> {
+  if (!resendApiKey) {
+    console.warn("submit_return_request_resend_not_configured");
+    return;
+  }
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from: resendFrom, to: [to], subject, html }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("submit_return_request_resend_error", text);
+  }
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const ip = getClientIp(req);
+  const ipLimit = await applyRateLimit({
+    endpoint: "submit-return-request",
+    kind: "ip",
+    key: ip,
+    limit: 10,
+    window: "1 m",
+  });
+  if (!ipLimit.success) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", ...rateLimitHeaders(ipLimit) },
+    });
+  }
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (!supabaseUrl || !anonKey || !serviceKey) {
+    return new Response(JSON.stringify({ error: "Misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const token = authHeader.replace("Bearer ", "");
+  const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+  if (claimsError || !claimsData?.claims?.sub) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const userId = claimsData.claims.sub as string;
+
+  const userLimit = await applyRateLimit({
+    endpoint: "submit-return-request",
+    kind: "identity",
+    key: userId,
+    limit: 5,
+    window: "1 h",
+  });
+  if (!userLimit.success) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", ...rateLimitHeaders(userLimit) },
+    });
+  }
+
+  let body: { orderId?: string; reason?: string; customerNote?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const orderId = String(body.orderId || "").trim();
+  const reason = String(body.reason || "").trim();
+  const customerNote = String(body.customerNote || "").trim().slice(0, 2000) || null;
+
+  if (!orderId || !VALID_REASONS.has(reason)) {
+    return new Response(JSON.stringify({ error: "Datos de solicitud inválidos" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey);
+
+  const { data: order, error: orderErr } = await admin
+    .from("orders")
+    .select("id, email, status, total, user_id, stripe_session_id, refund_status")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (orderErr || !order) {
+    return new Response(JSON.stringify({ error: "Pedido no encontrado" }), {
+      status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: userData } = await admin.auth.admin.getUserById(userId);
+  const userEmail = userData?.user?.email?.trim().toLowerCase() ?? "";
+  const orderEmail = String(order.email || "").trim().toLowerCase();
+  const orderUserId = order.user_id as string | null;
+
+  const ownsOrder =
+    orderUserId === userId ||
+    (!orderUserId && userEmail.length > 0 && userEmail === orderEmail);
+
+  if (!ownsOrder) {
+    return new Response(JSON.stringify({ error: "No tienes permiso sobre este pedido" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const status = String(order.status || "");
+  if (!ELIGIBLE_ORDER_STATUSES.has(status)) {
+    return new Response(
+      JSON.stringify({ error: "Este pedido no admite devoluciones en su estado actual" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  if (String(order.refund_status || "none") !== "none") {
+    return new Response(JSON.stringify({ error: "Este pedido ya tiene un reembolso registrado" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: existingActive } = await admin
+    .from("return_requests")
+    .select("id, status")
+    .eq("order_id", orderId)
+    .in("status", [...ACTIVE_RETURN_STATUSES])
+    .maybeSingle();
+
+  if (existingActive) {
+    return new Response(JSON.stringify({ error: "Ya existe una solicitud activa para este pedido" }), {
+      status: 409,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const requestedAmount = Number(order.total ?? 0);
+
+  const { data: inserted, error: insertErr } = await admin
+    .from("return_requests")
+    .insert({
+      order_id: orderId,
+      user_id: userId,
+      reason,
+      customer_note: customerNote,
+      status: "requested",
+      requested_amount: requestedAmount,
+    })
+    .select("id")
+    .single();
+
+  if (insertErr || !inserted) {
+    console.error("submit_return_request_insert", insertErr);
+    return new Response(JSON.stringify({ error: "No se pudo registrar la solicitud" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const html = buildReturnAdminNotifyHtml({
+    orderId,
+    orderEmail: orderEmail || userEmail,
+    redsysOrder: (order.stripe_session_id as string | null) ?? null,
+    reason,
+    customerNote,
+    requestedAmount,
+  });
+
+  await sendResendEmail(
+    adminNotifyEmail,
+    `[Shenna] Nueva solicitud de devolución — pedido ${orderId.slice(0, 8)}`,
+    html,
+  );
+
+  return new Response(JSON.stringify({ ok: true, returnRequestId: inserted.id }), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+});

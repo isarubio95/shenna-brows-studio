@@ -65,6 +65,9 @@ export type Database = {
           created_at: string | null
           email: string
           id: string
+          pending_cart_snapshot: Json | null
+          redsys_auth_code: string | null
+          refund_status: string
           shipping: number | null
           shipping_address: Json | null
           status: string
@@ -78,6 +81,9 @@ export type Database = {
           created_at?: string | null
           email: string
           id?: string
+          pending_cart_snapshot?: Json | null
+          redsys_auth_code?: string | null
+          refund_status?: string
           shipping?: number | null
           shipping_address?: Json | null
           status?: string
@@ -91,6 +97,9 @@ export type Database = {
           created_at?: string | null
           email?: string
           id?: string
+          pending_cart_snapshot?: Json | null
+          redsys_auth_code?: string | null
+          refund_status?: string
           shipping?: number | null
           shipping_address?: Json | null
           status?: string
@@ -100,6 +109,59 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      return_requests: {
+        Row: {
+          admin_note: string | null
+          created_at: string
+          customer_note: string | null
+          id: string
+          order_id: string
+          reason: string
+          refunded_amount: number | null
+          refunded_at: string | null
+          requested_amount: number | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          created_at?: string
+          customer_note?: string | null
+          id?: string
+          order_id: string
+          reason: string
+          refunded_amount?: number | null
+          refunded_at?: string | null
+          requested_amount?: number | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          created_at?: string
+          customer_note?: string | null
+          id?: string
+          order_id?: string
+          reason?: string
+          refunded_amount?: number | null
+          refunded_at?: string | null
+          requested_amount?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       newsletter_subscribers: {
         Row: {

@@ -15,6 +15,7 @@ import AdminContentEditor from "@/components/admin/AdminContentEditor";
 import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
+import AdminReturnsManager from "@/components/admin/AdminReturnsManager";
 import { getProductImageUrl } from "@/lib/product-images";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import {
@@ -1365,6 +1366,10 @@ const Admin = () => {
               </Table>
             )}
           </div>
+        </AnimatedSection>
+
+        <AnimatedSection delay={0.07}>
+          <AdminReturnsManager />
         </AnimatedSection>
 
         <div className="mb-12" />
