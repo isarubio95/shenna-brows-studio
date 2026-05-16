@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronDown, ChevronRight, FileDown, Loader2, Package, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, FileDown, Loader2, Package, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
@@ -16,6 +16,10 @@ import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
 import AdminReturnsManager from "@/components/admin/AdminReturnsManager";
+import {
+  canDownloadOrderInvoice,
+  getOrderInvoiceButtonLabel,
+} from "@/lib/invoices";
 import {
   getOrderReturnDisplay,
   pickLatestReturnRequest,
@@ -39,6 +43,7 @@ const statusColors: Record<string, string> = {
   pending_payment: "bg-amber-100 text-amber-800",
   paid: "bg-green-100 text-green-700",
   shipped: "bg-blue-100 text-blue-700",
+  delivered: "bg-emerald-100 text-emerald-800",
   cancelled: "bg-gray-100 text-gray-600",
 };
 
@@ -726,9 +731,11 @@ const Admin = () => {
   const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<{ id: string; email: string } | null>(null);
   const [orderToShip, setOrderToShip] = useState<{ id: string; email: string } | null>(null);
+  const [orderToReceive, setOrderToReceive] = useState<{ id: string; email: string } | null>(null);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [orderDeleteInProgress, setOrderDeleteInProgress] = useState(false);
   const [shippingOrderInProgress, setShippingOrderInProgress] = useState(false);
+  const [receivingOrderInProgress, setReceivingOrderInProgress] = useState(false);
   const [printingLabelOrderId, setPrintingLabelOrderId] = useState<string | null>(null);
   const [downloadingTicketOrderId, setDownloadingTicketOrderId] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -758,7 +765,7 @@ const Admin = () => {
   const fetchOrders = useCallback(async () => {
     const { data, error } = await (supabase as any)
       .from("orders")
-      .select("*, return_requests(id, status, created_at)")
+      .select("*, return_requests(id, status, created_at, refunded_amount)")
       .order("created_at", { ascending: false })
       .limit(20);
     if (error) {
@@ -771,6 +778,18 @@ const Admin = () => {
     }
     setOrders(data || []);
   }, [toast]);
+
+  const syncDeliveredOrders = useCallback(async () => {
+    const { error } = await supabase.functions.invoke("sync-delivered-orders", { body: {} });
+    if (error) {
+      console.warn("sync-delivered-orders", error);
+    }
+  }, []);
+
+  const syncAndFetchOrders = useCallback(async () => {
+    await syncDeliveredOrders();
+    await fetchOrders();
+  }, [fetchOrders, syncDeliveredOrders]);
 
   const toggleOrderDetails = async (orderId: string) => {
     if (expandedOrderId === orderId) {
@@ -818,7 +837,7 @@ const Admin = () => {
     if (!isAdmin) return;
     const fetchData = async () => {
       const [, productsRes, testimonialsRes] = await Promise.all([
-        fetchOrders(),
+        syncAndFetchOrders(),
         (supabase as any).from("products").select("*").order("name"),
         (supabase as any).from("testimonials").select("*").order("created_at", { ascending: false }),
       ]);
@@ -836,7 +855,7 @@ const Admin = () => {
       setLoading(false);
     };
     fetchData();
-  }, [isAdmin, fetchOrders]);
+  }, [isAdmin, syncAndFetchOrders]);
 
   if (authLoading) return <main className="min-h-screen bg-cream pt-32 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-gold" /></main>;
   if (!user || !isAdmin) return <Navigate to="/login" replace />;
@@ -932,7 +951,7 @@ const Admin = () => {
       });
     } else {
       toast({
-        title: "Pedido enviado",
+        title: "Enviado",
         description: "El cliente recibirá un correo de confirmación de envío.",
       });
       setOrders((prev) =>
@@ -944,6 +963,44 @@ const Admin = () => {
       setOrderToShip(null);
     }
     setShippingOrderInProgress(false);
+  };
+
+  const confirmMarkOrderReceived = async () => {
+    if (!orderToReceive) return;
+    setReceivingOrderInProgress(true);
+    const id = orderToReceive.id;
+    const { data, error } = await supabase.functions.invoke("mark-order-delivered", {
+      body: { orderId: id },
+    });
+    if (error || data?.error) {
+      toast({
+        title: "No se pudo marcar como entregado",
+        description: data?.error || error?.message || "Error desconocido",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Entregado",
+        description: data?.emailSent
+          ? "El cliente verá el estado «Entregado» y recibirá el correo de valoración e Instagram."
+          : "El pedido quedó como entregado, pero no se pudo enviar el correo al cliente.",
+      });
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === id
+            ? {
+                ...o,
+                status: "delivered",
+                delivered_at: data.deliveredAt ?? new Date().toISOString(),
+                ...(o.shipped_at ? {} : { shipped_at: data.deliveredAt ?? new Date().toISOString() }),
+              }
+            : o,
+        ),
+      );
+      queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+      setOrderToReceive(null);
+    }
+    setReceivingOrderInProgress(false);
   };
 
   const toggleFeatured = async (id: string, current: boolean) => {
@@ -1004,23 +1061,31 @@ const Admin = () => {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
-  const handleDownloadTicket = async (order: { id: string }) => {
+  const handleDownloadTicket = async (order: { id: string; status?: string; refund_status?: string | null; returned?: boolean | null; return_requests?: { status: ReturnRequestStatus; created_at: string; refunded_amount?: number | null }[] | null }) => {
+    const isCreditNote = getOrderInvoiceButtonLabel(order) === "Factura devolución";
     setDownloadingTicketOrderId(order.id);
     try {
       const { data, error } = await supabase.functions.invoke("generate-order-ticket", {
         body: { orderId: order.id },
       });
       if (error) throw error;
-      const payload = data as { pdfBase64?: string; filename?: string; error?: string } | null;
+      const payload = data as {
+        pdfBase64?: string;
+        filename?: string;
+        documentType?: string;
+        error?: string;
+      } | null;
       if (payload?.error) throw new Error(payload.error);
       const pdfBase64 = payload?.pdfBase64;
       if (!pdfBase64) throw new Error("No se recibió el PDF");
       const filename = payload.filename?.trim() || `ticket-${order.id.slice(0, 8)}.pdf`;
       downloadBase64Pdf(pdfBase64, filename);
-      toast({ title: "Factura descargada" });
+      toast({
+        title: isCreditNote ? "Factura de devolución descargada" : "Factura descargada",
+      });
     } catch (e) {
       toast({
-        title: "No se pudo descargar la factura",
+        title: isCreditNote ? "No se pudo descargar la factura de devolución" : "No se pudo descargar la factura",
         description: e instanceof Error ? e.message : "Error desconocido",
         variant: "destructive",
       });
@@ -1322,6 +1387,7 @@ const Admin = () => {
                       latestReturn ? { status: latestReturn.status } : null,
                     );
                     const fulfillmentBlocked = returnStatusBlocksFulfillment(latestReturn?.status);
+                    const isOrderReturned = o.returned === true;
 
                     return (
                       <Fragment key={o.id}>
@@ -1365,7 +1431,7 @@ const Admin = () => {
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex items-center justify-end gap-2">
-                          {o.status === "paid" && !fulfillmentBlocked && (
+                          {o.status === "paid" && !fulfillmentBlocked && !isOrderReturned && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -1374,29 +1440,45 @@ const Admin = () => {
                               aria-label={`Marcar pedido de ${o.email} como enviado`}
                             >
                               <Truck className="h-4 w-4 mr-1.5" />
-                              Pedido enviado
+                              Enviado
                             </Button>
                           )}
-                          {PAID_ORDER_STATUSES.has(o.status) && (
+                          {(o.status === "paid" || o.status === "shipped") && !fulfillmentBlocked && !isOrderReturned && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setOrderToReceive({ id: o.id, email: o.email })}
+                              className="border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                              aria-label={`Marcar pedido de ${o.email} como entregado`}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                              Entregado
+                            </Button>
+                          )}
+                          {canDownloadOrderInvoice(o) && (
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleDownloadTicket(o)}
                               disabled={downloadingTicketOrderId === o.id}
-                              className="border-gold/20 text-gold hover:bg-gold/5"
-                              aria-label={`Descargar factura de ${o.email}`}
+                              className={
+                                getOrderInvoiceButtonLabel(o) === "Factura devolución"
+                                  ? "border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                                  : "border-gold/20 text-gold hover:bg-gold/5"
+                              }
+                              aria-label={`Descargar ${getOrderInvoiceButtonLabel(o).toLowerCase()} de ${o.email}`}
                             >
                               {downloadingTicketOrderId === o.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <>
                                   <FileDown className="h-4 w-4 mr-1.5" />
-                                  Factura
+                                  {getOrderInvoiceButtonLabel(o)}
                                 </>
                               )}
                             </Button>
                           )}
-                          {canPrintShippingLabel(o.status) && !fulfillmentBlocked ? (
+                          {canPrintShippingLabel(o.status) && !fulfillmentBlocked && !isOrderReturned ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -1548,7 +1630,7 @@ const Admin = () => {
         </AnimatedSection>
 
         <AnimatedSection delay={0.07}>
-          <AdminReturnsManager onReturnsChanged={() => void fetchOrders()} />
+          <AdminReturnsManager onReturnsChanged={() => void syncAndFetchOrders()} />
         </AnimatedSection>
 
         <div className="mb-12" />
@@ -1624,6 +1706,36 @@ const Admin = () => {
             ))}
           </div>
         </AnimatedSection>
+
+        <AlertDialog open={orderToReceive !== null} onOpenChange={(open) => !open && setOrderToReceive(null)}>
+          <AlertDialogContent className="bg-cream border-gold/20">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-playfair text-carbon">¿Confirmar entrega del pedido?</AlertDialogTitle>
+              <AlertDialogDescription className="text-carbon/60 space-y-2">
+                <span>
+                  Se marcará como <strong>entregado</strong> el pedido de{" "}
+                  <span className="font-medium text-carbon">{orderToReceive?.email}</span>{" "}
+                  (<span className="font-mono text-xs">{orderToReceive?.id.slice(0, 8)}</span>).
+                </span>
+                <span className="block">
+                  El cliente verá el estado en Mi cuenta y, si aún no se envió, recibirá el correo invitándole a dejar
+                  una valoración y a seguirnos en Instagram.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-gold/20">Cancelar</AlertDialogCancel>
+              <Button
+                onClick={() => void confirmMarkOrderReceived()}
+                disabled={receivingOrderInProgress}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {receivingOrderInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Confirmar entrega
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={orderToShip !== null} onOpenChange={(open) => !open && setOrderToShip(null)}>
           <AlertDialogContent className="bg-cream border-gold/20">

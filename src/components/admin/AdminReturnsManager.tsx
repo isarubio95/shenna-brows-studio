@@ -85,9 +85,18 @@ const AdminReturnsManager = ({ onReturnsChanged }: AdminReturnsManagerProps) => 
     });
   }, [rows, filter]);
 
+  const submitRefundAmount = (returnRequestId: string, defaultRefund: string) => {
+    const amt = Number(refundAmounts[returnRequestId] ?? defaultRefund);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast({ title: "Importe inválido", variant: "destructive" });
+      return null;
+    }
+    return amt;
+  };
+
   const runAction = async (
     returnRequestId: string,
-    action: "approve" | "reject" | "product_received" | "refund",
+    action: "approve" | "reject" | "product_received" | "refund" | "refund_manual",
     extra?: { refundedAmount?: number },
   ) => {
     setBusyId(returnRequestId);
@@ -128,8 +137,8 @@ const AdminReturnsManager = ({ onReturnsChanged }: AdminReturnsManagerProps) => 
         <div>
           <h2 className="font-playfair text-xl font-semibold text-carbon">Devoluciones</h2>
           <p className="text-carbon/40 text-sm mt-1">
-            Al reembolsar, el importe se devuelve automáticamente a la tarjeta del cliente vía Redsys (puede tardar
-            varios días en el extracto bancario).
+            «Reembolsar en Redsys» devuelve el importe por API. «Reembolso en TPV» registra una devolución ya hecha
+            manualmente en Redsys Canales.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -243,7 +252,7 @@ const AdminReturnsManager = ({ onReturnsChanged }: AdminReturnsManagerProps) => 
                               placeholder="Visible para el cliente en el email…"
                             />
                           </div>
-                          {r.status === "product_received" ? (
+                          {r.status === "approved" || r.status === "product_received" ? (
                             <div>
                               <Label className="text-[10px] text-carbon/40">Importe reembolsado (€)</Label>
                               <Input
@@ -281,40 +290,65 @@ const AdminReturnsManager = ({ onReturnsChanged }: AdminReturnsManagerProps) => 
                               </>
                             ) : null}
                             {r.status === "approved" ? (
-                              <Button
-                                size="sm"
-                                disabled={isBusy}
-                                className="bg-gold hover:bg-gold/90 text-white h-8"
-                                onClick={() => void runAction(r.id, "product_received")}
-                              >
-                                Producto recibido
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  disabled={isBusy}
+                                  className="bg-gold hover:bg-gold/90 text-white h-8"
+                                  onClick={() => void runAction(r.id, "product_received")}
+                                >
+                                  Producto recibido
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isBusy}
+                                  className="h-8 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                                  onClick={() => {
+                                    const amt = submitRefundAmount(r.id, defaultRefund);
+                                    if (amt == null) return;
+                                    void runAction(r.id, "refund_manual", { refundedAmount: amt });
+                                  }}
+                                >
+                                  Reembolso en TPV
+                                </Button>
+                              </>
                             ) : null}
                             {r.status === "product_received" ? (
-                              <Button
-                                size="sm"
-                                disabled={isBusy}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white h-8"
-                                onClick={() => {
-                                  const amt = Number(refundAmounts[r.id] ?? defaultRefund);
-                                  if (!Number.isFinite(amt) || amt <= 0) {
-                                    toast({
-                                      title: "Importe inválido",
-                                      variant: "destructive",
-                                    });
-                                    return;
-                                  }
-                                  void runAction(r.id, "refund", { refundedAmount: amt });
-                                }}
-                              >
-                                Reembolsar en Redsys
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  disabled={isBusy}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-8"
+                                  onClick={() => {
+                                    const amt = submitRefundAmount(r.id, defaultRefund);
+                                    if (amt == null) return;
+                                    void runAction(r.id, "refund", { refundedAmount: amt });
+                                  }}
+                                >
+                                  Reembolsar en Redsys
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isBusy}
+                                  className="h-8 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                                  onClick={() => {
+                                    const amt = submitRefundAmount(r.id, defaultRefund);
+                                    if (amt == null) return;
+                                    void runAction(r.id, "refund_manual", { refundedAmount: amt });
+                                  }}
+                                >
+                                  Reembolso en TPV
+                                </Button>
+                              </>
                             ) : null}
                             {isBusy ? <Loader2 className="h-4 w-4 animate-spin text-gold" /> : null}
                           </div>
-                          {r.status === "product_received" ? (
+                          {r.status === "approved" || r.status === "product_received" ? (
                             <p className="text-[10px] text-carbon/50 text-right">
-                              La operación es irreversible. El abono en el extracto puede tardar varios días.
+                              Usa «Reembolso en TPV» si ya devolviste el importe manualmente en Redsys Canales. El
+                              cliente recibirá el correo de reembolso tramitado.
                             </p>
                           ) : null}
                         </div>

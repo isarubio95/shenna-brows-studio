@@ -440,7 +440,7 @@ const Account = () => {
         </AnimatedSection>
 
         <AnimatedSection delay={0.15}>
-          <div className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-8 mt-10">
+          <div id="tu-experiencia" className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-8 mt-10 scroll-mt-28">
             <div className="flex items-center gap-3 mb-6">
               <MessageSquareQuote size={22} className="text-primary" />
               <h2 className="font-playfair text-xl font-semibold text-foreground">Tu experiencia Shenna</h2>

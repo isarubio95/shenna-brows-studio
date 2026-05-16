@@ -35,3 +35,9 @@ verify_jwt = false
 
 [functions.cancel-order]
 verify_jwt = false
+
+[functions.sync-delivered-orders]
+verify_jwt = false
+
+[functions.mark-order-delivered]
+verify_jwt = false
