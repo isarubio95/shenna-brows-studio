@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
+import { userHasAdminRole } from "../_shared/adminRole.ts";
 import { buildReturnAdminNotifyHtml } from "../_shared/returnEmails.ts";
 
 const corsHeaders = {
@@ -134,7 +135,7 @@ serve(async (req) => {
 
   const { data: order, error: orderErr } = await admin
     .from("orders")
-    .select("id, email, status, total, user_id, stripe_session_id, refund_status")
+    .select("id, email, status, total, user_id, stripe_session_id, refund_status, returned")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -150,11 +151,13 @@ serve(async (req) => {
   const orderEmail = String(order.email || "").trim().toLowerCase();
   const orderUserId = order.user_id as string | null;
 
+  const isAdmin = await userHasAdminRole(userClient, userId);
+
   const ownsOrder =
     orderUserId === userId ||
     (!orderUserId && userEmail.length > 0 && userEmail === orderEmail);
 
-  if (!ownsOrder) {
+  if (!ownsOrder && !isAdmin) {
     return new Response(JSON.stringify({ error: "No tienes permiso sobre este pedido" }), {
       status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -162,26 +165,41 @@ serve(async (req) => {
   }
 
   const status = String(order.status || "");
-  if (status === "paid") {
-    return new Response(
-      JSON.stringify({
-        error: "Tu pedido aún no ha sido enviado. Puedes cancelarlo directamente desde tu cuenta.",
-      }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  }
-  if (!ELIGIBLE_ORDER_STATUSES.has(status)) {
+
+  if (!isAdmin) {
+    if (status === "paid") {
+      return new Response(
+        JSON.stringify({
+          error: "Tu pedido aún no ha sido enviado. Puedes cancelarlo directamente desde tu cuenta.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (!ELIGIBLE_ORDER_STATUSES.has(status)) {
+      return new Response(
+        JSON.stringify({ error: "Este pedido no admite devoluciones en su estado actual" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (order.returned === true) {
+      return new Response(JSON.stringify({ error: "Este pedido ya ha sido devuelto" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (String(order.refund_status || "none") !== "none") {
+      return new Response(JSON.stringify({ error: "Este pedido ya tiene un reembolso registrado" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  } else if (status === "cancelled" || status === "pending_payment" || status === "pending") {
     return new Response(
       JSON.stringify({ error: "Este pedido no admite devoluciones en su estado actual" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-  }
-
-  if (String(order.refund_status || "none") !== "none") {
-    return new Response(JSON.stringify({ error: "Este pedido ya tiene un reembolso registrado" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   }
 
   const { data: existingActive } = await admin
@@ -200,11 +218,13 @@ serve(async (req) => {
 
   const requestedAmount = Number(order.total ?? 0);
 
+  const returnUserId = (orderUserId as string | null) || userId;
+
   const { data: inserted, error: insertErr } = await admin
     .from("return_requests")
     .insert({
       order_id: orderId,
-      user_id: userId,
+      user_id: returnUserId,
       reason,
       customer_note: customerNote,
       status: "requested",

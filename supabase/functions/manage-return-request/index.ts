@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { buildReturnCustomerStatusHtml } from "../_shared/returnEmails.ts";
+import { executeRedsysRefund, getRedsysCredentialsFromEnv } from "../_shared/redsys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -178,6 +179,8 @@ serve(async (req) => {
     admin_note: adminNote ?? undefined,
   };
 
+  let refundedAmountForOrder = 0;
+
   if (action === "refund") {
     const refundedAmount =
       body.refundedAmount != null && Number.isFinite(Number(body.refundedAmount))
@@ -189,8 +192,69 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const redsysOrder = String(orderRel?.stripe_session_id || "").trim();
+    if (!redsysOrder) {
+      return new Response(
+        JSON.stringify({ error: "Este pedido no tiene referencia Redsys; no se puede reembolsar automáticamente" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const credentials = getRedsysCredentialsFromEnv();
+    if (!credentials) {
+      return new Response(JSON.stringify({ error: "TPV Redsys no configurado en el servidor" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: priorRefunds } = await admin
+      .from("return_requests")
+      .select("refunded_amount")
+      .eq("order_id", row.order_id)
+      .eq("status", "refunded");
+
+    const alreadyRefunded = (priorRefunds ?? []).reduce(
+      (sum, r) => sum + Number((r as { refunded_amount?: number }).refunded_amount ?? 0),
+      0,
+    );
+    if (alreadyRefunded + refundedAmount > orderTotal + 0.01) {
+      return new Response(
+        JSON.stringify({
+          error: `El importe supera lo reembolsable (máx. ${Math.max(0, orderTotal - alreadyRefunded).toFixed(2)} €)`,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const amountMinor = Math.round(refundedAmount * 100);
+    const redsysResult = await executeRedsysRefund({
+      merchantOrder: redsysOrder,
+      amountMinor,
+      credentials,
+    });
+
+    if (!redsysResult.ok) {
+      return new Response(JSON.stringify({ error: redsysResult.message }), {
+        status: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (redsysResult.authCode) {
+      console.log("redsys_refund_ok", {
+        returnRequestId,
+        orderId: row.order_id,
+        redsysOrder,
+        authCode: redsysResult.authCode,
+        amountEur: refundedAmount,
+      });
+    }
+
     updatePayload.refunded_amount = refundedAmount;
     updatePayload.refunded_at = new Date().toISOString();
+    refundedAmountForOrder = refundedAmount;
   }
 
   const { error: upErr } = await admin
@@ -207,11 +271,14 @@ serve(async (req) => {
   }
 
   if (action === "refund") {
-    const refundedAmount = Number(updatePayload.refunded_amount);
+    const refundedAmount = refundedAmountForOrder;
     const refundStatus = refundedAmount >= orderTotal - 0.01 ? "full" : "partial";
     await admin
       .from("orders")
-      .update({ refund_status: refundStatus })
+      .update({
+        refund_status: refundStatus,
+        returned: refundStatus === "full",
+      })
       .eq("id", row.order_id);
   }
 

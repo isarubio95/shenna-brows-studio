@@ -7,13 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, ExternalLink, Loader2 } from "lucide-react";
-import {
-  RETURN_REASON_LABELS,
-  RETURN_STATUS_LABELS,
-  getRedsysCanalesUrl,
-  type ReturnRequestStatus,
-} from "@/lib/returns";
+import { Copy, Loader2 } from "lucide-react";
+import { RETURN_REASON_LABELS, RETURN_STATUS_LABELS, type ReturnRequestStatus } from "@/lib/returns";
 
 type ReturnRow = {
   id: string;
@@ -47,7 +42,11 @@ const statusBadgeClass: Record<string, string> = {
   cancelled: "bg-gray-100 text-gray-600",
 };
 
-const AdminReturnsManager = () => {
+type AdminReturnsManagerProps = {
+  onReturnsChanged?: () => void;
+};
+
+const AdminReturnsManager = ({ onReturnsChanged }: AdminReturnsManagerProps) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<ReturnRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +108,7 @@ const AdminReturnsManager = () => {
     } else {
       toast({ title: "Solicitud actualizada", description: RETURN_STATUS_LABELS[data.status as ReturnRequestStatus] });
       await load();
+      onReturnsChanged?.();
     }
     setBusyId(null);
   };
@@ -122,19 +122,14 @@ const AdminReturnsManager = () => {
     }
   };
 
-  const canalesUrl = getRedsysCanalesUrl();
-
   return (
     <div className="mb-12">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
         <div>
           <h2 className="font-playfair text-xl font-semibold text-carbon">Devoluciones</h2>
           <p className="text-carbon/40 text-sm mt-1">
-            Gestiona solicitudes de clientes. El reembolso bancario se hace en{" "}
-            <a href={canalesUrl} target="_blank" rel="noopener noreferrer" className="text-gold underline">
-              Redsys Canales
-            </a>{" "}
-            (irreversible).
+            Al reembolsar, el importe se devuelve automáticamente a la tarjeta del cliente vía Redsys (puede tardar
+            varios días en el extracto bancario).
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -228,18 +223,6 @@ const AdminReturnsManager = () => {
                               >
                                 <Copy className="h-3.5 w-3.5" />
                               </Button>
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                title="Abrir Canales"
-                                asChild
-                              >
-                                <a href={canalesUrl} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
-                              </Button>
                             </div>
                           </div>
                         ) : (
@@ -324,14 +307,14 @@ const AdminReturnsManager = () => {
                                   void runAction(r.id, "refund", { refundedAmount: amt });
                                 }}
                               >
-                                Marcar reembolsado
+                                Reembolsar en Redsys
                               </Button>
                             ) : null}
                             {isBusy ? <Loader2 className="h-4 w-4 animate-spin text-gold" /> : null}
                           </div>
                           {r.status === "product_received" ? (
-                            <p className="text-[10px] text-amber-700 text-right">
-                              Tras marcar reembolsado, ejecuta la devolución en Canales con el n.º de pedido.
+                            <p className="text-[10px] text-carbon/50 text-right">
+                              La operación es irreversible. El abono en el extracto puede tardar varios días.
                             </p>
                           ) : null}
                         </div>

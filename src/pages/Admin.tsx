@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,6 +16,12 @@ import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
 import AdminReturnsManager from "@/components/admin/AdminReturnsManager";
+import {
+  getOrderReturnDisplay,
+  pickLatestReturnRequest,
+  returnStatusBlocksFulfillment,
+  type ReturnRequestStatus,
+} from "@/lib/returns";
 import { getProductImageUrl } from "@/lib/product-images";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import {
@@ -46,6 +52,11 @@ const statusLabels: Record<string, string> = {
 };
 
 const PAID_ORDER_STATUSES = new Set(["paid", "shipped", "delivered"]);
+const PENDING_ORDER_STATUSES = new Set(["pending", "pending_payment"]);
+
+function canPrintShippingLabel(orderStatus: string): boolean {
+  return !PENDING_ORDER_STATUSES.has(orderStatus) && orderStatus !== "cancelled";
+}
 
 const PRODUCT_VARIANT_SEPS = [" — ", " – ", " - "] as const;
 
@@ -744,6 +755,23 @@ const Admin = () => {
     return map;
   }, [productCatalogById]);
 
+  const fetchOrders = useCallback(async () => {
+    const { data, error } = await (supabase as any)
+      .from("orders")
+      .select("*, return_requests(id, status, created_at)")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) {
+      toast({
+        title: "Error al cargar pedidos",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    setOrders(data || []);
+  }, [toast]);
+
   const toggleOrderDetails = async (orderId: string) => {
     if (expandedOrderId === orderId) {
       setExpandedOrderId(null);
@@ -789,12 +817,11 @@ const Admin = () => {
   useEffect(() => {
     if (!isAdmin) return;
     const fetchData = async () => {
-      const [ordersRes, productsRes, testimonialsRes] = await Promise.all([
-        (supabase as any).from("orders").select("*").order("created_at", { ascending: false }).limit(20),
+      const [, productsRes, testimonialsRes] = await Promise.all([
+        fetchOrders(),
         (supabase as any).from("products").select("*").order("name"),
         (supabase as any).from("testimonials").select("*").order("created_at", { ascending: false }),
       ]);
-      setOrders(ordersRes.data || []);
       setProducts(productsRes.data || []);
       // Enrich testimonials with profile names
       const rawTestimonials = testimonialsRes.data || [];
@@ -809,7 +836,7 @@ const Admin = () => {
       setLoading(false);
     };
     fetchData();
-  }, [isAdmin]);
+  }, [isAdmin, fetchOrders]);
 
   if (authLoading) return <main className="min-h-screen bg-cream pt-32 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-gold" /></main>;
   if (!user || !isAdmin) return <Navigate to="/login" replace />;
@@ -1056,6 +1083,28 @@ const Admin = () => {
   };
 
   const handlePrintLabel = async (order: any) => {
+    const orderStatus = String(order?.status || "");
+    if (!canPrintShippingLabel(orderStatus)) {
+      toast({
+        title: "No se puede imprimir la etiqueta",
+        description: PENDING_ORDER_STATUSES.has(orderStatus)
+          ? "El pedido aún no está pagado."
+          : "Este pedido está cancelado.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const latestReturn = pickLatestReturnRequest(
+      order?.return_requests as { status: ReturnRequestStatus; created_at: string }[] | undefined,
+    );
+    if (returnStatusBlocksFulfillment(latestReturn?.status)) {
+      toast({
+        title: "No se puede imprimir la etiqueta",
+        description: "Hay una devolución con el producto ya recibido; tramita el reembolso antes.",
+        variant: "destructive",
+      });
+      return;
+    }
     setPrintingLabelOrderId(order.id);
     // Abrimos una pestaña en el gesto de usuario para evitar bloqueos por popup
     // cuando la respuesta de Correos llega tras varias llamadas asíncronas.
@@ -1226,7 +1275,7 @@ const Admin = () => {
 
   return (
     <main className="min-h-screen bg-cream pt-28 pb-16">
-      <div className="container mx-auto px-6 max-w-5xl">
+      <div className="container mx-auto px-6 max-w-7xl">
         <AnimatedSection>
           <h1 className="font-playfair text-3xl font-bold text-carbon mb-2">Panel de Administración</h1>
           <p className="text-carbon/50 text-sm mb-10">Gestiona pedidos, inventario y productos.</p>
@@ -1248,6 +1297,7 @@ const Admin = () => {
                     <TableHead className="text-carbon/60">Email</TableHead>
                     <TableHead className="text-carbon/60">Total</TableHead>
                     <TableHead className="text-carbon/60">Estado</TableHead>
+                    <TableHead className="text-carbon/60">Devolución</TableHead>
                     <TableHead className="text-carbon/60">Fecha</TableHead>
                     <TableHead className="text-carbon/60 text-right">Acciones</TableHead>
                   </TableRow>
@@ -1264,6 +1314,14 @@ const Admin = () => {
                     );
                     const addressLines = formatShippingAddressLines(o.shipping_address);
                     const hasCorreosCode = Boolean(o.correos_shipment_code?.trim());
+                    const latestReturn = pickLatestReturnRequest(
+                      o.return_requests as { status: ReturnRequestStatus; created_at: string }[] | undefined,
+                    );
+                    const returnDisplay = getOrderReturnDisplay(
+                      o,
+                      latestReturn ? { status: latestReturn.status } : null,
+                    );
+                    const fulfillmentBlocked = returnStatusBlocksFulfillment(latestReturn?.status);
 
                     return (
                       <Fragment key={o.id}>
@@ -1289,6 +1347,15 @@ const Admin = () => {
                           {statusLabels[o.status] || o.status}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        {returnDisplay ? (
+                          <Badge variant="outline" className={returnDisplay.badgeClass}>
+                            {returnDisplay.label}
+                          </Badge>
+                        ) : (
+                          <span className="text-carbon/30 text-sm">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-carbon/60 text-sm">
                         {new Date(o.created_at).toLocaleDateString("es-ES", {
                           day: "2-digit",
@@ -1298,7 +1365,7 @@ const Admin = () => {
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex items-center justify-end gap-2">
-                          {o.status === "paid" && (
+                          {o.status === "paid" && !fulfillmentBlocked && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -1329,22 +1396,24 @@ const Admin = () => {
                               )}
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handlePrintLabel(o)}
-                            disabled={printingLabelOrderId === o.id}
-                            className="border-gold/20 text-gold hover:bg-gold/5"
-                          >
-                            {printingLabelOrderId === o.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Printer className="h-4 w-4 mr-1.5" />
-                                Imprimir
-                              </>
-                            )}
-                          </Button>
+                          {canPrintShippingLabel(o.status) && !fulfillmentBlocked ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handlePrintLabel(o)}
+                              disabled={printingLabelOrderId === o.id}
+                              className="border-gold/20 text-gold hover:bg-gold/5"
+                            >
+                              {printingLabelOrderId === o.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Printer className="h-4 w-4 mr-1.5" />
+                                  Imprimir
+                                </>
+                              )}
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="outline"
@@ -1359,7 +1428,7 @@ const Admin = () => {
                     </TableRow>
                         {isExpanded && (
                           <TableRow className="border-b border-gold/10 bg-cream/40">
-                            <TableCell colSpan={6} className="p-0">
+                            <TableCell colSpan={7} className="p-0">
                               <div className="px-5 py-5 space-y-5">
                                 <div className="grid gap-5 sm:grid-cols-2">
                                   <div>
@@ -1479,7 +1548,7 @@ const Admin = () => {
         </AnimatedSection>
 
         <AnimatedSection delay={0.07}>
-          <AdminReturnsManager />
+          <AdminReturnsManager onReturnsChanged={() => void fetchOrders()} />
         </AnimatedSection>
 
         <div className="mb-12" />

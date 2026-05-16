@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { buildOrderCancelAdminNotifyHtml, buildOrderCancelCustomerHtml } from "../_shared/orderCancelEmails.ts";
+import { executeRedsysRefund, getRedsysCredentialsFromEnv } from "../_shared/redsys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -187,9 +188,56 @@ serve(async (req) => {
     });
   }
 
+  const total = Number(order.total ?? 0);
+  const redsysOrder = String(order.stripe_session_id || "").trim();
+
+  if (!redsysOrder) {
+    return new Response(
+      JSON.stringify({ error: "Este pedido no tiene referencia Redsys; no se puede reembolsar automáticamente" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  if (total <= 0) {
+    return new Response(JSON.stringify({ error: "Importe del pedido inválido para reembolso" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const credentials = getRedsysCredentialsFromEnv();
+  if (!credentials) {
+    return new Response(JSON.stringify({ error: "TPV Redsys no configurado en el servidor" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const amountMinor = Math.round(total * 100);
+  const redsysResult = await executeRedsysRefund({
+    merchantOrder: redsysOrder,
+    amountMinor,
+    credentials,
+  });
+
+  if (!redsysResult.ok) {
+    return new Response(JSON.stringify({ error: redsysResult.message }), {
+      status: 402,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (redsysResult.authCode) {
+    console.log("cancel_order_redsys_refund_ok", { orderId, redsysOrder, authCode: redsysResult.authCode });
+  }
+
   const { error: updateErr } = await admin
     .from("orders")
-    .update({ status: "cancelled" })
+    .update({
+      status: "cancelled",
+      refund_status: "full",
+      returned: true,
+    })
     .eq("id", orderId);
 
   if (updateErr) {
@@ -200,13 +248,10 @@ serve(async (req) => {
     });
   }
 
-  const total = Number(order.total ?? 0);
-  const redsysOrder = (order.stripe_session_id as string | null) ?? null;
-
   const adminHtml = buildOrderCancelAdminNotifyHtml({
     orderId,
     orderEmail: orderEmail || userEmail,
-    redsysOrder,
+    redsysOrder: redsysOrder || null,
     total,
     customerNote,
   });

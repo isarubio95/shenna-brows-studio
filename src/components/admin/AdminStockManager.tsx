@@ -135,7 +135,8 @@ const AdminStockManager = ({ products, loading, onStockUpdated }: AdminStockMana
                 <TableHead className="text-carbon/60 min-w-[200px]">Producto</TableHead>
                 <TableHead className="text-carbon/60 text-center w-[100px]">Stock actual</TableHead>
                 <TableHead className="text-carbon/60 text-center min-w-[200px]">Ajuste rápido</TableHead>
-                <TableHead className="text-carbon/60 min-w-[220px]">Nuevo stock y guardar</TableHead>
+                <TableHead className="text-carbon/60 min-w-[140px]">Nuevo stock</TableHead>
+                <TableHead className="w-0" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -186,34 +187,35 @@ const AdminStockManager = ({ products, loading, onStockUpdated }: AdminStockMana
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={workingText(p)}
-                          disabled={busy}
-                          onChange={(e) => setDraftText((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                          className="h-9 max-w-[120px] bg-white border-gold/15 tabular-nums"
-                          aria-label={`Nuevo stock (borrador) para ${p.name}`}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          disabled={busy || !guardarOk}
-                          onClick={() => handleGuardar(p)}
-                          className="bg-gold/15 text-carbon hover:bg-gold/25 shrink-0"
-                        >
-                          {busy ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Save className="h-4 w-4 mr-1.5" />
-                              Guardar
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={workingText(p)}
+                        disabled={busy}
+                        onChange={(e) => setDraftText((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                        className="h-9 max-w-[120px] bg-white border-gold/15 tabular-nums"
+                        aria-label={`Nuevo stock (borrador) para ${p.name}`}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right w-0 whitespace-nowrap">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy || !guardarOk}
+                        onClick={() => handleGuardar(p)}
+                        className="bg-gold/15 text-carbon hover:bg-gold/25 shrink-0"
+                        aria-label={`Guardar stock de ${p.name}`}
+                      >
+                        {busy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-1.5" />
+                            Guardar
+                          </>
+                        )}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );

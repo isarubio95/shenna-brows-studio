@@ -19,6 +19,7 @@ import {
   RETURN_STATUS_LABELS,
   canRequestReturn,
   canCancelOrder,
+  getOrderReturnDisplay,
   type ReturnReason,
   type ReturnRequestStatus,
 } from "@/lib/returns";
@@ -332,8 +333,13 @@ const Account = () => {
                   {filteredOrders.map((order) => {
                     const cfg = statusConfig[order.status] || { label: order.status, variant: "outline" as const };
                     const returnReq = returnByOrderId.get(order.id);
-                    const refundStatus = (order as { refund_status?: string }).refund_status ?? "none";
-                    const canReturn = canRequestReturn(order.status, refundStatus) && !returnReq;
+                    const refundStatus = order.refund_status ?? "none";
+                    const returnDisplay = getOrderReturnDisplay(
+                      order,
+                      returnReq ? { status: returnReq.status } : null,
+                    );
+                    const canReturn =
+                      canRequestReturn(order.status, refundStatus, order.returned) && !returnReq;
                     const canCancel = canCancelOrder(order.status, refundStatus) && !returnReq;
                     return (
                       <TableRow key={order.id}>
@@ -357,13 +363,9 @@ const Account = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {refundStatus === "full" || refundStatus === "partial" ? (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                              Reembolsado
-                            </Badge>
-                          ) : returnReq ? (
-                            <Badge variant="outline" className="text-xs">
-                              {RETURN_STATUS_LABELS[returnReq.status]}
+                          {returnDisplay ? (
+                            <Badge variant="outline" className={`text-xs ${returnDisplay.badgeClass}`}>
+                              {returnDisplay.label}
                             </Badge>
                           ) : canCancel ? (
                             <span className="text-xs text-muted-foreground">Cancelación disponible</span>
@@ -500,14 +502,20 @@ const Account = () => {
                 <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">ID</p>
                 <p className="font-mono text-sm">{selectedOrder.id}</p>
               </div>
-              {returnByOrderId.get(selectedOrder.id) ? (
-                <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Devolución</p>
-                  <p className="text-sm font-medium">
-                    {RETURN_STATUS_LABELS[returnByOrderId.get(selectedOrder.id)!.status]}
-                  </p>
-                </div>
-              ) : null}
+              {(() => {
+                const sheetReturn = returnByOrderId.get(selectedOrder.id);
+                const sheetReturnDisplay = getOrderReturnDisplay(
+                  selectedOrder,
+                  sheetReturn ? { status: sheetReturn.status } : null,
+                );
+                if (!sheetReturnDisplay) return null;
+                return (
+                  <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Devolución</p>
+                    <p className="text-sm font-medium">{sheetReturnDisplay.label}</p>
+                  </div>
+                );
+              })()}
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2">Productos</p>
                 <div className="space-y-3">

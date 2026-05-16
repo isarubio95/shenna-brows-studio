@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { userHasAdminRole } from "../_shared/adminRole.ts";
 import { buildOrderConfirmationHtml } from "../_shared/orderConfirmationEmail.ts";
 
 const corsHeaders = {
@@ -114,6 +115,8 @@ serve(async (req) => {
     });
   }
 
+  const isAdmin = await userHasAdminRole(supabase, userId);
+
   const status = String(order.status || "");
   if (status === "cancelled") {
     return new Response(JSON.stringify({ error: "El pedido está cancelado" }), {
@@ -121,15 +124,23 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  if (status === "shipped" || status === "delivered") {
-    return new Response(JSON.stringify({ error: "El pedido ya consta como enviado" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-  if (status !== "paid") {
+
+  if (!isAdmin) {
+    if (status === "shipped" || status === "delivered") {
+      return new Response(JSON.stringify({ error: "El pedido ya consta como enviado" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (status !== "paid") {
+      return new Response(
+        JSON.stringify({ error: "Solo se pueden marcar como enviados los pedidos pagados" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+  } else if (!["paid", "shipped", "delivered"].includes(status)) {
     return new Response(
-      JSON.stringify({ error: "Solo se pueden marcar como enviados los pedidos pagados" }),
+      JSON.stringify({ error: "Solo se pueden marcar como enviados pedidos pagados o ya enviados (modo admin)" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }

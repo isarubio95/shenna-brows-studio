@@ -140,3 +140,168 @@ export function redsysRealizarPagoUrl(env: "test" | "production"): string {
     ? "https://sis.redsys.es/sis/realizarPago"
     : "https://sis-t.redsys.es:25443/sis/realizarPago";
 }
+
+export type RedsysEnv = "test" | "production";
+
+export function getRedsysEnv(): RedsysEnv {
+  const v = (Deno.env.get("REDSYS_ENV") || "production").toLowerCase();
+  return v === "test" || v === "sandbox" ? "test" : "production";
+}
+
+export function redsysTrataPeticionRestUrl(env: RedsysEnv): string {
+  return env === "production"
+    ? "https://sis.redsys.es/sis/rest/trataPeticionREST"
+    : "https://sis-t.redsys.es:25443/sis/rest/trataPeticionREST";
+}
+
+export type RedsysCredentials = {
+  merchantCode: string;
+  terminal: string;
+  secretKey: string;
+  currency: string;
+};
+
+export function getRedsysCredentialsFromEnv(): RedsysCredentials | null {
+  const merchantCode = Deno.env.get("REDSYS_MERCHANT_CODE")?.trim();
+  const terminal = Deno.env.get("REDSYS_TERMINAL")?.trim() || "001";
+  const secretKey = Deno.env.get("REDSYS_SECRET_KEY")?.trim();
+  const currency = Deno.env.get("REDSYS_CURRENCY")?.trim() || "978";
+  if (!merchantCode || !secretKey) return null;
+  return { merchantCode, terminal, secretKey, currency };
+}
+
+export function padRedsysTerminal(terminal: string): string {
+  return terminal.length >= 3 ? terminal : terminal.padStart(3, "0");
+}
+
+function pickDecodedField(decoded: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = decoded[key];
+    if (value != null && String(value).trim()) return String(value).trim();
+  }
+  return "";
+}
+
+/** Devolución REST: Ds_Response 0900 = devolución correcta (doc Redsys). */
+export function isRedsysRefundAuthorized(dsResponse: string): boolean {
+  return dsResponse.trim() === "0900";
+}
+
+export function redsysRefundErrorMessage(dsResponse: string): string {
+  const code = dsResponse.trim();
+  const known: Record<string, string> = {
+    "0106": "No hay operación original para devolver con ese número de pedido.",
+    "0116": "El importe a devolver supera el permitido.",
+    "0184": "La autenticación del titular ha fallado.",
+    "0190": "Denegación sin especificar motivo.",
+    "0909": "Error de sistema.",
+    "0912": "Emisor no disponible.",
+    "0913": "Pedido repetido.",
+    "0944": "Sesión incorrecta.",
+    "0950": "Operación de devolución no permitida.",
+    "9064": "Número de posiciones de la tarjeta incorrecto.",
+    "9078": "Tipo de operación no permitida para esa tarjeta.",
+    "9093": "Tarjeta no existente.",
+    "9094": "Rechazo servidores internacionales.",
+    "9104": "Comercio con «titular seguro» y titular sin clave de compra segura.",
+    "9126": "Operación duplicada.",
+    "9132": "La fecha de caducidad no puede superar la actual.",
+    "9142": "Tiempo excedido para el pago.",
+    "9407": "Importe inválido.",
+    "9412": "Pedido duplicado.",
+    "9413": "Pedido no encontrado.",
+  };
+  if (known[code]) return known[code];
+  if (code) return `Redsys rechazó la devolución (código ${code}).`;
+  return "Redsys rechazó la devolución.";
+}
+
+export type RedsysRefundResult =
+  | { ok: true; responseCode: string; authCode?: string }
+  | { ok: false; responseCode: string; message: string };
+
+export async function executeRedsysRefund(input: {
+  merchantOrder: string;
+  amountMinor: number;
+  credentials: RedsysCredentials;
+}): Promise<RedsysRefundResult> {
+  const amountMinor = Math.max(0, Math.round(input.amountMinor));
+  if (amountMinor < 1) {
+    return { ok: false, responseCode: "", message: "Importe de reembolso inválido" };
+  }
+
+  const merchantOrder = String(input.merchantOrder || "").trim();
+  if (!merchantOrder) {
+    return { ok: false, responseCode: "", message: "Falta el número de pedido Redsys" };
+  }
+
+  const { merchantCode, secretKey, currency } = input.credentials;
+  const terminal = padRedsysTerminal(input.credentials.terminal);
+
+  const merchantParams: RedsysMerchantParams = {
+    Ds_Merchant_Amount: formatAmount12(amountMinor),
+    Ds_Merchant_Order: merchantOrder,
+    Ds_Merchant_MerchantCode: merchantCode,
+    Ds_Merchant_Currency: currency,
+    Ds_Merchant_TransactionType: "3",
+    Ds_Merchant_Terminal: terminal,
+  };
+
+  const dsMerchantParameters = encodeMerchantParameters(merchantParams);
+  const dsSignature = createMerchantSignature(secretKey, merchantOrder, dsMerchantParameters);
+
+  const url = redsysTrataPeticionRestUrl(getRedsysEnv());
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        Ds_SignatureVersion: "HMAC_SHA256_V1",
+        Ds_MerchantParameters: dsMerchantParameters,
+        Ds_Signature: dsSignature,
+      }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("redsys_refund_fetch_error", msg);
+    return { ok: false, responseCode: "", message: "No se pudo conectar con Redsys" };
+  }
+
+  if (!res.ok) {
+    console.error("redsys_refund_http_error", res.status, await res.text());
+    return { ok: false, responseCode: "", message: `Redsys no respondió correctamente (${res.status})` };
+  }
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = (await res.json()) as Record<string, unknown>;
+  } catch {
+    return { ok: false, responseCode: "", message: "Respuesta Redsys no válida" };
+  }
+
+  const respParams = String(raw.Ds_MerchantParameters ?? raw.ds_merchantparameters ?? "");
+  const respSig = String(raw.Ds_Signature ?? raw.ds_signature ?? "");
+  if (!respParams || !respSig) {
+    return { ok: false, responseCode: "", message: "Respuesta Redsys incompleta" };
+  }
+
+  if (!isMerchantSignatureValid(respSig, secretKey, respParams)) {
+    console.warn("redsys_refund_bad_signature");
+    return { ok: false, responseCode: "", message: "Firma de respuesta Redsys no válida" };
+  }
+
+  const decoded = decodeMerchantParameters<Record<string, unknown>>(respParams);
+  const dsResponse = pickDecodedField(decoded, ["Ds_Response", "DS_RESPONSE"]);
+  if (isRedsysRefundAuthorized(dsResponse)) {
+    const authCode = pickDecodedField(decoded, [
+      "Ds_AuthorisationCode",
+      "DS_AUTHORISATIONCODE",
+      "Ds_AuthorizationCode",
+    ]);
+    return { ok: true, responseCode: dsResponse, authCode: authCode || undefined };
+  }
+
+  console.warn("redsys_refund_declined", { dsResponse, merchantOrder, amountMinor });
+  return { ok: false, responseCode: dsResponse, message: redsysRefundErrorMessage(dsResponse) };
+}
