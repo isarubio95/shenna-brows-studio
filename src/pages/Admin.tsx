@@ -13,9 +13,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
 import AdminEmailSender from "@/components/admin/AdminEmailSender";
+import AdminNewsletterSubscribers from "@/components/admin/AdminNewsletterSubscribers";
+import AdminCustomerEmails from "@/components/admin/AdminCustomerEmails";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
 import AdminReturnsManager from "@/components/admin/AdminReturnsManager";
+import AdminSectionNav, {
+  getAdminSectionDescription,
+  type AdminSection,
+} from "@/components/admin/AdminSectionNav";
 import {
   canDownloadOrderInvoice,
   getOrderInvoiceButtonLabel,
@@ -741,6 +747,7 @@ const Admin = () => {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [orderItemsCache, setOrderItemsCache] = useState<Record<string, unknown[]>>({});
   const [loadingOrderItemsId, setLoadingOrderItemsId] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<AdminSection>("pedidos");
 
   const productCatalogById = useMemo(() => {
     const map = new Map<string, ProductCatalogEntry>();
@@ -1343,10 +1350,12 @@ const Admin = () => {
       <div className="container mx-auto px-6 max-w-7xl">
         <AnimatedSection>
           <h1 className="font-playfair text-3xl font-bold text-carbon mb-2">Panel de Administración</h1>
-          <p className="text-carbon/50 text-sm mb-10">Gestiona pedidos, inventario y productos.</p>
+          <p className="text-carbon/50 text-sm mb-6">{getAdminSectionDescription(activeSection)}</p>
+          <AdminSectionNav active={activeSection} onChange={setActiveSection} />
         </AnimatedSection>
 
-        {/* Orders */}
+        {activeSection === "pedidos" && (
+          <>
         <AnimatedSection delay={0.05}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Pedidos Recientes</h2>
           <div className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden mb-12">
@@ -1632,8 +1641,11 @@ const Admin = () => {
         <AnimatedSection delay={0.07}>
           <AdminReturnsManager onReturnsChanged={() => void syncAndFetchOrders()} />
         </AnimatedSection>
+          </>
+        )}
 
-        <div className="mb-12" />
+        {activeSection === "catalogo" && (
+          <>
 
         <AnimatedSection delay={0.08}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-2">Gestión de stock</h2>
@@ -1643,10 +1655,7 @@ const Admin = () => {
           <AdminStockManager products={products} loading={loading} onStockUpdated={refreshProducts} />
         </AnimatedSection>
 
-        <div className="mb-12" />
-
-        {/* Products */}
-        <AnimatedSection delay={0.1}>
+        <AnimatedSection delay={0.1} className="mt-12">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
             <div>
               <h2 className="font-playfair text-xl font-semibold text-carbon">Productos</h2>
@@ -1706,6 +1715,8 @@ const Admin = () => {
             ))}
           </div>
         </AnimatedSection>
+          </>
+        )}
 
         <AlertDialog open={orderToReceive !== null} onOpenChange={(open) => !open && setOrderToReceive(null)}>
           <AlertDialogContent className="bg-cream border-gold/20">
@@ -1833,33 +1844,40 @@ const Admin = () => {
           onSaved={refreshProducts}
         />
 
-        <div className="mb-12" />
+        {activeSection === "correos" && (
+          <AnimatedSection delay={0.05}>
+            <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Correo a clientes</h2>
+            <p className="text-carbon/40 text-sm mb-4">
+              Envía emails individuales a clientes con pedido (incluidos invitados) y a usuarios registrados.
+            </p>
+            <AdminCustomerEmails />
+          </AnimatedSection>
+        )}
 
-        {/* Newsletter Sender */}
-        <AnimatedSection delay={0.13}>
-          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Newsletter</h2>
-          <p className="text-carbon/40 text-sm mb-4">Envía campañas solo a suscriptores con consentimiento activo.</p>
-          <AdminEmailSender />
-        </AnimatedSection>
+        {activeSection === "newsletter" && (
+          <AnimatedSection delay={0.05}>
+            <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Newsletter</h2>
+            <p className="text-carbon/40 text-sm mb-4">Envía campañas solo a suscriptores con consentimiento activo.</p>
+            <AdminEmailSender />
+            <AdminNewsletterSubscribers />
+          </AnimatedSection>
+        )}
 
-        <div className="mb-12" />
-        <AnimatedSection delay={0.12}>
+        {activeSection === "contenido" && (
+          <>
+        <AnimatedSection delay={0.05}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Contenido de la Web</h2>
           <p className="text-carbon/40 text-sm mb-4">Edita los textos del inicio y la página "Sobre mí".</p>
           <AdminContentEditor />
         </AnimatedSection>
 
-        <div className="mb-12" />
-        <AnimatedSection delay={0.14}>
+        <AnimatedSection delay={0.08} className="mt-12">
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Personalización del Tema</h2>
           <p className="text-carbon/40 text-sm mb-4">Cambia los colores de fondo de las secciones, del footer y de la tipografía.</p>
           <AdminThemeEditor />
         </AnimatedSection>
 
-        <div className="mb-12" />
-
-        {/* Testimonials Management */}
-        <AnimatedSection delay={0.15}>
+        <AnimatedSection delay={0.11} className="mt-12">
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Gestión de Testimonios</h2>
           <div className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
             {testimonials.length === 0 ? (
@@ -1900,6 +1918,8 @@ const Admin = () => {
             )}
           </div>
         </AnimatedSection>
+          </>
+        )}
       </div>
     </main>
   );

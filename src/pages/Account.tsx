@@ -16,7 +16,6 @@ import { Loader2, Eye, RotateCcw, Package, MessageSquareQuote, CheckCircle2, X, 
 import { useToast } from "@/hooks/use-toast";
 import {
   RETURN_REASON_LABELS,
-  RETURN_STATUS_LABELS,
   canRequestReturn,
   canCancelOrder,
   getOrderReturnDisplay,
@@ -49,6 +48,26 @@ type ReturnRequestRow = {
   created_at: string;
 };
 
+type OrderItemRow = {
+  id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+};
+
+type OrderWithItems = {
+  id: string;
+  created_at: string | null;
+  status: string;
+  refund_status: string;
+  returned: boolean;
+  total: number | null;
+  subtotal: number | null;
+  shipping: number | null;
+  shipping_address: unknown;
+  order_items: OrderItemRow[];
+};
+
 const Account = () => {
   const { user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -71,10 +90,10 @@ const Account = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("*")
+        .select("*, order_items(id, product_name, quantity, unit_price)")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return (data ?? []) as OrderWithItems[];
     },
     enabled: !!user,
   });
@@ -321,11 +340,8 @@ const Account = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Pedido</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Devolución</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -334,18 +350,11 @@ const Account = () => {
                     const cfg = statusConfig[order.status] || { label: order.status, variant: "outline" as const };
                     const returnReq = returnByOrderId.get(order.id);
                     const refundStatus = order.refund_status ?? "none";
-                    const returnDisplay = getOrderReturnDisplay(
-                      order,
-                      returnReq ? { status: returnReq.status } : null,
-                    );
                     const canReturn =
                       canRequestReturn(order.status, refundStatus, order.returned) && !returnReq;
                     const canCancel = canCancelOrder(order.status, refundStatus) && !returnReq;
                     return (
                       <TableRow key={order.id}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {order.id.slice(0, 8)}…
-                        </TableCell>
                         <TableCell className="text-sm">
                           {new Date(order.created_at!).toLocaleDateString("es-ES")}
                         </TableCell>
@@ -361,24 +370,6 @@ const Account = () => {
                           }>
                             {cfg.label}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {returnDisplay ? (
-                            <Badge variant="outline" className={`text-xs ${returnDisplay.badgeClass}`}>
-                              {returnDisplay.label}
-                            </Badge>
-                          ) : canCancel ? (
-                            <span className="text-xs text-muted-foreground">Cancelación disponible</span>
-                          ) : canReturn ? (
-                            <span className="text-xs text-muted-foreground">Devolución disponible</span>
-                          ) : order.status === "cancelled" ? (
-                            <span className="text-xs text-muted-foreground">Cancelado</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          €{(order.total ?? 0).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
