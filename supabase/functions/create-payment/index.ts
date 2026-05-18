@@ -126,6 +126,7 @@ serve(async (req) => {
     const currency = Deno.env.get("REDSYS_CURRENCY")?.trim() || "978";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
 
     if (!merchantCode || !secretKey || !supabaseUrl || !serviceKey) {
       console.error("create_payment_misconfigured");
@@ -183,6 +184,19 @@ serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, serviceKey);
+
+    let checkoutUserId: string | null = null;
+    if (authHeader?.startsWith("Bearer ") && anonKey) {
+      const authClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+      if (!claimsError && claimsData?.claims?.sub) {
+        checkoutUserId = String(claimsData.claims.sub);
+      }
+    }
+
     const productIds = [...new Set(items.map((i) => String(i.productId)))];
     const { data: products, error: productsError } = await admin
       .from("products")
@@ -345,6 +359,7 @@ serve(async (req) => {
       stripe_session_id: merchantOrder,
       shipping_address: normalizedShipping,
       pending_cart_snapshot: pendingCartSnapshot,
+      ...(checkoutUserId ? { user_id: checkoutUserId } : {}),
     });
     if (pendingOrderErr) {
       console.warn("create_payment_pending_order_insert", pendingOrderErr);

@@ -98,6 +98,21 @@ type PendingOrderRow = {
   pending_cart_snapshot?: unknown;
 };
 
+async function resolveUserIdForEmail(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+): Promise<string | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  const { data, error } = await admin
+    .from("profiles")
+    .select("user_id")
+    .eq("email", normalized)
+    .maybeSingle();
+  if (error || !data?.user_id) return null;
+  return String(data.user_id);
+}
+
 function payloadFromPendingRow(row: PendingOrderRow): MerchantPayload | null {
   const snap = row.pending_cart_snapshot as {
     lines?: Array<{ productId?: unknown; quantity?: unknown; productDisplayName?: unknown; product_display_name?: unknown }>;
@@ -378,6 +393,7 @@ serve(async (req) => {
       const status = String(existing.status ?? "");
       if (status === "pending_payment") {
         const keepAddress = resolvedShipping ?? shippingFromRow(existing.shipping_address);
+        const linkedUserId = await resolveUserIdForEmail(admin, payload.email);
         const { data: updated, error: upErr } = await admin
           .from("orders")
           .update({
@@ -388,6 +404,7 @@ serve(async (req) => {
             total,
             shipping_address: keepAddress ?? existing.shipping_address,
             pending_cart_snapshot: null,
+            ...(linkedUserId ? { user_id: linkedUserId } : {}),
             ...(dsAuthCode ? { redsys_auth_code: dsAuthCode } : {}),
           })
           .eq("id", existing.id)
@@ -433,6 +450,7 @@ serve(async (req) => {
     }
 
     const shipping_address = resolvedShipping;
+    const linkedUserId = await resolveUserIdForEmail(admin, payload.email);
 
     const { data: orderRow, error: orderErr } = await admin
       .from("orders")
@@ -444,6 +462,7 @@ serve(async (req) => {
         total,
         stripe_session_id: dsOrder,
         shipping_address,
+        ...(linkedUserId ? { user_id: linkedUserId } : {}),
         ...(dsAuthCode ? { redsys_auth_code: dsAuthCode } : {}),
       })
       .select("id, correos_shipment_code")
