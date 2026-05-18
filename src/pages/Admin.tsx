@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,14 +8,30 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronDown, ChevronRight, FileDown, Loader2, Package, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, FileDown, Loader2, Package, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
 import AdminEmailSender from "@/components/admin/AdminEmailSender";
+import AdminNewsletterSubscribers from "@/components/admin/AdminNewsletterSubscribers";
+import AdminCustomerEmails from "@/components/admin/AdminCustomerEmails";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
 import AdminReturnsManager from "@/components/admin/AdminReturnsManager";
+import AdminSectionNav, {
+  getAdminSectionDescription,
+  type AdminSection,
+} from "@/components/admin/AdminSectionNav";
+import {
+  canDownloadOrderInvoice,
+  getOrderInvoiceButtonLabel,
+} from "@/lib/invoices";
+import {
+  getOrderReturnDisplay,
+  pickLatestReturnRequest,
+  returnStatusBlocksFulfillment,
+  type ReturnRequestStatus,
+} from "@/lib/returns";
 import { getProductImageUrl } from "@/lib/product-images";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import {
@@ -33,6 +49,7 @@ const statusColors: Record<string, string> = {
   pending_payment: "bg-amber-100 text-amber-800",
   paid: "bg-green-100 text-green-700",
   shipped: "bg-blue-100 text-blue-700",
+  delivered: "bg-emerald-100 text-emerald-800",
   cancelled: "bg-gray-100 text-gray-600",
 };
 
@@ -46,6 +63,11 @@ const statusLabels: Record<string, string> = {
 };
 
 const PAID_ORDER_STATUSES = new Set(["paid", "shipped", "delivered"]);
+const PENDING_ORDER_STATUSES = new Set(["pending", "pending_payment"]);
+
+function canPrintShippingLabel(orderStatus: string): boolean {
+  return !PENDING_ORDER_STATUSES.has(orderStatus) && orderStatus !== "cancelled";
+}
 
 const PRODUCT_VARIANT_SEPS = [" — ", " – ", " - "] as const;
 
@@ -715,14 +737,17 @@ const Admin = () => {
   const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<{ id: string; email: string } | null>(null);
   const [orderToShip, setOrderToShip] = useState<{ id: string; email: string } | null>(null);
+  const [orderToReceive, setOrderToReceive] = useState<{ id: string; email: string } | null>(null);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [orderDeleteInProgress, setOrderDeleteInProgress] = useState(false);
   const [shippingOrderInProgress, setShippingOrderInProgress] = useState(false);
+  const [receivingOrderInProgress, setReceivingOrderInProgress] = useState(false);
   const [printingLabelOrderId, setPrintingLabelOrderId] = useState<string | null>(null);
   const [downloadingTicketOrderId, setDownloadingTicketOrderId] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [orderItemsCache, setOrderItemsCache] = useState<Record<string, unknown[]>>({});
   const [loadingOrderItemsId, setLoadingOrderItemsId] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<AdminSection>("pedidos");
 
   const productCatalogById = useMemo(() => {
     const map = new Map<string, ProductCatalogEntry>();
@@ -743,6 +768,35 @@ const Admin = () => {
     }
     return map;
   }, [productCatalogById]);
+
+  const fetchOrders = useCallback(async () => {
+    const { data, error } = await (supabase as any)
+      .from("orders")
+      .select("*, return_requests(id, status, created_at, refunded_amount)")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) {
+      toast({
+        title: "Error al cargar pedidos",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    setOrders(data || []);
+  }, [toast]);
+
+  const syncDeliveredOrders = useCallback(async () => {
+    const { error } = await supabase.functions.invoke("sync-delivered-orders", { body: {} });
+    if (error) {
+      console.warn("sync-delivered-orders", error);
+    }
+  }, []);
+
+  const syncAndFetchOrders = useCallback(async () => {
+    await syncDeliveredOrders();
+    await fetchOrders();
+  }, [fetchOrders, syncDeliveredOrders]);
 
   const toggleOrderDetails = async (orderId: string) => {
     if (expandedOrderId === orderId) {
@@ -789,12 +843,11 @@ const Admin = () => {
   useEffect(() => {
     if (!isAdmin) return;
     const fetchData = async () => {
-      const [ordersRes, productsRes, testimonialsRes] = await Promise.all([
-        (supabase as any).from("orders").select("*").order("created_at", { ascending: false }).limit(20),
+      const [, productsRes, testimonialsRes] = await Promise.all([
+        syncAndFetchOrders(),
         (supabase as any).from("products").select("*").order("name"),
         (supabase as any).from("testimonials").select("*").order("created_at", { ascending: false }),
       ]);
-      setOrders(ordersRes.data || []);
       setProducts(productsRes.data || []);
       // Enrich testimonials with profile names
       const rawTestimonials = testimonialsRes.data || [];
@@ -809,7 +862,7 @@ const Admin = () => {
       setLoading(false);
     };
     fetchData();
-  }, [isAdmin]);
+  }, [isAdmin, syncAndFetchOrders]);
 
   if (authLoading) return <main className="min-h-screen bg-cream pt-32 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-gold" /></main>;
   if (!user || !isAdmin) return <Navigate to="/login" replace />;
@@ -905,7 +958,7 @@ const Admin = () => {
       });
     } else {
       toast({
-        title: "Pedido enviado",
+        title: "Enviado",
         description: "El cliente recibirá un correo de confirmación de envío.",
       });
       setOrders((prev) =>
@@ -917,6 +970,44 @@ const Admin = () => {
       setOrderToShip(null);
     }
     setShippingOrderInProgress(false);
+  };
+
+  const confirmMarkOrderReceived = async () => {
+    if (!orderToReceive) return;
+    setReceivingOrderInProgress(true);
+    const id = orderToReceive.id;
+    const { data, error } = await supabase.functions.invoke("mark-order-delivered", {
+      body: { orderId: id },
+    });
+    if (error || data?.error) {
+      toast({
+        title: "No se pudo marcar como entregado",
+        description: data?.error || error?.message || "Error desconocido",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Entregado",
+        description: data?.emailSent
+          ? "El cliente verá el estado «Entregado» y recibirá el correo de valoración e Instagram."
+          : "El pedido quedó como entregado, pero no se pudo enviar el correo al cliente.",
+      });
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === id
+            ? {
+                ...o,
+                status: "delivered",
+                delivered_at: data.deliveredAt ?? new Date().toISOString(),
+                ...(o.shipped_at ? {} : { shipped_at: data.deliveredAt ?? new Date().toISOString() }),
+              }
+            : o,
+        ),
+      );
+      queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+      setOrderToReceive(null);
+    }
+    setReceivingOrderInProgress(false);
   };
 
   const toggleFeatured = async (id: string, current: boolean) => {
@@ -977,23 +1068,31 @@ const Admin = () => {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
-  const handleDownloadTicket = async (order: { id: string }) => {
+  const handleDownloadTicket = async (order: { id: string; status?: string; refund_status?: string | null; returned?: boolean | null; return_requests?: { status: ReturnRequestStatus; created_at: string; refunded_amount?: number | null }[] | null }) => {
+    const isCreditNote = getOrderInvoiceButtonLabel(order) === "Factura devolución";
     setDownloadingTicketOrderId(order.id);
     try {
       const { data, error } = await supabase.functions.invoke("generate-order-ticket", {
         body: { orderId: order.id },
       });
       if (error) throw error;
-      const payload = data as { pdfBase64?: string; filename?: string; error?: string } | null;
+      const payload = data as {
+        pdfBase64?: string;
+        filename?: string;
+        documentType?: string;
+        error?: string;
+      } | null;
       if (payload?.error) throw new Error(payload.error);
       const pdfBase64 = payload?.pdfBase64;
       if (!pdfBase64) throw new Error("No se recibió el PDF");
       const filename = payload.filename?.trim() || `ticket-${order.id.slice(0, 8)}.pdf`;
       downloadBase64Pdf(pdfBase64, filename);
-      toast({ title: "Factura descargada" });
+      toast({
+        title: isCreditNote ? "Factura de devolución descargada" : "Factura descargada",
+      });
     } catch (e) {
       toast({
-        title: "No se pudo descargar la factura",
+        title: isCreditNote ? "No se pudo descargar la factura de devolución" : "No se pudo descargar la factura",
         description: e instanceof Error ? e.message : "Error desconocido",
         variant: "destructive",
       });
@@ -1056,6 +1155,28 @@ const Admin = () => {
   };
 
   const handlePrintLabel = async (order: any) => {
+    const orderStatus = String(order?.status || "");
+    if (!canPrintShippingLabel(orderStatus)) {
+      toast({
+        title: "No se puede imprimir la etiqueta",
+        description: PENDING_ORDER_STATUSES.has(orderStatus)
+          ? "El pedido aún no está pagado."
+          : "Este pedido está cancelado.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const latestReturn = pickLatestReturnRequest(
+      order?.return_requests as { status: ReturnRequestStatus; created_at: string }[] | undefined,
+    );
+    if (returnStatusBlocksFulfillment(latestReturn?.status)) {
+      toast({
+        title: "No se puede imprimir la etiqueta",
+        description: "Hay una devolución con el producto ya recibido; tramita el reembolso antes.",
+        variant: "destructive",
+      });
+      return;
+    }
     setPrintingLabelOrderId(order.id);
     // Abrimos una pestaña en el gesto de usuario para evitar bloqueos por popup
     // cuando la respuesta de Correos llega tras varias llamadas asíncronas.
@@ -1226,13 +1347,15 @@ const Admin = () => {
 
   return (
     <main className="min-h-screen bg-cream pt-28 pb-16">
-      <div className="container mx-auto px-6 max-w-5xl">
+      <div className="container mx-auto px-6 max-w-7xl">
         <AnimatedSection>
           <h1 className="font-playfair text-3xl font-bold text-carbon mb-2">Panel de Administración</h1>
-          <p className="text-carbon/50 text-sm mb-10">Gestiona pedidos, inventario y productos.</p>
+          <p className="text-carbon/50 text-sm mb-6">{getAdminSectionDescription(activeSection)}</p>
+          <AdminSectionNav active={activeSection} onChange={setActiveSection} />
         </AnimatedSection>
 
-        {/* Orders */}
+        {activeSection === "pedidos" && (
+          <>
         <AnimatedSection delay={0.05}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Pedidos Recientes</h2>
           <div className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden mb-12">
@@ -1248,6 +1371,7 @@ const Admin = () => {
                     <TableHead className="text-carbon/60">Email</TableHead>
                     <TableHead className="text-carbon/60">Total</TableHead>
                     <TableHead className="text-carbon/60">Estado</TableHead>
+                    <TableHead className="text-carbon/60">Devolución</TableHead>
                     <TableHead className="text-carbon/60">Fecha</TableHead>
                     <TableHead className="text-carbon/60 text-right">Acciones</TableHead>
                   </TableRow>
@@ -1264,6 +1388,15 @@ const Admin = () => {
                     );
                     const addressLines = formatShippingAddressLines(o.shipping_address);
                     const hasCorreosCode = Boolean(o.correos_shipment_code?.trim());
+                    const latestReturn = pickLatestReturnRequest(
+                      o.return_requests as { status: ReturnRequestStatus; created_at: string }[] | undefined,
+                    );
+                    const returnDisplay = getOrderReturnDisplay(
+                      o,
+                      latestReturn ? { status: latestReturn.status } : null,
+                    );
+                    const fulfillmentBlocked = returnStatusBlocksFulfillment(latestReturn?.status);
+                    const isOrderReturned = o.returned === true;
 
                     return (
                       <Fragment key={o.id}>
@@ -1289,6 +1422,15 @@ const Admin = () => {
                           {statusLabels[o.status] || o.status}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        {returnDisplay ? (
+                          <Badge variant="outline" className={returnDisplay.badgeClass}>
+                            {returnDisplay.label}
+                          </Badge>
+                        ) : (
+                          <span className="text-carbon/30 text-sm">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-carbon/60 text-sm">
                         {new Date(o.created_at).toLocaleDateString("es-ES", {
                           day: "2-digit",
@@ -1298,7 +1440,7 @@ const Admin = () => {
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex items-center justify-end gap-2">
-                          {o.status === "paid" && (
+                          {o.status === "paid" && !fulfillmentBlocked && !isOrderReturned && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -1307,44 +1449,62 @@ const Admin = () => {
                               aria-label={`Marcar pedido de ${o.email} como enviado`}
                             >
                               <Truck className="h-4 w-4 mr-1.5" />
-                              Pedido enviado
+                              Enviado
                             </Button>
                           )}
-                          {PAID_ORDER_STATUSES.has(o.status) && (
+                          {(o.status === "paid" || o.status === "shipped") && !fulfillmentBlocked && !isOrderReturned && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setOrderToReceive({ id: o.id, email: o.email })}
+                              className="border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                              aria-label={`Marcar pedido de ${o.email} como entregado`}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                              Entregado
+                            </Button>
+                          )}
+                          {canDownloadOrderInvoice(o) && (
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleDownloadTicket(o)}
                               disabled={downloadingTicketOrderId === o.id}
-                              className="border-gold/20 text-gold hover:bg-gold/5"
-                              aria-label={`Descargar factura de ${o.email}`}
+                              className={
+                                getOrderInvoiceButtonLabel(o) === "Factura devolución"
+                                  ? "border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                                  : "border-gold/20 text-gold hover:bg-gold/5"
+                              }
+                              aria-label={`Descargar ${getOrderInvoiceButtonLabel(o).toLowerCase()} de ${o.email}`}
                             >
                               {downloadingTicketOrderId === o.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <>
                                   <FileDown className="h-4 w-4 mr-1.5" />
-                                  Factura
+                                  {getOrderInvoiceButtonLabel(o)}
                                 </>
                               )}
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handlePrintLabel(o)}
-                            disabled={printingLabelOrderId === o.id}
-                            className="border-gold/20 text-gold hover:bg-gold/5"
-                          >
-                            {printingLabelOrderId === o.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Printer className="h-4 w-4 mr-1.5" />
-                                Imprimir
-                              </>
-                            )}
-                          </Button>
+                          {canPrintShippingLabel(o.status) && !fulfillmentBlocked && !isOrderReturned ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handlePrintLabel(o)}
+                              disabled={printingLabelOrderId === o.id}
+                              className="border-gold/20 text-gold hover:bg-gold/5"
+                            >
+                              {printingLabelOrderId === o.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Printer className="h-4 w-4 mr-1.5" />
+                                  Imprimir
+                                </>
+                              )}
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="outline"
@@ -1359,7 +1519,7 @@ const Admin = () => {
                     </TableRow>
                         {isExpanded && (
                           <TableRow className="border-b border-gold/10 bg-cream/40">
-                            <TableCell colSpan={6} className="p-0">
+                            <TableCell colSpan={7} className="p-0">
                               <div className="px-5 py-5 space-y-5">
                                 <div className="grid gap-5 sm:grid-cols-2">
                                   <div>
@@ -1479,10 +1639,13 @@ const Admin = () => {
         </AnimatedSection>
 
         <AnimatedSection delay={0.07}>
-          <AdminReturnsManager />
+          <AdminReturnsManager onReturnsChanged={() => void syncAndFetchOrders()} />
         </AnimatedSection>
+          </>
+        )}
 
-        <div className="mb-12" />
+        {activeSection === "catalogo" && (
+          <>
 
         <AnimatedSection delay={0.08}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-2">Gestión de stock</h2>
@@ -1492,10 +1655,7 @@ const Admin = () => {
           <AdminStockManager products={products} loading={loading} onStockUpdated={refreshProducts} />
         </AnimatedSection>
 
-        <div className="mb-12" />
-
-        {/* Products */}
-        <AnimatedSection delay={0.1}>
+        <AnimatedSection delay={0.1} className="mt-12">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
             <div>
               <h2 className="font-playfair text-xl font-semibold text-carbon">Productos</h2>
@@ -1555,6 +1715,38 @@ const Admin = () => {
             ))}
           </div>
         </AnimatedSection>
+          </>
+        )}
+
+        <AlertDialog open={orderToReceive !== null} onOpenChange={(open) => !open && setOrderToReceive(null)}>
+          <AlertDialogContent className="bg-cream border-gold/20">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-playfair text-carbon">¿Confirmar entrega del pedido?</AlertDialogTitle>
+              <AlertDialogDescription className="text-carbon/60 space-y-2">
+                <span>
+                  Se marcará como <strong>entregado</strong> el pedido de{" "}
+                  <span className="font-medium text-carbon">{orderToReceive?.email}</span>{" "}
+                  (<span className="font-mono text-xs">{orderToReceive?.id.slice(0, 8)}</span>).
+                </span>
+                <span className="block">
+                  El cliente verá el estado en Mi cuenta y, si aún no se envió, recibirá el correo invitándole a dejar
+                  una valoración y a seguirnos en Instagram.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-gold/20">Cancelar</AlertDialogCancel>
+              <Button
+                onClick={() => void confirmMarkOrderReceived()}
+                disabled={receivingOrderInProgress}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {receivingOrderInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Confirmar entrega
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={orderToShip !== null} onOpenChange={(open) => !open && setOrderToShip(null)}>
           <AlertDialogContent className="bg-cream border-gold/20">
@@ -1652,33 +1844,40 @@ const Admin = () => {
           onSaved={refreshProducts}
         />
 
-        <div className="mb-12" />
+        {activeSection === "correos" && (
+          <AnimatedSection delay={0.05}>
+            <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Correo a clientes</h2>
+            <p className="text-carbon/40 text-sm mb-4">
+              Envía emails individuales a clientes con pedido (incluidos invitados) y a usuarios registrados.
+            </p>
+            <AdminCustomerEmails />
+          </AnimatedSection>
+        )}
 
-        {/* Newsletter Sender */}
-        <AnimatedSection delay={0.13}>
-          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Newsletter</h2>
-          <p className="text-carbon/40 text-sm mb-4">Envía campañas solo a suscriptores con consentimiento activo.</p>
-          <AdminEmailSender />
-        </AnimatedSection>
+        {activeSection === "newsletter" && (
+          <AnimatedSection delay={0.05}>
+            <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Newsletter</h2>
+            <p className="text-carbon/40 text-sm mb-4">Envía campañas solo a suscriptores con consentimiento activo.</p>
+            <AdminEmailSender />
+            <AdminNewsletterSubscribers />
+          </AnimatedSection>
+        )}
 
-        <div className="mb-12" />
-        <AnimatedSection delay={0.12}>
+        {activeSection === "contenido" && (
+          <>
+        <AnimatedSection delay={0.05}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Contenido de la Web</h2>
           <p className="text-carbon/40 text-sm mb-4">Edita los textos del inicio y la página "Sobre mí".</p>
           <AdminContentEditor />
         </AnimatedSection>
 
-        <div className="mb-12" />
-        <AnimatedSection delay={0.14}>
+        <AnimatedSection delay={0.08} className="mt-12">
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Personalización del Tema</h2>
           <p className="text-carbon/40 text-sm mb-4">Cambia los colores de fondo de las secciones, del footer y de la tipografía.</p>
           <AdminThemeEditor />
         </AnimatedSection>
 
-        <div className="mb-12" />
-
-        {/* Testimonials Management */}
-        <AnimatedSection delay={0.15}>
+        <AnimatedSection delay={0.11} className="mt-12">
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Gestión de Testimonios</h2>
           <div className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
             {testimonials.length === 0 ? (
@@ -1719,6 +1918,8 @@ const Admin = () => {
             )}
           </div>
         </AnimatedSection>
+          </>
+        )}
       </div>
     </main>
   );

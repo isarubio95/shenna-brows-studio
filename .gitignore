@@ -16,6 +16,7 @@ pruebas*
 PRUEBAS*
 *.postman_collection*.json
 CLAVES.md
+CUENTAS.md
 postman_correos.json
 
 # Editor directories and files

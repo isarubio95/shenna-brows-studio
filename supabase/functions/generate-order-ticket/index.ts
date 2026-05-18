@@ -1,7 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
-import { generatePurchaseTicketPdfBase64 } from "../_shared/purchaseTicket.ts";
+import { resolveRefundInvoiceContext } from "../_shared/invoiceHelpers.ts";
+import {
+  generatePurchaseTicketPdfBase64,
+  generateRectificativeInvoicePdfBase64,
+} from "../_shared/purchaseTicket.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +13,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const PAID_STATUSES = new Set(["paid", "shipped", "delivered"]);
+const PAID_STATUSES = new Set(["paid", "shipped", "delivered", "cancelled"]);
 
 function shippingAddressName(addr: unknown): Record<string, string> | null {
   if (!addr || typeof addr !== "object") return null;
@@ -113,7 +117,9 @@ serve(async (req) => {
 
   const { data: order, error: orderErr } = await admin
     .from("orders")
-    .select("id, email, status, subtotal, shipping, total, stripe_session_id, shipping_address, created_at")
+    .select(
+      "id, email, status, subtotal, shipping, total, stripe_session_id, shipping_address, created_at, refund_status, returned",
+    )
     .eq("id", orderId)
     .maybeSingle();
 
@@ -126,7 +132,7 @@ serve(async (req) => {
 
   const status = String(order.status ?? "");
   if (!PAID_STATUSES.has(status)) {
-    return new Response(JSON.stringify({ error: "El pedido no está pagado" }), {
+    return new Response(JSON.stringify({ error: "El pedido no admite factura" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -169,9 +175,70 @@ serve(async (req) => {
   const subtotal = Number(order.subtotal) || 0;
   const shipping = Number(order.shipping) || 0;
   const total = Number(order.total) || subtotal + shipping;
-  const issuedAt = order.created_at ? new Date(String(order.created_at)) : new Date();
+  const originalIssuedAt = order.created_at ? new Date(String(order.created_at)) : new Date();
+  const refundStatus = String(order.refund_status ?? "none");
+  const returned = Boolean(order.returned);
+
+  const { data: refundedReturns } = await admin
+    .from("return_requests")
+    .select("refunded_amount")
+    .eq("order_id", orderId)
+    .eq("status", "refunded");
+
+  const refundedReturnAmounts = (refundedReturns ?? []).map((row) =>
+    Number((row as { refunded_amount?: number }).refunded_amount ?? 0)
+  );
+
+  const refundContext = resolveRefundInvoiceContext({
+    orderStatus: status,
+    orderSubtotal: subtotal,
+    orderShipping: shipping,
+    orderTotal: total,
+    refundStatus,
+    returned,
+    lines,
+    refundedReturnAmounts,
+  });
+
+  const isCreditNote = refundContext !== null;
+  const isPaidLike = new Set(["paid", "shipped", "delivered"]).has(status);
+
+  if (!isCreditNote && !isPaidLike) {
+    return new Response(
+      JSON.stringify({ error: "Solo hay factura de devolución cuando el reembolso está tramitado" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
 
   try {
+    if (isCreditNote && refundContext) {
+      const rectificativeIssuedAt = new Date();
+      const pdfBase64 = await generateRectificativeInvoicePdfBase64({
+        orderRef,
+        email,
+        originalIssuedAt,
+        issuedAt: rectificativeIssuedAt,
+        reason: refundContext.reason,
+        subtotal: refundContext.refundSubtotal,
+        shipping: refundContext.refundShipping,
+        total: refundContext.refundGrossTotal,
+        lines: refundContext.lines,
+        shippingAddress: shippingAddressName(order.shipping_address),
+      });
+
+      return new Response(
+        JSON.stringify({
+          pdfBase64,
+          filename: `factura-rectificativa-${orderRef}.pdf`,
+          documentType: "credit_note",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const pdfBase64 = await generatePurchaseTicketPdfBase64({
       orderRef,
       email,
@@ -180,13 +247,14 @@ serve(async (req) => {
       total,
       lines,
       shippingAddress: shippingAddressName(order.shipping_address),
-      issuedAt,
+      issuedAt: originalIssuedAt,
     });
 
     return new Response(
       JSON.stringify({
         pdfBase64,
-        filename: `ticket-${orderRef}.pdf`,
+        filename: `factura-${orderRef}.pdf`,
+        documentType: "invoice",
       }),
       {
         status: 200,
@@ -195,7 +263,7 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error("generate_order_ticket_error", e instanceof Error ? e.message : e);
-    return new Response(JSON.stringify({ error: "No se pudo generar el ticket" }), {
+    return new Response(JSON.stringify({ error: "No se pudo generar el documento" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

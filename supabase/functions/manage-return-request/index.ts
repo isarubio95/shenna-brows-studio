@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { buildReturnCustomerStatusHtml } from "../_shared/returnEmails.ts";
+import { executeRedsysRefund, getRedsysCredentialsFromEnv } from "../_shared/redsys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,20 +10,27 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-type ManageAction = "approve" | "reject" | "product_received" | "refund" | "cancel";
+type ManageAction =
+  | "approve"
+  | "reject"
+  | "product_received"
+  | "refund"
+  | "refund_manual"
+  | "cancel";
 
 const ACTION_TO_STATUS: Record<ManageAction, string> = {
   approve: "approved",
   reject: "rejected",
   product_received: "product_received",
   refund: "refunded",
+  refund_manual: "refunded",
   cancel: "cancelled",
 };
 
 const VALID_TRANSITIONS: Record<string, ManageAction[]> = {
   requested: ["approve", "reject", "cancel"],
-  approved: ["product_received", "reject", "cancel"],
-  product_received: ["refund", "reject"],
+  approved: ["product_received", "reject", "cancel", "refund_manual"],
+  product_received: ["refund", "refund_manual", "reject"],
 };
 
 const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim();
@@ -138,7 +146,7 @@ serve(async (req) => {
   const adminNote = String(body.adminNote || "").trim().slice(0, 2000) || null;
 
   if (!returnRequestId || !action || !ACTION_TO_STATUS[action]) {
-    return new Response(JSON.stringify({ error: "Parámetros inválidos" }), {
+    return new Response(JSON.stringify({ error: "Parametros invalidos" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -178,19 +186,95 @@ serve(async (req) => {
     admin_note: adminNote ?? undefined,
   };
 
-  if (action === "refund") {
+  let refundedAmountForOrder = 0;
+
+  if (action === "refund" || action === "refund_manual") {
     const refundedAmount =
       body.refundedAmount != null && Number.isFinite(Number(body.refundedAmount))
         ? Number(body.refundedAmount)
         : orderTotal;
     if (refundedAmount <= 0) {
-      return new Response(JSON.stringify({ error: "Importe de reembolso inválido" }), {
+      return new Response(JSON.stringify({ error: "Importe de reembolso invalido" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const { data: priorRefunds } = await admin
+      .from("return_requests")
+      .select("refunded_amount")
+      .eq("order_id", row.order_id)
+      .eq("status", "refunded");
+
+    const alreadyRefunded = (priorRefunds ?? []).reduce(
+      (sum, r) => sum + Number((r as { refunded_amount?: number }).refunded_amount ?? 0),
+      0,
+    );
+    if (alreadyRefunded + refundedAmount > orderTotal + 0.01) {
+      return new Response(
+        JSON.stringify({
+          error: `El importe supera lo reembolsable (max. ${Math.max(0, orderTotal - alreadyRefunded).toFixed(2)} EUR)`,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (action === "refund_manual") {
+      console.log("return_refund_manual", {
+        returnRequestId,
+        orderId: row.order_id,
+        amountEur: refundedAmount,
+      });
+      if (!adminNote) {
+        updatePayload.admin_note = "Reembolso registrado manualmente desde el TPV.";
+      }
+    }
+
+    if (action === "refund") {
+      const redsysOrder = String(orderRel?.stripe_session_id || "").trim();
+      if (!redsysOrder) {
+        return new Response(
+          JSON.stringify({ error: "Este pedido no tiene referencia Redsys; no se puede reembolsar automaticamente" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const credentials = getRedsysCredentialsFromEnv();
+      if (!credentials) {
+        return new Response(JSON.stringify({ error: "TPV Redsys no configurado en el servidor" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const amountMinor = Math.round(refundedAmount * 100);
+      const redsysResult = await executeRedsysRefund({
+        merchantOrder: redsysOrder,
+        amountMinor,
+        credentials,
+      });
+
+      if (!redsysResult.ok) {
+        return new Response(JSON.stringify({ error: redsysResult.message }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (redsysResult.authCode) {
+        console.log("redsys_refund_ok", {
+          returnRequestId,
+          orderId: row.order_id,
+          redsysOrder,
+          authCode: redsysResult.authCode,
+          amountEur: refundedAmount,
+        });
+      }
+    }
+
     updatePayload.refunded_amount = refundedAmount;
     updatePayload.refunded_at = new Date().toISOString();
+    refundedAmountForOrder = refundedAmount;
   }
 
   const { error: upErr } = await admin
@@ -206,12 +290,15 @@ serve(async (req) => {
     });
   }
 
-  if (action === "refund") {
-    const refundedAmount = Number(updatePayload.refunded_amount);
+  if (action === "refund" || action === "refund_manual") {
+    const refundedAmount = refundedAmountForOrder;
     const refundStatus = refundedAmount >= orderTotal - 0.01 ? "full" : "partial";
     await admin
       .from("orders")
-      .update({ refund_status: refundStatus })
+      .update({
+        refund_status: refundStatus,
+        returned: refundStatus === "full",
+      })
       .eq("id", row.order_id);
   }
 
@@ -219,16 +306,16 @@ serve(async (req) => {
     const html = buildReturnCustomerStatusHtml({
       status: newStatus,
       orderIdShort: String(row.order_id).slice(0, 8),
-      adminNote,
+      adminNote: (updatePayload.admin_note as string | undefined) ?? adminNote,
     });
     const subjects: Record<string, string> = {
-      approved: "Tu devolución ha sido aprobada",
-      rejected: "Actualización sobre tu solicitud de devolución",
-      product_received: "Hemos recibido tu devolución",
+      approved: "Tu devolucion ha sido aprobada",
+      rejected: "Actualizacion sobre tu solicitud de devolucion",
+      product_received: "Hemos recibido tu devolucion",
       refunded: "Reembolso tramitado",
-      cancelled: "Solicitud de devolución cancelada",
+      cancelled: "Solicitud de devolucion cancelada",
     };
-    await sendResendEmail(orderEmail, subjects[newStatus] ?? "Actualización de devolución", html);
+    await sendResendEmail(orderEmail, subjects[newStatus] ?? "Actualizacion de devolucion", html);
   }
 
   return new Response(JSON.stringify({ ok: true, status: newStatus }), {

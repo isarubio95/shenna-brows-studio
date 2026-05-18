@@ -7,13 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, ExternalLink, Loader2 } from "lucide-react";
-import {
-  RETURN_REASON_LABELS,
-  RETURN_STATUS_LABELS,
-  getRedsysCanalesUrl,
-  type ReturnRequestStatus,
-} from "@/lib/returns";
+import { Copy, Loader2 } from "lucide-react";
+import { RETURN_REASON_LABELS, RETURN_STATUS_LABELS, type ReturnRequestStatus } from "@/lib/returns";
 
 type ReturnRow = {
   id: string;
@@ -47,7 +42,11 @@ const statusBadgeClass: Record<string, string> = {
   cancelled: "bg-gray-100 text-gray-600",
 };
 
-const AdminReturnsManager = () => {
+type AdminReturnsManagerProps = {
+  onReturnsChanged?: () => void;
+};
+
+const AdminReturnsManager = ({ onReturnsChanged }: AdminReturnsManagerProps) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<ReturnRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,9 +85,18 @@ const AdminReturnsManager = () => {
     });
   }, [rows, filter]);
 
+  const submitRefundAmount = (returnRequestId: string, defaultRefund: string) => {
+    const amt = Number(refundAmounts[returnRequestId] ?? defaultRefund);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast({ title: "Importe inválido", variant: "destructive" });
+      return null;
+    }
+    return amt;
+  };
+
   const runAction = async (
     returnRequestId: string,
-    action: "approve" | "reject" | "product_received" | "refund",
+    action: "approve" | "reject" | "product_received" | "refund" | "refund_manual",
     extra?: { refundedAmount?: number },
   ) => {
     setBusyId(returnRequestId);
@@ -109,6 +117,7 @@ const AdminReturnsManager = () => {
     } else {
       toast({ title: "Solicitud actualizada", description: RETURN_STATUS_LABELS[data.status as ReturnRequestStatus] });
       await load();
+      onReturnsChanged?.();
     }
     setBusyId(null);
   };
@@ -122,19 +131,14 @@ const AdminReturnsManager = () => {
     }
   };
 
-  const canalesUrl = getRedsysCanalesUrl();
-
   return (
     <div className="mb-12">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
         <div>
           <h2 className="font-playfair text-xl font-semibold text-carbon">Devoluciones</h2>
           <p className="text-carbon/40 text-sm mt-1">
-            Gestiona solicitudes de clientes. El reembolso bancario se hace en{" "}
-            <a href={canalesUrl} target="_blank" rel="noopener noreferrer" className="text-gold underline">
-              Redsys Canales
-            </a>{" "}
-            (irreversible).
+            «Reembolsar en Redsys» devuelve el importe por API. «Reembolso en TPV» registra una devolución ya hecha
+            manualmente en Redsys Canales.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -228,18 +232,6 @@ const AdminReturnsManager = () => {
                               >
                                 <Copy className="h-3.5 w-3.5" />
                               </Button>
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                title="Abrir Canales"
-                                asChild
-                              >
-                                <a href={canalesUrl} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
-                              </Button>
                             </div>
                           </div>
                         ) : (
@@ -260,7 +252,7 @@ const AdminReturnsManager = () => {
                               placeholder="Visible para el cliente en el email…"
                             />
                           </div>
-                          {r.status === "product_received" ? (
+                          {r.status === "approved" || r.status === "product_received" ? (
                             <div>
                               <Label className="text-[10px] text-carbon/40">Importe reembolsado (€)</Label>
                               <Input
@@ -298,40 +290,65 @@ const AdminReturnsManager = () => {
                               </>
                             ) : null}
                             {r.status === "approved" ? (
-                              <Button
-                                size="sm"
-                                disabled={isBusy}
-                                className="bg-gold hover:bg-gold/90 text-white h-8"
-                                onClick={() => void runAction(r.id, "product_received")}
-                              >
-                                Producto recibido
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  disabled={isBusy}
+                                  className="bg-gold hover:bg-gold/90 text-white h-8"
+                                  onClick={() => void runAction(r.id, "product_received")}
+                                >
+                                  Producto recibido
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isBusy}
+                                  className="h-8 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                                  onClick={() => {
+                                    const amt = submitRefundAmount(r.id, defaultRefund);
+                                    if (amt == null) return;
+                                    void runAction(r.id, "refund_manual", { refundedAmount: amt });
+                                  }}
+                                >
+                                  Reembolso en TPV
+                                </Button>
+                              </>
                             ) : null}
                             {r.status === "product_received" ? (
-                              <Button
-                                size="sm"
-                                disabled={isBusy}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white h-8"
-                                onClick={() => {
-                                  const amt = Number(refundAmounts[r.id] ?? defaultRefund);
-                                  if (!Number.isFinite(amt) || amt <= 0) {
-                                    toast({
-                                      title: "Importe inválido",
-                                      variant: "destructive",
-                                    });
-                                    return;
-                                  }
-                                  void runAction(r.id, "refund", { refundedAmount: amt });
-                                }}
-                              >
-                                Marcar reembolsado
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  disabled={isBusy}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-8"
+                                  onClick={() => {
+                                    const amt = submitRefundAmount(r.id, defaultRefund);
+                                    if (amt == null) return;
+                                    void runAction(r.id, "refund", { refundedAmount: amt });
+                                  }}
+                                >
+                                  Reembolsar en Redsys
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isBusy}
+                                  className="h-8 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                                  onClick={() => {
+                                    const amt = submitRefundAmount(r.id, defaultRefund);
+                                    if (amt == null) return;
+                                    void runAction(r.id, "refund_manual", { refundedAmount: amt });
+                                  }}
+                                >
+                                  Reembolso en TPV
+                                </Button>
+                              </>
                             ) : null}
                             {isBusy ? <Loader2 className="h-4 w-4 animate-spin text-gold" /> : null}
                           </div>
-                          {r.status === "product_received" ? (
-                            <p className="text-[10px] text-amber-700 text-right">
-                              Tras marcar reembolsado, ejecuta la devolución en Canales con el n.º de pedido.
+                          {r.status === "approved" || r.status === "product_received" ? (
+                            <p className="text-[10px] text-carbon/50 text-right">
+                              Usa «Reembolso en TPV» si ya devolviste el importe manualmente en Redsys Canales. El
+                              cliente recibirá el correo de reembolso tramitado.
                             </p>
                           ) : null}
                         </div>

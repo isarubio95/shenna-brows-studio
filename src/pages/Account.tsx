@@ -16,9 +16,9 @@ import { Loader2, Eye, RotateCcw, Package, MessageSquareQuote, CheckCircle2, X, 
 import { useToast } from "@/hooks/use-toast";
 import {
   RETURN_REASON_LABELS,
-  RETURN_STATUS_LABELS,
   canRequestReturn,
   canCancelOrder,
+  getOrderReturnDisplay,
   type ReturnReason,
   type ReturnRequestStatus,
 } from "@/lib/returns";
@@ -48,6 +48,26 @@ type ReturnRequestRow = {
   created_at: string;
 };
 
+type OrderItemRow = {
+  id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+};
+
+type OrderWithItems = {
+  id: string;
+  created_at: string | null;
+  status: string;
+  refund_status: string;
+  returned: boolean;
+  total: number | null;
+  subtotal: number | null;
+  shipping: number | null;
+  shipping_address: unknown;
+  order_items: OrderItemRow[];
+};
+
 const Account = () => {
   const { user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -70,10 +90,10 @@ const Account = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("*")
+        .select("*, order_items(id, product_name, quantity, unit_price)")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return (data ?? []) as OrderWithItems[];
     },
     enabled: !!user,
   });
@@ -320,11 +340,8 @@ const Account = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Pedido</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Devolución</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -332,14 +349,12 @@ const Account = () => {
                   {filteredOrders.map((order) => {
                     const cfg = statusConfig[order.status] || { label: order.status, variant: "outline" as const };
                     const returnReq = returnByOrderId.get(order.id);
-                    const refundStatus = (order as { refund_status?: string }).refund_status ?? "none";
-                    const canReturn = canRequestReturn(order.status, refundStatus) && !returnReq;
+                    const refundStatus = order.refund_status ?? "none";
+                    const canReturn =
+                      canRequestReturn(order.status, refundStatus, order.returned) && !returnReq;
                     const canCancel = canCancelOrder(order.status, refundStatus) && !returnReq;
                     return (
                       <TableRow key={order.id}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {order.id.slice(0, 8)}…
-                        </TableCell>
                         <TableCell className="text-sm">
                           {new Date(order.created_at!).toLocaleDateString("es-ES")}
                         </TableCell>
@@ -355,28 +370,6 @@ const Account = () => {
                           }>
                             {cfg.label}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {refundStatus === "full" || refundStatus === "partial" ? (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                              Reembolsado
-                            </Badge>
-                          ) : returnReq ? (
-                            <Badge variant="outline" className="text-xs">
-                              {RETURN_STATUS_LABELS[returnReq.status]}
-                            </Badge>
-                          ) : canCancel ? (
-                            <span className="text-xs text-muted-foreground">Cancelación disponible</span>
-                          ) : canReturn ? (
-                            <span className="text-xs text-muted-foreground">Devolución disponible</span>
-                          ) : order.status === "cancelled" ? (
-                            <span className="text-xs text-muted-foreground">Cancelado</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          €{(order.total ?? 0).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -438,7 +431,7 @@ const Account = () => {
         </AnimatedSection>
 
         <AnimatedSection delay={0.15}>
-          <div className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-8 mt-10">
+          <div id="tu-experiencia" className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-8 mt-10 scroll-mt-28">
             <div className="flex items-center gap-3 mb-6">
               <MessageSquareQuote size={22} className="text-primary" />
               <h2 className="font-playfair text-xl font-semibold text-foreground">Tu experiencia Shenna</h2>
@@ -500,14 +493,20 @@ const Account = () => {
                 <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">ID</p>
                 <p className="font-mono text-sm">{selectedOrder.id}</p>
               </div>
-              {returnByOrderId.get(selectedOrder.id) ? (
-                <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Devolución</p>
-                  <p className="text-sm font-medium">
-                    {RETURN_STATUS_LABELS[returnByOrderId.get(selectedOrder.id)!.status]}
-                  </p>
-                </div>
-              ) : null}
+              {(() => {
+                const sheetReturn = returnByOrderId.get(selectedOrder.id);
+                const sheetReturnDisplay = getOrderReturnDisplay(
+                  selectedOrder,
+                  sheetReturn ? { status: sheetReturn.status } : null,
+                );
+                if (!sheetReturnDisplay) return null;
+                return (
+                  <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Devolución</p>
+                    <p className="text-sm font-medium">{sheetReturnDisplay.label}</p>
+                  </div>
+                );
+              })()}
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2">Productos</p>
                 <div className="space-y-3">
