@@ -17,6 +17,10 @@ const AUTH_RATE_LIMIT_ENDPOINT = `${SUPABASE_URL}/functions/v1/auth-rate-limit`;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
 type AuthGuardError = Error & { status?: number; unlockAt?: string };
 
+function isAuthGuardError(err: unknown): err is AuthGuardError {
+  return err instanceof Error && "status" in err;
+}
+
 const Login = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
@@ -116,8 +120,8 @@ const Login = () => {
         navigate("/");
       }
     } catch (err: unknown) {
-      const safeError = err instanceof Error ? (err as AuthGuardError) : new Error("Error inesperado");
-      const status = safeError.status;
+      const safeError = err instanceof Error ? err : new Error("Error inesperado");
+      const status = isAuthGuardError(err) ? err.status : undefined;
       if (status === 423) {
         toast({
           title: "Cuenta temporalmente bloqueada",
