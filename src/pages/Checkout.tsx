@@ -379,7 +379,6 @@ const Checkout = () => {
                       turnstileRef.current?.reset();
                       setTurnstileToken("");
                     }}
-                    options={{ theme: "light", size: "flexible" }}
                   />
                 </div>
               ) : null}
