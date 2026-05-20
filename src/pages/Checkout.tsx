@@ -23,8 +23,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import Turnstile from "react-turnstile";
 import type { BoundTurnstileObject } from "react-turnstile";
+import { TurnstileField } from "@/components/TurnstileField";
 import { getEdgeFunctionErrorMessage } from "@/lib/edge-function-error";
 import { getTurnstileSiteKey, getVisitorId, isCloudflareProtectionEnabled } from "@/lib/security";
 
@@ -332,6 +332,22 @@ const Checkout = () => {
                 Para Bizum, usa el botón dedicado. La dirección se guardará con tu pedido para el envío.
               </p>
 
+              {cloudflareProtectionEnabled && turnstileSiteKey ? (
+                <TurnstileField
+                  siteKey={turnstileSiteKey}
+                  className="mt-4"
+                  onVerify={(token, bound) => {
+                    turnstileRef.current = bound;
+                    setTurnstileToken(token);
+                  }}
+                  onExpire={() => setTurnstileToken("")}
+                  onError={() => {
+                    turnstileRef.current?.reset();
+                    setTurnstileToken("");
+                  }}
+                />
+              ) : null}
+
               <div className="space-y-3 mt-4">
                 <Button
                   type="submit"
@@ -363,24 +379,6 @@ const Checkout = () => {
                 <p className="text-xs text-center text-carbon/60">
                   Espera {cooldownSeconds}s antes de volver a intentar.
                 </p>
-              ) : null}
-              {cloudflareProtectionEnabled && turnstileSiteKey ? (
-                <div className="w-full">
-                  <Turnstile
-                    sitekey={turnstileSiteKey}
-                    onVerify={(token, bound) => {
-                      turnstileRef.current = bound;
-                      setTurnstileToken(token);
-                    }}
-                    onExpire={() => {
-                      setTurnstileToken("");
-                    }}
-                    onError={() => {
-                      turnstileRef.current?.reset();
-                      setTurnstileToken("");
-                    }}
-                  />
-                </div>
               ) : null}
             </form>
           </AnimatedSection>

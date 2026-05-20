@@ -8,7 +8,7 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import Turnstile from "react-turnstile";
+import { TurnstileField } from "@/components/TurnstileField";
 import { getTurnstileSiteKey, getVisitorId, isCloudflareProtectionEnabled } from "@/lib/security";
 
 const SUPABASE_URL =
@@ -213,6 +213,18 @@ const Login = () => {
                 </label>
               </div>
             )}
+            {cloudflareProtectionEnabled && turnstileSiteKey ? (
+              <TurnstileField
+                siteKey={turnstileSiteKey}
+                onVerify={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken("")}
+                onError={() => setTurnstileToken("")}
+              />
+            ) : (
+              <p className="text-xs text-center text-carbon/50">
+                Protección Cloudflare desactivada en entorno local.
+              </p>
+            )}
             <Button type="submit" disabled={loading} className="w-full bg-gold hover:bg-gold/90 text-white py-5 tracking-wide rounded-full">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : isRegister ? "Registrarse" : "Entrar"}
             </Button>
@@ -221,22 +233,6 @@ const Login = () => {
                 Espera {cooldownSeconds}s antes de volver a enviar.
               </p>
             ) : null}
-            {cloudflareProtectionEnabled && turnstileSiteKey ? (
-              <div className="pt-1 w-full">
-                <Turnstile
-                  sitekey={turnstileSiteKey}
-                  onVerify={(token) => setTurnstileToken(token)}
-                  onExpire={() => setTurnstileToken("")}
-                  onError={() => setTurnstileToken("")}
-                  theme="light"
-                  size="flexible"
-                />
-              </div>
-            ) : (
-              <p className="text-xs text-center text-carbon/50">
-                Protección Cloudflare desactivada en entorno local.
-              </p>
-            )}
           </form>
 
           <p className="text-center text-sm text-carbon/50 mt-6">
