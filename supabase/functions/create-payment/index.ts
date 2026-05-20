@@ -90,7 +90,7 @@ serve(async (req) => {
       endpoint: "create-payment",
       kind: "ip",
       key: ip,
-      limit: 5,
+      limit: 15,
       window: "1 m",
     });
     if (!ipLimit.success) {
@@ -159,7 +159,7 @@ serve(async (req) => {
       });
     }
 
-    const turnstileValid = await verifyTurnstileToken(String(turnstileToken || ""), ip);
+    const turnstileValid = await verifyTurnstileToken(String(turnstileToken || ""));
     if (!turnstileValid) {
       console.warn("checkout_blocked_turnstile", { endpoint: "create-payment", ip });
       return new Response(JSON.stringify({ error: "Bot challenge failed" }), {

@@ -97,7 +97,7 @@ serve(async (req) => {
       }
 
       if (cloudflareProtectionEnabled) {
-        const validTurnstile = await verifyTurnstileToken(turnstileToken!, ip);
+        const validTurnstile = await verifyTurnstileToken(turnstileToken!);
         if (!validTurnstile) {
           return new Response(JSON.stringify({ error: "Bot challenge failed" }), {
             status: 403,

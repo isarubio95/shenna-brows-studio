@@ -13,7 +13,7 @@ export function isCloudflareProtectionEnabled(): boolean {
   return value === "true" || value === "1" || value === "yes";
 }
 
-export async function verifyTurnstileToken(token: string, remoteIp?: string): Promise<boolean> {
+export async function verifyTurnstileToken(token: string): Promise<boolean> {
   if (!isCloudflareProtectionEnabled()) {
     return true;
   }
@@ -24,14 +24,17 @@ export async function verifyTurnstileToken(token: string, remoteIp?: string): Pr
     return true;
   }
 
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  // No enviamos remoteip: en móvil, WebViews (Instagram, etc.) y proxies la IP
+  // que ve Supabase suele no coincidir con la del desafío y siteverify falla.
   const body = new URLSearchParams({
     secret,
-    response: token,
+    response: trimmed,
   });
-
-  if (remoteIp) {
-    body.set("remoteip", remoteIp);
-  }
 
   const verification = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
     method: "POST",
@@ -40,9 +43,16 @@ export async function verifyTurnstileToken(token: string, remoteIp?: string): Pr
   });
 
   if (!verification.ok) {
+    console.warn("turnstile_siteverify_http_error", { status: verification.status });
     return false;
   }
 
-  const payload = await verification.json() as { success?: boolean };
+  const payload = await verification.json() as {
+    success?: boolean;
+    "error-codes"?: string[];
+  };
+  if (!payload.success) {
+    console.warn("turnstile_siteverify_failed", { errorCodes: payload["error-codes"] ?? [] });
+  }
   return Boolean(payload.success);
 }

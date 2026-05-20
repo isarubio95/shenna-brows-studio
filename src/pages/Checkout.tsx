@@ -21,9 +21,11 @@ import {
   SHIPPING_PRICE_LEGEND,
 } from "@/data/shipping-provinces";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import Turnstile from "react-turnstile";
+import type { BoundTurnstileObject } from "react-turnstile";
+import { getEdgeFunctionErrorMessage } from "@/lib/edge-function-error";
 import { getTurnstileSiteKey, getVisitorId, isCloudflareProtectionEnabled } from "@/lib/security";
 
 const emptyShipping = {
@@ -43,6 +45,7 @@ const Checkout = () => {
   const [email, setEmail] = useState("");
   const [shipping, setShipping] = useState(emptyShipping);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef<BoundTurnstileObject | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const { toast } = useToast();
   const turnstileSiteKey = getTurnstileSiteKey();
@@ -150,15 +153,19 @@ const Checkout = () => {
         throw new Error("No se recibieron datos de la pasarela de pago");
       }
     } catch (err: unknown) {
-      const error = err instanceof Error ? err : new Error("Error inesperado");
+      const description = await getEdgeFunctionErrorMessage(
+        err,
+        "No se pudo procesar el pago. Inténtalo de nuevo.",
+      );
       const maybeStatus = (err as { context?: { status?: number }; status?: number } | undefined)?.context?.status
         ?? (err as { status?: number } | undefined)?.status;
       if (maybeStatus === 429) {
         setCooldownUntil(Date.now() + 30000);
       }
-      toast({ title: "Error al procesar el pago", description: error.message, variant: "destructive" });
-    } finally {
+      turnstileRef.current?.reset();
       setTurnstileToken("");
+      toast({ title: "Error al procesar el pago", description, variant: "destructive" });
+    } finally {
       setLoading(false);
     }
   };
@@ -361,9 +368,17 @@ const Checkout = () => {
                 <div className="w-full">
                   <Turnstile
                     sitekey={turnstileSiteKey}
-                    onVerify={(token) => setTurnstileToken(token)}
-                    onExpire={() => setTurnstileToken("")}
-                    onError={() => setTurnstileToken("")}
+                    onVerify={(token, bound) => {
+                      turnstileRef.current = bound;
+                      setTurnstileToken(token);
+                    }}
+                    onExpire={() => {
+                      setTurnstileToken("");
+                    }}
+                    onError={() => {
+                      turnstileRef.current?.reset();
+                      setTurnstileToken("");
+                    }}
                     options={{ theme: "light", size: "flexible" }}
                   />
                 </div>
