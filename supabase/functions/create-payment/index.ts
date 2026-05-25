@@ -392,7 +392,7 @@ serve(async (req) => {
         Ds_Merchant_UrlKO: `${origin}/payment-ko`,
         Ds_Merchant_ConsumerLanguage: "001",
         Ds_Merchant_MerchantData: merchantDataB64,
-        Ds_Merchant_ProductDescription: "Shenna Brows Studio",
+        Ds_Merchant_ProductDescription: "Shenna Brows",
       },
       payMethodsFilter,
     );
