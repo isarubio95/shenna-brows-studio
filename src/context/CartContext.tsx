@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { Product } from "@/data/products";
-import { cartLineId, type ColorVariant } from "@/lib/color-variants";
+import { cartLineId, normalizeHex, type ColorVariant } from "@/lib/color-variants";
 
 export interface CartItem {
   lineId: string;
@@ -26,9 +26,106 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 const IS_STORE_UNDER_CONSTRUCTION = import.meta.env.VITE_MANTEINANCE_MODE === "true";
 const CART_HISTORY_STATE_KEY = "__shennaCartOpen";
+const CART_STORAGE_KEY = "shenna-brows-cart";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const restoreString = (value: unknown) => (typeof value === "string" ? value : "");
+
+const restoreProduct = (value: unknown): Product | null => {
+  if (!isRecord(value)) return null;
+
+  const {
+    id,
+    name,
+    slug,
+    price,
+    stock,
+  } = value;
+
+  if (
+    typeof id !== "string" ||
+    typeof name !== "string" ||
+    typeof slug !== "string" ||
+    typeof price !== "number" ||
+    !Number.isFinite(price) ||
+    !id ||
+    !name ||
+    !slug
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    slug,
+    category: restoreString(value.category),
+    price,
+    stock: typeof stock === "number" && Number.isFinite(stock) ? stock : 0,
+    image_url: restoreString(value.image_url) || "/placeholder.svg",
+    description: restoreString(value.description),
+    materials: restoreString(value.materials),
+    shipping_info: restoreString(value.shipping_info),
+    tagline: restoreString(value.tagline),
+    stripe_price_id: restoreString(value.stripe_price_id),
+    selectedColorVariant: null,
+  };
+};
+
+const restoreColorVariant = (value: unknown): ColorVariant | null => {
+  if (value == null) return null;
+  if (!isRecord(value)) return null;
+
+  const { id, name, hex } = value;
+  if (typeof id !== "string" || typeof name !== "string" || typeof hex !== "string") {
+    return null;
+  }
+
+  const normalizedHex = normalizeHex(hex);
+  if (!normalizedHex) return null;
+
+  return { id, name, hex: normalizedHex };
+};
+
+const restoreCartItem = (value: unknown): CartItem | null => {
+  if (!isRecord(value)) return null;
+
+  const product = restoreProduct(value.product);
+  const quantity = value.quantity;
+
+  if (!product || typeof quantity !== "number" || !Number.isInteger(quantity) || quantity <= 0) {
+    return null;
+  }
+
+  const colorVariant = restoreColorVariant(value.colorVariant);
+  const lineId = cartLineId(product.id, colorVariant?.id ?? null);
+
+  return { lineId, product, colorVariant, quantity };
+};
+
+const restoreCartItems = (): CartItem[] => {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const stored = window.localStorage.getItem(CART_STORAGE_KEY);
+    if (!stored) return [];
+
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.flatMap((item) => {
+      const restored = restoreCartItem(item);
+      return restored ? [restored] : [];
+    });
+  } catch {
+    return [];
+  }
+};
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(restoreCartItems);
   const [isOpen, setIsOpen] = useState(false);
   const isOpenRef = useRef(isOpen);
   const closingFromHistoryRef = useRef(false);
@@ -40,6 +137,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
+
+  useEffect(() => {
+    try {
+      if (items.length === 0) {
+        window.localStorage.removeItem(CART_STORAGE_KEY);
+        return;
+      }
+
+      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    } catch {
+      // Si el navegador bloquea el almacenamiento, el carrito sigue funcionando durante la sesión.
+    }
+  }, [items]);
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
