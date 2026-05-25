@@ -24,6 +24,11 @@ const CartDrawer = () => {
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-carbon/40">
             <ShoppingBag size={48} strokeWidth={1} />
             <p className="text-sm">Tu carrito está vacío</p>
+            <Button asChild variant="outline" className="border-gold/30 text-carbon hover:text-gold">
+              <Link to="/tienda" replace onClick={closeCart}>
+                Seguir comprando
+              </Link>
+            </Button>
           </div>
         ) : (
           <>
@@ -81,7 +86,7 @@ const CartDrawer = () => {
               ))}
             </div>
 
-            <div className="border-t border-gold/10 pt-4 space-y-3">
+            <div className="border-t border-gold/10 pt-4 flex flex-col gap-3">
               <div className="flex items-start gap-2 text-xs text-carbon/50">
                 <Truck size={14} className="shrink-0 mt-0.5" />
                 <span>
@@ -92,11 +97,16 @@ const CartDrawer = () => {
                 <span>Subtotal</span>
                 <span className="text-carbon font-medium">€{totalPrice.toFixed(2)}</span>
               </div>
-              <Link to="/checkout" onClick={closeCart}>
-                <Button className="w-full bg-gold hover:bg-gold/90 text-white font-medium tracking-wide">
+              <Button asChild variant="outline" className="w-full border-gold/30 text-carbon hover:text-gold">
+                <Link to="/tienda" replace onClick={closeCart}>
+                  Seguir comprando
+                </Link>
+              </Button>
+              <Button asChild className="w-full bg-gold hover:bg-gold/90 text-white font-medium tracking-wide">
+                <Link to="/checkout" replace onClick={closeCart}>
                   Finalizar Compra
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </>
         )}

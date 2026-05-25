@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { Product } from "@/data/products";
 import { cartLineId, type ColorVariant } from "@/lib/color-variants";
 
@@ -25,13 +25,66 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 const IS_STORE_UNDER_CONSTRUCTION = import.meta.env.VITE_MANTEINANCE_MODE === "true";
+const CART_HISTORY_STATE_KEY = "__shennaCartOpen";
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const isOpenRef = useRef(isOpen);
+  const closingFromHistoryRef = useRef(false);
+  const pushedCartHistoryRef = useRef(false);
 
   const openCart = useCallback(() => setIsOpen(true), []);
   const closeCart = useCallback(() => setIsOpen(false), []);
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.[CART_HISTORY_STATE_KEY]) {
+        pushedCartHistoryRef.current = true;
+        setIsOpen(true);
+        return;
+      }
+
+      if (!isOpenRef.current) return;
+
+      closingFromHistoryRef.current = true;
+      pushedCartHistoryRef.current = false;
+      setIsOpen(false);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (window.history.state?.[CART_HISTORY_STATE_KEY]) {
+        pushedCartHistoryRef.current = true;
+      } else {
+        window.history.pushState(
+          { ...window.history.state, [CART_HISTORY_STATE_KEY]: true },
+          "",
+          window.location.href
+        );
+        pushedCartHistoryRef.current = true;
+      }
+      return;
+    }
+
+    if (closingFromHistoryRef.current) {
+      closingFromHistoryRef.current = false;
+      return;
+    }
+
+    if (pushedCartHistoryRef.current && window.history.state?.[CART_HISTORY_STATE_KEY]) {
+      pushedCartHistoryRef.current = false;
+      window.history.back();
+    }
+  }, [isOpen]);
 
   const addItem = useCallback((product: Product, colorVariant?: ColorVariant | null) => {
     if (IS_STORE_UNDER_CONSTRUCTION) return;
