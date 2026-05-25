@@ -296,7 +296,7 @@ serve(async (req) => {
     if (!shipCity) missingShip.push("city");
     if (!provinceCodeNorm) missingShip.push("province_code");
     if (!shipPhone) missingShip.push("phone");
-    if (missingShip.length > 0) {
+    if (missingShip.length > 0 || !provinceCodeNorm) {
       return new Response(
         JSON.stringify({ error: `Faltan datos de envío: ${missingShip.join(", ")}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },

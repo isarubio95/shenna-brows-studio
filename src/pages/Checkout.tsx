@@ -5,9 +5,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -15,9 +13,9 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import {
-  getProvinceOptionsGrouped,
   getProvinceOptionByCode,
   getShippingEurForProvinceCode,
+  PROVINCE_OPTIONS,
   SHIPPING_PRICE_LEGEND,
 } from "@/data/shipping-provinces";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,7 +52,10 @@ const Checkout = () => {
   const cooldownSeconds = Math.ceil(cooldownMs / 1000);
   const isCooldownActive = cooldownMs > 0;
 
-  const provinceGroups = useMemo(() => getProvinceOptionsGrouped(), []);
+  const provinceOptions = useMemo(
+    () => [...PROVINCE_OPTIONS].sort((a, b) => a.label.localeCompare(b.label, "es")),
+    [],
+  );
   const shippingEur = getShippingEurForProvinceCode(shipping.province_code, shipping.city);
   const canQuoteShipping = shippingEur != null;
   const total = totalPrice + (shippingEur ?? 0);
@@ -299,15 +300,10 @@ const Checkout = () => {
                       <SelectValue placeholder="Selecciona tu provincia" />
                     </SelectTrigger>
                     <SelectContent className="max-h-72">
-                      {provinceGroups.map(({ ccaa, provinces }) => (
-                        <SelectGroup key={ccaa}>
-                          <SelectLabel className="text-carbon/80">{ccaa}</SelectLabel>
-                          {provinces.map((p) => (
-                            <SelectItem key={p.code} value={p.code}>
-                              {p.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
+                      {provinceOptions.map((p) => (
+                        <SelectItem key={p.code} value={p.code}>
+                          {p.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
