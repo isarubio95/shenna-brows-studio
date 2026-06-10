@@ -6,22 +6,24 @@ import forge from "npm:node-forge@1.3.1";
 export type RedsysMerchantParams = Record<string, string>;
 
 /** Valores admitidos en Ds_Merchant_PayMethods (redirección). Ver documentación Redsys / TPV Virtual. */
-export const REDSYS_PAY_METHOD_TOKENS = ["card", "z"] as const;
+export const REDSYS_PAY_METHOD_TOKENS = ["card", "z", "xpay"] as const;
 
 /** Bizum en redirección exige `z` aislado; mezclarlo con `card` bloquea el resto en muchos terminales. */
 export const REDSYS_BIZUM_PAY_METHOD = "z";
 
 /**
- * Pago principal por redirección: solo `card`.
- * Con Apple Pay dado de alta en el terminal, Redsys puede mostrarlo en la pantalla de tarjeta.
+ * Pago principal por redirección: omitir Ds_Merchant_PayMethods (cadena vacía).
+ * Según la documentación de Redsys, al omitir el campo la pasarela muestra todos los
+ * métodos activados en el terminal (tarjeta, Google Pay, Apple Pay…). Enviar un valor
+ * concreto (p. ej. `card`) restringe la pantalla solo a ese método.
  */
-export const DEFAULT_REDSYS_PAY_METHODS = "card";
+export const DEFAULT_REDSYS_PAY_METHODS = "";
 
 const ALLOWED_PAY_METHOD_SET = new Set<string>(REDSYS_PAY_METHOD_TOKENS);
 
 /**
- * Resuelve Ds_Merchant_PayMethods. En redirección, omitir el campo suele mostrar solo tarjeta;
- * hay que enviar la lista explícita de métodos contratados en el terminal.
+ * Resuelve Ds_Merchant_PayMethods. Devuelve "" cuando hay que omitir el campo
+ * (mostrar todos los métodos del terminal).
  */
 export function resolveRedsysPayMethods(requested?: string | null): string {
   const envDefault = Deno.env.get("REDSYS_PAY_METHODS")?.trim();
@@ -32,12 +34,7 @@ export function resolveRedsysPayMethods(requested?: string | null): string {
   }
   const normalized = raw.toLowerCase();
   if (normalized === "all" || normalized === "default") {
-    return DEFAULT_REDSYS_PAY_METHODS;
-  }
-  if (normalized === "xpay" || normalized === "wallets" || normalized === "google") {
-    throw new Error(
-      "Ese método de pago no está disponible. Usa «Pagar» (tarjeta) o «Pagar con Bizum».",
-    );
+    return envDefault || DEFAULT_REDSYS_PAY_METHODS;
   }
 
   const tokens = raw
@@ -55,6 +52,7 @@ export function resolveRedsysPayMethods(requested?: string | null): string {
   return tokens.join(",");
 }
 
+/** Si `payMethods` es vacío, omite Ds_Merchant_PayMethods para que Redsys muestre todos los métodos del terminal. */
 export function applyRedsysPayMethods(
   params: RedsysMerchantParams,
   payMethods: string,
@@ -63,7 +61,9 @@ export function applyRedsysPayMethods(
   for (const key of Object.keys(out)) {
     if (key.toLowerCase() === "ds_merchant_paymethods") delete out[key];
   }
-  out.Ds_Merchant_PayMethods = payMethods;
+  if (payMethods.trim()) {
+    out.Ds_Merchant_PayMethods = payMethods.trim();
+  }
   return out;
 }
 

@@ -324,7 +324,7 @@ const Checkout = () => {
               </div>
 
               <p className="text-xs text-carbon/40 leading-relaxed">
-                Serás redirigido a la pasarela segura de Redsys (tarjeta; Apple Pay en Safari si el banco lo tiene activo).
+                Serás redirigido a la pasarela segura de Redsys (tarjeta, Google Pay o Apple Pay según tu dispositivo).
                 Para Bizum, usa el botón dedicado. La dirección se guardará con tu pedido para el envío.
               </p>
 
