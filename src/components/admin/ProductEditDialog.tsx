@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, ImageIcon, Plus, X, Bold, Italic, List, ListOrdered, Link as LinkIcon } from "lucide-react";
+import { Loader2, Upload, ImageIcon, Plus, X, Bold, Italic, List, ListOrdered, Link as LinkIcon, Tag } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { normalizeHex, parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import { cn } from "@/lib/utils";
@@ -132,6 +132,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         image_url: null,
         materials_label: "materiales",
         is_pack: false,
+        is_on_sale: false,
+        sale_price: null,
       });
       setImageUrls([]);
       setColorVariantRows([]);
@@ -155,15 +157,45 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       image_url: currentProduct.image_url,
       materials_label: (currentProduct as any).materials_label || "materiales",
       is_pack: currentProduct.is_pack ?? false,
+      is_on_sale: currentProduct.is_on_sale ?? false,
+      sale_price: currentProduct.sale_price ?? null,
     });
     setImageUrls(parseGalleryFromImageUrl(currentProduct.image_url));
     const parsed = parseColorVariants(currentProduct.color_variants);
     setColorVariantRows(parsed.map((v) => ({ ...v, hexDraft: null })));
   }, [currentProduct, mode, open]);
 
-  const updateField = (field: keyof Product, value: string | number) => {
+  const updateField = (field: keyof Product, value: string | number | boolean | null) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
+
+  const validateSaleFields = (): boolean => {
+    if (!form.is_on_sale) return true;
+    const regular = Number(form.price) || 0;
+    const sale = Number(form.sale_price);
+    if (!Number.isFinite(sale) || sale <= 0) {
+      toast({
+        title: "Precio de oferta requerido",
+        description: "Introduce un precio de oferta mayor que 0.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    if (sale >= regular) {
+      toast({
+        title: "Precio de oferta no válido",
+        description: "El precio de oferta debe ser menor que el precio habitual.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const salePayload = () => ({
+    is_on_sale: Boolean(form.is_on_sale),
+    sale_price: form.is_on_sale ? Number(form.sale_price) : null,
+  });
 
   const verifySlugOnBlur = useCallback(async () => {
     setSlugChecking(true);
@@ -374,6 +406,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       colorVariantsPayload.push({ id: r.id, name, hex });
     }
 
+    if (!validateSaleFields()) return;
+
     if (mode === "create") {
       const name = (form.name || "").trim();
       if (!name) {
@@ -421,6 +455,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         stock: Number(form.stock) || 0,
         image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         is_pack: Boolean(form.is_pack),
+        ...salePayload(),
         color_variants: colorVariantsPayload,
       });
 
@@ -471,6 +506,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         stock: Number(form.stock) || 0,
         image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         is_pack: Boolean(form.is_pack),
+        ...salePayload(),
         color_variants: colorVariantsPayload,
       })
       .eq("id", currentProduct.id);
@@ -930,6 +966,31 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 className="mt-1 bg-white border-gold/15"
               />
             </div>
+            <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-gold/15 bg-white/60 px-4 py-3">
+              <div className="min-w-0">
+                <Label htmlFor="is_on_sale" className="text-carbon/70 text-xs uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <Tag size={14} className="text-red-500 rotate-[-12deg]" aria-hidden />
+                  En oferta
+                </Label>
+                <p id="is_on_sale-hint" className="text-xs text-carbon/45 mt-1 leading-snug">
+                  Muestra el precio habitual tachado y el precio rebajado en la tienda.
+                </p>
+              </div>
+              <Switch
+                id="is_on_sale"
+                checked={Boolean(form.is_on_sale)}
+                onCheckedChange={(checked) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    is_on_sale: checked,
+                    sale_price: checked ? prev.sale_price ?? null : null,
+                  }))
+                }
+                className="shrink-0 data-[state=checked]:bg-red-500"
+                aria-describedby="is_on_sale-hint"
+              />
+            </div>
+
             <div>
               <Label htmlFor="price" className="text-carbon/70 text-xs uppercase tracking-wider">
                 Precio (€)
@@ -943,7 +1004,27 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 className="mt-1 bg-white border-gold/15"
               />
             </div>
-            <div>
+            {form.is_on_sale ? (
+              <div>
+                <Label htmlFor="sale_price" className="text-carbon/70 text-xs uppercase tracking-wider">
+                  Precio de oferta (€)
+                </Label>
+                <Input
+                  id="sale_price"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={form.sale_price ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    updateField("sale_price", raw === "" ? null : parseFloat(raw) || 0);
+                  }}
+                  className="mt-1 bg-white border-gold/15 border-red-200/60 focus-visible:ring-red-300/40"
+                  placeholder="Ej. 19.99"
+                />
+              </div>
+            ) : null}
+            <div className={form.is_on_sale ? "sm:col-span-2" : undefined}>
               <Label htmlFor="stock" className="text-carbon/70 text-xs uppercase tracking-wider">
                 Stock
               </Label>

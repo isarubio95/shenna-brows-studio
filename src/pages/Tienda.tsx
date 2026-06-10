@@ -8,8 +8,11 @@ import type { Database } from "@/integrations/supabase/types";
 import { getProductImageGallery } from "@/lib/product-images";
 import { useCart } from "@/context/CartContext";
 import AnimatedSection from "@/components/AnimatedSection";
+import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
+import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getEffectivePrice } from "@/lib/product-pricing";
 
 type Product = Database["public"]["Tables"]["products"]["Row"];
 
@@ -94,6 +97,10 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
         }}
       >
         <Link to={`/${product.slug}`} className="relative block aspect-square bg-muted overflow-hidden">
+          <ProductSaleBadge
+            product={product}
+            className={featured ? "left-3 top-12" : undefined}
+          />
           {featured && (
             <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-gold px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white shadow-md">
               <Sparkles size={12} aria-hidden />
@@ -161,9 +168,7 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
 
           <div className="mt-5">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-4">
-              <p className={`text-lg font-semibold ${outOfStock ? "text-carbon/45" : "text-carbon"}`}>
-                €{Number(product.price).toFixed(2)}
-              </p>
+              <ProductPriceDisplay product={product} muted={outOfStock} />
               {outOfStock && !addToCartDisabled && (
                 <span className="text-xs font-semibold uppercase tracking-wider text-carbon/55">No disponible</span>
               )}
@@ -274,7 +279,7 @@ const Tienda = () => {
           offers: {
             "@type": "Offer",
             priceCurrency: "EUR",
-            price: Number(product.price).toFixed(2),
+            price: getEffectivePrice(product).toFixed(2),
             availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
             url: `${baseUrl}/${product.slug}`,
           },
@@ -289,7 +294,7 @@ const Tienda = () => {
       name: product.name,
       slug: product.slug,
       category: product.category,
-      price: Number(product.price),
+      price: getEffectivePrice(product),
       stock: product.stock,
       image_url: product.image_url,
       description: product.description,

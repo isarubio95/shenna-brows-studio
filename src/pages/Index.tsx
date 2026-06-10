@@ -9,6 +9,8 @@ import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import logoMetalico from "@/assets/logo-metalico.png";
 import { getProductImageUrl } from "@/lib/product-images";
+import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
+import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import CeoSection from "@/components/CeoSection";
 
 const VIDEO_POSTER_TIME = 2; // segundo del que extraer la portada
@@ -209,7 +211,8 @@ const Index = () => {
                       transition={{ duration: 0.3 }}
                       className="group h-full bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-shadow duration-500 flex flex-col"
                     >
-                      <div className="aspect-square bg-muted overflow-hidden">
+                      <div className="relative aspect-square bg-muted overflow-hidden">
+                        <ProductSaleBadge product={product} />
                         <img
                           src={getProductImageUrl(product.image_url, product.slug)}
                           alt={product.name}
@@ -223,7 +226,7 @@ const Index = () => {
                           <h3 className="font-playfair text-xl font-semibold text-carbon mb-1">{product.name}</h3>
                           <p className="text-sm text-carbon/50">{product.tagline}</p>
                         </div>
-                        <p className="text-lg font-semibold text-carbon mt-4">€{Number(product.price).toFixed(2)}</p>
+                        <ProductPriceDisplay product={product} className="mt-4" />
                       </div>
                     </motion.div>
                   </Link>

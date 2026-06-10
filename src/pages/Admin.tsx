@@ -33,6 +33,8 @@ import {
   type ReturnRequestStatus,
 } from "@/lib/returns";
 import { getProductImageUrl } from "@/lib/product-images";
+import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
+import { isProductOnSale } from "@/lib/product-pricing";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import {
   AlertDialog,
@@ -1685,9 +1687,14 @@ const Admin = () => {
                         Pack
                       </span>
                     ) : null}
+                    {isProductOnSale(p) ? (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-600">
+                        Oferta
+                      </span>
+                    ) : null}
                   </p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-carbon font-semibold">€{Number(p.price).toFixed(2)}</span>
+                    <ProductPriceDisplay product={p} size="sm" />
                     <span className="text-xs text-carbon/50">Stock: {p.stock}</span>
                   </div>
                   <div className="flex gap-2 mt-3">

@@ -24,9 +24,20 @@ type CheckoutProductRow = {
   id: string;
   name: string;
   price: unknown;
+  is_on_sale?: boolean | null;
+  sale_price?: unknown;
   stock: number | null;
   color_variants: unknown;
 };
+
+function effectiveUnitPrice(p: CheckoutProductRow): number {
+  const regular = Number(p.price);
+  if (p.is_on_sale) {
+    const sale = Number(p.sale_price);
+    if (Number.isFinite(sale) && sale > 0 && sale < regular) return sale;
+  }
+  return regular;
+}
 
 type ParsedColorVariant = { id: string; name: string; hex: string };
 
@@ -200,7 +211,7 @@ serve(async (req) => {
     const productIds = [...new Set(items.map((i) => String(i.productId)))];
     const { data: products, error: productsError } = await admin
       .from("products")
-      .select("id, name, price, stock, color_variants")
+      .select("id, name, price, is_on_sale, sale_price, stock, color_variants")
       .in("id", productIds);
 
     if (productsError || !products?.length) {
@@ -239,7 +250,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const unit = Number(p.price);
+      const unit = effectiveUnitPrice(p);
       subtotalEur += unit * qty;
 
       const colorVariants = parseColorVariantsFromDb(p.color_variants);

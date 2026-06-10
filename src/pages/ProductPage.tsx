@@ -4,8 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
+import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
+import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import { ShoppingBag, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImageGallery, getProductImageUrl } from "@/lib/product-images";
+import { getEffectivePrice } from "@/lib/product-pricing";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import { motion } from "framer-motion";
 
@@ -39,6 +42,8 @@ type CatalogProduct = {
   slug: string;
   category: string;
   price: number;
+  is_on_sale?: boolean | null;
+  sale_price?: number | null;
   image_url: string;
   tagline: string | null;
 };
@@ -115,7 +120,7 @@ const ProductPage = () => {
     if (!slug) return;
     (supabase as any)
       .from("products")
-      .select("id,name,slug,category,price,image_url,tagline")
+      .select("id,name,slug,category,price,is_on_sale,sale_price,image_url,tagline")
       .order("name")
       .then(({ data }: { data: CatalogProduct[] | null }) => {
         setOtherProducts((data || []).filter((p) => p.slug !== slug));
@@ -177,7 +182,7 @@ const ProductPage = () => {
         name: product.name,
         slug: product.slug,
         category: product.category,
-        price: Number(product.price),
+        price: getEffectivePrice(product),
         stock: product.stock,
         image_url: product.image_url,
         description: product.description,
@@ -204,6 +209,7 @@ const ProductPage = () => {
           <AnimatedSection>
             <div>
               <div className="relative aspect-square rounded-2xl bg-white overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)] ring-1 ring-black/4">
+                <ProductSaleBadge product={product} />
                 {outOfStock && (
                   <span className="absolute right-3 top-3 z-10 rounded-full bg-carbon px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white shadow-md">
                     Sin stock
@@ -260,7 +266,7 @@ const ProductPage = () => {
               <p className="text-gold text-xs uppercase tracking-[0.3em] font-medium mb-3">{product.category}</p>
               <h1 className="font-playfair text-4xl md:text-5xl font-bold text-carbon mb-3">{product.name}</h1>
               <p className="text-carbon/50 text-lg italic mb-6">{product.tagline}</p>
-              <p className="font-playfair text-3xl font-bold text-carbon mb-4">€{Number(product.price).toFixed(2)}</p>
+              <ProductPriceDisplay product={product} size="lg" className="mb-4" muted={outOfStock} />
 
               {colorVariants.length > 0 && selectedColorVariant && (
                 <div className="mb-6 space-y-3">
@@ -433,7 +439,7 @@ const ProductPage = () => {
                             {p.name}
                           </h3>
                         </div>
-                        <p className="text-carbon/55 text-xs font-medium pt-1">€{Number(p.price).toFixed(2)}</p>
+                        <ProductPriceDisplay product={p} size="sm" className="pt-1" />
                       </div>
                     </motion.div>
                   </Link>

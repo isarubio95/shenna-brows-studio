@@ -213,11 +213,13 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          is_on_sale: boolean
           is_pack: boolean
           materials: string | null
           materials_label: string | null
           name: string
           price: number
+          sale_price: number | null
           shipping_info: string | null
           slug: string
           stock: number
@@ -232,11 +234,13 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_on_sale?: boolean
           is_pack?: boolean
           materials?: string | null
           materials_label?: string | null
           name: string
           price?: number
+          sale_price?: number | null
           shipping_info?: string | null
           slug: string
           stock?: number
@@ -251,11 +255,13 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_on_sale?: boolean
           is_pack?: boolean
           materials?: string | null
           materials_label?: string | null
           name?: string
           price?: number
+          sale_price?: number | null
           shipping_info?: string | null
           slug?: string
           stock?: number
