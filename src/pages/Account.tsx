@@ -300,6 +300,57 @@ const Account = () => {
         </AnimatedSection>
 
         <AnimatedSection delay={0.05}>
+          <div id="tu-experiencia" className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-8 mb-10 scroll-mt-28">
+            <div className="flex items-center gap-3 mb-6">
+              <MessageSquareQuote size={22} className="text-primary" />
+              <h2 className="font-playfair text-xl font-semibold text-foreground">Tu experiencia Shenna</h2>
+            </div>
+
+            {myTestimonial ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground italic leading-relaxed">
+                  "{myTestimonial.content}"
+                </p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <CheckCircle2 size={14} className={myTestimonial.is_featured ? "text-emerald-500" : "text-muted-foreground"} />
+                  <span>{myTestimonial.is_featured ? "Publicado" : "Pendiente de aprobación"}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Cuéntanos cómo ha sido tu experiencia con nuestras herramientas. Tu opinión nos ayuda a crecer.
+                </p>
+                <Textarea
+                  value={testimonialText}
+                  onChange={(e) => setTestimonialText(e.target.value)}
+                  placeholder="Comparte tu experiencia con Shenna Brows…"
+                  className="min-h-[100px] bg-background border-border resize-none"
+                  maxLength={500}
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{testimonialText.length}/500</span>
+                  <Button
+                    variant="outline"
+                    onClick={() => testimonialMutation.mutate(testimonialText)}
+                    disabled={testimonialText.trim().length < 10 || testimonialMutation.isPending || testimonialCooldownActive}
+                    className="border-primary/30 text-primary hover:bg-primary/5"
+                  >
+                    {testimonialMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Enviar Opinión
+                  </Button>
+                </div>
+                {testimonialCooldownActive ? (
+                  <p className="text-xs text-muted-foreground">
+                    Espera {Math.ceil(testimonialCooldownMs / 1000)}s antes de enviar otra opinión.
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection delay={0.1}>
           <div className="flex flex-wrap gap-3 mb-6">
             <Select value={filterMonth} onValueChange={setFilterMonth}>
               <SelectTrigger className="w-[160px] bg-card border-border">
@@ -325,7 +376,7 @@ const Account = () => {
           </div>
         </AnimatedSection>
 
-        <AnimatedSection delay={0.1}>
+        <AnimatedSection delay={0.15}>
           <div className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
             {isLoading ? (
               <div className="flex items-center justify-center py-16">
@@ -428,57 +479,6 @@ const Account = () => {
             </a>
             .
           </p>
-        </AnimatedSection>
-
-        <AnimatedSection delay={0.15}>
-          <div id="tu-experiencia" className="bg-card rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-8 mt-10 scroll-mt-28">
-            <div className="flex items-center gap-3 mb-6">
-              <MessageSquareQuote size={22} className="text-primary" />
-              <h2 className="font-playfair text-xl font-semibold text-foreground">Tu experiencia Shenna</h2>
-            </div>
-
-            {myTestimonial ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground italic leading-relaxed">
-                  "{myTestimonial.content}"
-                </p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <CheckCircle2 size={14} className={myTestimonial.is_featured ? "text-emerald-500" : "text-muted-foreground"} />
-                  <span>{myTestimonial.is_featured ? "Publicado" : "Pendiente de aprobación"}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Cuéntanos cómo ha sido tu experiencia con nuestras herramientas. Tu opinión nos ayuda a crecer.
-                </p>
-                <Textarea
-                  value={testimonialText}
-                  onChange={(e) => setTestimonialText(e.target.value)}
-                  placeholder="Comparte tu experiencia con Shenna Brows…"
-                  className="min-h-[100px] bg-background border-border resize-none"
-                  maxLength={500}
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">{testimonialText.length}/500</span>
-                  <Button
-                    variant="outline"
-                    onClick={() => testimonialMutation.mutate(testimonialText)}
-                    disabled={testimonialText.trim().length < 10 || testimonialMutation.isPending || testimonialCooldownActive}
-                    className="border-primary/30 text-primary hover:bg-primary/5"
-                  >
-                    {testimonialMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Enviar Opinión
-                  </Button>
-                </div>
-                {testimonialCooldownActive ? (
-                  <p className="text-xs text-muted-foreground">
-                    Espera {Math.ceil(testimonialCooldownMs / 1000)}s antes de enviar otra opinión.
-                  </p>
-                ) : null}
-              </div>
-            )}
-          </div>
         </AnimatedSection>
       </div>
 
