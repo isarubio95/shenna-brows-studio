@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
-import { Instagram, Mail, Monitor } from "lucide-react";
+import { Instagram, Mail } from "lucide-react";
 import logo from "@/assets/logo-shenna.png";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -170,20 +170,8 @@ const Footer = () => {
             </div>
           </div>
         </div>
-        <div className="border-t border-cream/10 mt-12 pt-8 text-center text-xs text-cream/40 space-y-1">
-          <p>© {new Date().getFullYear()} Shenna BROWS. Todos los derechos reservados.</p>
-          <p>
-            Construido por{" "}
-            <a
-              href="https://www.instagram.com/isarubio95/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-gold transition-colors group"
-            >
-              Isaías Rubio
-              <Monitor size={12} className="opacity-40 group-hover:opacity-70" aria-hidden />
-            </a>
-          </p>
+        <div className="border-t border-cream/10 mt-12 pt-8 text-center text-xs text-cream/40">
+          © {new Date().getFullYear()} Shenna BROWS. Todos los derechos reservados.
         </div>
       </div>
     </footer>
