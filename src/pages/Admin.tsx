@@ -25,6 +25,7 @@ import AdminSectionNav, {
 import {
   canDownloadOrderInvoice,
   getOrderInvoiceButtonLabel,
+  type OrderForInvoice,
 } from "@/lib/invoices";
 import {
   getOrderReturnDisplay,
@@ -891,13 +892,23 @@ const Admin = () => {
     if (!productToDelete) return;
     setDeleteInProgress(true);
     const id = productToDelete.id;
-    const { error } = await (supabase as any).from("products").delete().eq("id", id);
+    const { data: deletedRows, error } = await (supabase as any)
+      .from("products")
+      .delete()
+      .eq("id", id)
+      .select("id");
     if (error) {
       toast({
         title: "No se pudo eliminar",
         description: error.message.includes("foreign key")
           ? "Este producto está vinculado a pedidos antiguos. En base de datos habría que usar ON DELETE SET NULL o conservar el producto."
           : error.message,
+        variant: "destructive",
+      });
+    } else if (!deletedRows?.length) {
+      toast({
+        title: "No se pudo eliminar",
+        description: "El producto no se eliminó en la base de datos. Comprueba que tu usuario tiene rol de administrador.",
         variant: "destructive",
       });
     } else {
@@ -1070,7 +1081,7 @@ const Admin = () => {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
-  const handleDownloadTicket = async (order: { id: string; status?: string; refund_status?: string | null; returned?: boolean | null; return_requests?: { status: ReturnRequestStatus; created_at: string; refunded_amount?: number | null }[] | null }) => {
+  const handleDownloadTicket = async (order: OrderForInvoice & { id: string }) => {
     const isCreditNote = getOrderInvoiceButtonLabel(order) === "Factura devolución";
     setDownloadingTicketOrderId(order.id);
     try {
@@ -1403,7 +1414,7 @@ const Admin = () => {
                     return (
                       <Fragment key={o.id}>
                         <TableRow
-                          className={`border-b border-gold/5 cursor-pointer transition-colors hover:bg-gold/[0.03] ${isExpanded ? "bg-gold/[0.04]" : ""}`}
+                          className={`border-b border-gold/5 cursor-pointer transition-colors hover:bg-gold/3 ${isExpanded ? "bg-gold/[0.04]" : ""}`}
                           onClick={() => toggleOrderDetails(o.id)}
                           aria-expanded={isExpanded}
                         >
@@ -1672,6 +1683,21 @@ const Admin = () => {
               Nuevo producto
             </Button>
           </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-carbon/40">
+              <Loader2 className="h-8 w-8 animate-spin text-gold" />
+            </div>
+          ) : products.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gold/25 bg-white/60 px-6 py-12 text-center">
+              <Package className="h-10 w-10 mx-auto text-gold/40 mb-3" />
+              <p className="font-medium text-carbon">Aún no hay productos en el catálogo</p>
+              <p className="text-sm text-carbon/45 mt-1 mb-4">Crea el primero con el botón de arriba.</p>
+              <Button type="button" onClick={openCreateProduct} className="bg-gold hover:bg-gold/90 text-white">
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo producto
+              </Button>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {products.map((p) => (
               <div key={p.id} className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden group">
@@ -1721,6 +1747,7 @@ const Admin = () => {
               </div>
             ))}
           </div>
+          )}
         </AnimatedSection>
           </>
         )}

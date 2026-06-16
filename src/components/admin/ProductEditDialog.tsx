@@ -442,25 +442,34 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         return;
       }
       setSaving(true);
-      const { error } = await (supabase as any).from("products").insert({
-        name,
-        slug: slugFinal,
-        category: categoryTrim,
-        tagline: form.tagline || "",
-        description: normalizedDescription || null,
-        materials: materialsString || null,
-        materials_label: (form as any).materials_label || "materiales",
-        shipping_info: form.shipping_info || "",
-        price: Number(form.price) || 0,
-        stock: Number(form.stock) || 0,
-        image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
-        is_pack: Boolean(form.is_pack),
-        ...salePayload(),
-        color_variants: colorVariantsPayload,
-      });
+      const { data: createdRows, error } = await (supabase as any)
+        .from("products")
+        .insert({
+          name,
+          slug: slugFinal,
+          category: categoryTrim,
+          tagline: form.tagline || "",
+          description: normalizedDescription || null,
+          materials: materialsString || null,
+          materials_label: (form as any).materials_label || "materiales",
+          shipping_info: form.shipping_info || "",
+          price: Number(form.price) || 0,
+          stock: Number(form.stock) || 0,
+          image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+          is_pack: Boolean(form.is_pack),
+          ...salePayload(),
+          color_variants: colorVariantsPayload,
+        })
+        .select("id");
 
       if (error) {
         toast({ title: "Error al crear", description: error.message, variant: "destructive" });
+      } else if (!createdRows?.length) {
+        toast({
+          title: "No se pudo crear",
+          description: "El producto no se guardó en la base de datos. Comprueba que tu usuario tiene rol de administrador.",
+          variant: "destructive",
+        });
       } else {
         toast({ title: "Producto creado correctamente" });
         onSaved();
@@ -969,7 +978,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
             <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-gold/15 bg-white/60 px-4 py-3">
               <div className="min-w-0">
                 <Label htmlFor="is_on_sale" className="text-carbon/70 text-xs uppercase tracking-wider inline-flex items-center gap-1.5">
-                  <Tag size={14} className="text-red-500 rotate-[-12deg]" aria-hidden />
+                  <Tag size={14} className="text-red-500 -rotate-12" aria-hidden />
                   En oferta
                 </Label>
                 <p id="is_on_sale-hint" className="text-xs text-carbon/45 mt-1 leading-snug">

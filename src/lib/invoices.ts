@@ -1,7 +1,7 @@
 import type { ReturnRequestStatus } from "@/lib/returns";
 import { pickLatestReturnRequest } from "@/lib/returns";
 
-type OrderForInvoice = {
+export type OrderForInvoice = {
   status: string;
   refund_status?: string | null;
   returned?: boolean | null;
