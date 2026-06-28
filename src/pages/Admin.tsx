@@ -67,6 +67,7 @@ const statusLabels: Record<string, string> = {
 
 const PAID_ORDER_STATUSES = new Set(["paid", "shipped", "delivered"]);
 const PENDING_ORDER_STATUSES = new Set(["pending", "pending_payment"]);
+const ORDERS_PAGE_SIZE = 10;
 
 function canPrintShippingLabel(orderStatus: string): boolean {
   return !PENDING_ORDER_STATUSES.has(orderStatus) && orderStatus !== "cancelled";
@@ -730,6 +731,9 @@ const Admin = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [orders, setOrders] = useState<any[]>([]);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersTotalCount, setOrdersTotalCount] = useState(0);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -772,12 +776,14 @@ const Admin = () => {
     return map;
   }, [productCatalogById]);
 
-  const fetchOrders = useCallback(async () => {
-    const { data, error } = await (supabase as any)
+  const fetchOrders = useCallback(async (page: number) => {
+    const from = (page - 1) * ORDERS_PAGE_SIZE;
+    const to = from + ORDERS_PAGE_SIZE - 1;
+    const { data, error, count } = await (supabase as any)
       .from("orders")
-      .select("*, return_requests(id, status, created_at, refunded_amount)")
+      .select("*, return_requests(id, status, created_at, refunded_amount)", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(20);
+      .range(from, to);
     if (error) {
       toast({
         title: "Error al cargar pedidos",
@@ -787,6 +793,7 @@ const Admin = () => {
       return;
     }
     setOrders(data || []);
+    setOrdersTotalCount(count ?? 0);
   }, [toast]);
 
   const syncDeliveredOrders = useCallback(async () => {
@@ -796,10 +803,26 @@ const Admin = () => {
     }
   }, []);
 
-  const syncAndFetchOrders = useCallback(async () => {
+  const syncAndFetchOrders = useCallback(async (page: number) => {
     await syncDeliveredOrders();
-    await fetchOrders();
+    await fetchOrders(page);
   }, [fetchOrders, syncDeliveredOrders]);
+
+  const goToOrdersPage = useCallback(async (page: number) => {
+    const totalPages = Math.max(1, Math.ceil(ordersTotalCount / ORDERS_PAGE_SIZE));
+    if (page < 1 || (ordersTotalCount > 0 && page > totalPages)) return;
+    setOrdersPage(page);
+    setExpandedOrderId(null);
+    setOrdersLoading(true);
+    try {
+      await syncAndFetchOrders(page);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [ordersTotalCount, syncAndFetchOrders]);
+
+  const ordersTotalPages = Math.max(1, Math.ceil(ordersTotalCount / ORDERS_PAGE_SIZE));
+  const ordersTableLoading = loading || ordersLoading;
 
   const toggleOrderDetails = async (orderId: string) => {
     if (expandedOrderId === orderId) {
@@ -847,7 +870,7 @@ const Admin = () => {
     if (!isAdmin) return;
     const fetchData = async () => {
       const [, productsRes, testimonialsRes] = await Promise.all([
-        syncAndFetchOrders(),
+        syncAndFetchOrders(1),
         (supabase as any).from("products").select("*").order("name"),
         (supabase as any).from("testimonials").select("*").order("created_at", { ascending: false }),
       ]);
@@ -943,13 +966,21 @@ const Admin = () => {
       });
     } else {
       toast({ title: "Pedido eliminado" });
-      setOrders((prev) => prev.filter((o) => o.id !== id));
       setExpandedOrderId((prev) => (prev === id ? null : prev));
       setOrderItemsCache((prev) => {
         const next = { ...prev };
         delete next[id];
         return next;
       });
+      const remainingOnPage = orders.length - 1;
+      if (remainingOnPage === 0 && ordersPage > 1) {
+        const previousPage = ordersPage - 1;
+        setOrdersPage(previousPage);
+        await fetchOrders(previousPage);
+      } else {
+        setOrders((prev) => prev.filter((o) => o.id !== id));
+        setOrdersTotalCount((prev) => Math.max(0, prev - 1));
+      }
       queryClient.invalidateQueries({ queryKey: ["my-orders"] });
       setOrderToDelete(null);
     }
@@ -1370,9 +1401,9 @@ const Admin = () => {
         {activeSection === "pedidos" && (
           <>
         <AnimatedSection delay={0.05}>
-          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Pedidos Recientes</h2>
+          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Pedidos</h2>
           <div className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden mb-12">
-            {loading ? (
+            {ordersTableLoading ? (
               <div className="p-8 text-center"><Loader2 className="h-6 w-6 animate-spin text-gold mx-auto" /></div>
             ) : orders.length === 0 ? (
               <div className="p-8 text-center text-carbon/40">No hay pedidos aún</div>
@@ -1648,11 +1679,36 @@ const Admin = () => {
                 </TableBody>
               </Table>
             )}
+            {!ordersTableLoading && ordersTotalCount > ORDERS_PAGE_SIZE && (
+              <div className="flex flex-col gap-3 border-t border-gold/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-carbon/50">
+                  Página {ordersPage} de {ordersTotalPages} · {ordersTotalCount} pedidos
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={ordersPage <= 1}
+                    onClick={() => void goToOrdersPage(ordersPage - 1)}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={ordersPage >= ordersTotalPages}
+                    onClick={() => void goToOrdersPage(ordersPage + 1)}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </AnimatedSection>
 
         <AnimatedSection delay={0.07}>
-          <AdminReturnsManager onReturnsChanged={() => void syncAndFetchOrders()} />
+          <AdminReturnsManager onReturnsChanged={() => void syncAndFetchOrders(ordersPage)} />
         </AnimatedSection>
           </>
         )}

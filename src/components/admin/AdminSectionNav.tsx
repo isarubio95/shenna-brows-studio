@@ -19,7 +19,7 @@ const SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
 ];
 
 const SECTION_DESCRIPTIONS: Record<AdminSection, string> = {
-  pedidos: "Gestiona pedidos recientes y devoluciones.",
+  pedidos: "Gestiona pedidos y devoluciones.",
   catalogo: "Controla stock y productos del catálogo.",
   correos: "Envía correos individuales a clientes.",
   newsletter: "Campañas a suscriptores con consentimiento activo.",
