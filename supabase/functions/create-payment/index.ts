@@ -86,6 +86,15 @@ function minorUnitsFromEur(eur: number): number {
   return Math.round(eur * 100);
 }
 
+function normalizeCustomerTaxId(raw: unknown): string {
+  return String(raw ?? "").trim().toUpperCase().replace(/[\s.-]/g, "");
+}
+
+function isValidCustomerTaxId(value: string): boolean {
+  if (value.length < 8 || value.length > 12) return false;
+  return /^[A-Z0-9]+$/.test(value);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -156,8 +165,12 @@ serve(async (req) => {
       shippingAddress?: Record<string, unknown>;
       payMethod?: string;
       payMethods?: string;
+      invoiceRequested?: boolean;
+      customerTaxId?: string;
     };
     const { items, customerEmail, turnstileToken, shippingAddress } = body;
+    const invoiceRequested = Boolean(body.invoiceRequested);
+    const customerTaxId = normalizeCustomerTaxId(body.customerTaxId);
 
     let payMethodsFilter: string;
     try {
@@ -314,6 +327,13 @@ serve(async (req) => {
       );
     }
 
+    if (invoiceRequested && !isValidCustomerTaxId(customerTaxId)) {
+      return new Response(
+        JSON.stringify({ error: "Introduce un NIF/CIF válido para solicitar factura" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const shippingEur = shippingEurForShippingAddress(provinceCodeNorm, shipCity);
     if (shippingEur == null) {
       return new Response(JSON.stringify({ error: "Código de provincia de envío no válido" }), {
@@ -370,6 +390,8 @@ serve(async (req) => {
       stripe_session_id: merchantOrder,
       shipping_address: normalizedShipping,
       pending_cart_snapshot: pendingCartSnapshot,
+      invoice_requested: invoiceRequested,
+      customer_tax_id: invoiceRequested ? customerTaxId : null,
       ...(checkoutUserId ? { user_id: checkoutUserId } : {}),
     });
     if (pendingOrderErr) {

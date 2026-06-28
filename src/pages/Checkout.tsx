@@ -1,5 +1,6 @@
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,11 +38,22 @@ const emptyShipping = {
   phone: "",
 };
 
+function normalizeCustomerTaxId(value: string): string {
+  return value.trim().toUpperCase().replace(/[\s.-]/g, "");
+}
+
+function isValidCustomerTaxId(value: string): boolean {
+  if (value.length < 8 || value.length > 12) return false;
+  return /^[A-Z0-9]+$/.test(value);
+}
+
 const Checkout = () => {
   const { items, totalPrice } = useCart();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [shipping, setShipping] = useState(emptyShipping);
+  const [wantsInvoice, setWantsInvoice] = useState(false);
+  const [customerTaxId, setCustomerTaxId] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef<BoundTurnstileObject | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
@@ -99,6 +111,15 @@ const Checkout = () => {
       });
       return;
     }
+    const normalizedTaxId = normalizeCustomerTaxId(customerTaxId);
+    if (wantsInvoice && !isValidCustomerTaxId(normalizedTaxId)) {
+      toast({
+        title: "Introduce tu CIF/NIF",
+        description: "Si deseas factura, indica un NIF o CIF válido (8-12 caracteres).",
+        variant: "destructive",
+      });
+      return;
+    }
     if (isCooldownActive) {
       toast({ title: "Espera antes de reintentar", description: `${cooldownSeconds}s`, variant: "destructive" });
       return;
@@ -121,6 +142,8 @@ const Checkout = () => {
           })),
           customerEmail: email,
           shippingAddress: ship,
+          invoiceRequested: wantsInvoice,
+          customerTaxId: wantsInvoice ? normalizedTaxId : undefined,
           turnstileToken: cloudflareProtectionEnabled ? turnstileToken : "",
           ...(payMethod ? { payMethod } : { payMethods: "all" }),
         },
@@ -321,6 +344,44 @@ const Checkout = () => {
                     className="bg-white border-gold/15 focus:border-gold"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-4 pt-2 border-t border-gold/10">
+                <h2 className="font-playfair text-lg font-semibold text-carbon">Facturación</h2>
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="wants-invoice"
+                    checked={wantsInvoice}
+                    onCheckedChange={(checked) => {
+                      const next = checked === true;
+                      setWantsInvoice(next);
+                      if (!next) setCustomerTaxId("");
+                    }}
+                    className="mt-0.5 border-gold/30 data-[state=checked]:bg-gold data-[state=checked]:border-gold"
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="wants-invoice" className="text-carbon text-sm font-medium cursor-pointer">
+                      Deseo factura
+                    </Label>
+                    <p className="text-xs text-carbon/45 leading-relaxed">
+                      Marca esta casilla si necesitas factura a nombre de empresa o autónomo con NIF/CIF.
+                    </p>
+                  </div>
+                </div>
+                {wantsInvoice ? (
+                  <div className="space-y-2 pl-7">
+                    <Label htmlFor="customer-tax-id" className="text-carbon/70 text-sm">NIF/CIF *</Label>
+                    <Input
+                      id="customer-tax-id"
+                      value={customerTaxId}
+                      onChange={(e) => setCustomerTaxId(e.target.value.toUpperCase())}
+                      placeholder="B12345678"
+                      maxLength={12}
+                      autoComplete="off"
+                      className="bg-white border-gold/15 focus:border-gold max-w-xs"
+                    />
+                  </div>
+                ) : null}
               </div>
 
               <p className="text-xs text-carbon/40 leading-relaxed">

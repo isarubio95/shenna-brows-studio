@@ -31,7 +31,42 @@ export type GeneratePurchaseTicketArgs = {
   shippingAddress?: Record<string, string> | null;
   /** Fecha del ticket (p. ej. fecha del pedido). Por defecto: ahora. */
   issuedAt?: Date;
+  invoiceRequested?: boolean;
+  customerTaxId?: string | null;
 };
+
+function drawCustomerBlock(args: {
+  page: PDFPage;
+  email: string;
+  shippingAddress?: Record<string, string> | null;
+  invoiceRequested?: boolean;
+  customerTaxId?: string | null;
+  shippingLabel?: string;
+  yStart: number;
+  font: Awaited<ReturnType<PDFDocument["embedFont"]>>;
+  textColor: ReturnType<typeof rgb>;
+}): number {
+  let y = args.yStart;
+  const isInvoiceWithTaxId = Boolean(args.invoiceRequested && args.customerTaxId?.trim());
+  args.page.drawText(`Cliente: ${args.email}`, { x: 40, y, size: 10, font: args.font, color: args.textColor });
+  y -= 14;
+  if (args.shippingAddress?.name) {
+    const label = args.shippingLabel ?? "Envio a";
+    args.page.drawText(`${label}: ${args.shippingAddress.name}`, { x: 40, y, size: 10, font: args.font, color: args.textColor });
+    y -= 14;
+  }
+  if (isInvoiceWithTaxId) {
+    args.page.drawText(`NIF/CIF cliente: ${args.customerTaxId!.trim().toUpperCase()}`, {
+      x: 40,
+      y,
+      size: 10,
+      font: args.font,
+      color: args.textColor,
+    });
+    y -= 14;
+  }
+  return y;
+}
 
 function normalizeEuros(value: number): number {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
@@ -77,6 +112,8 @@ export type GenerateRectificativeInvoiceArgs = {
   lines: PurchaseTicketLine[];
   shippingAddress?: Record<string, string> | null;
   originalInvoiceNumber?: string;
+  invoiceRequested?: boolean;
+  customerTaxId?: string | null;
 };
 
 export async function generateRectificativeInvoicePdfBase64(
@@ -130,12 +167,17 @@ export async function generateRectificativeInvoicePdfBase64(
   }
 
   y -= 8;
-  page.drawText(`Cliente / destinatario: ${args.email}`, { x: 40, y, size: 10, font, color: textColor });
-  y -= 14;
-  if (args.shippingAddress?.name) {
-    page.drawText(`Referencia envío: ${args.shippingAddress.name}`, { x: 40, y, size: 10, font, color: textColor });
-    y -= 14;
-  }
+  y = drawCustomerBlock({
+    page,
+    email: args.email,
+    shippingAddress: args.shippingAddress,
+    invoiceRequested: args.invoiceRequested,
+    customerTaxId: args.customerTaxId,
+    shippingLabel: "Referencia envío",
+    yStart: y,
+    font,
+    textColor,
+  });
 
   y -= 10;
   page.drawText("Concepto", { x: 40, y, size: 10, font: fontBold, color: textColor });
@@ -231,24 +273,30 @@ export async function generatePurchaseTicketPdfBase64(
     }
   }
 
-  page.drawText("TICKET / FACTURA SIMPLIFICADA", {
-    x: 180,
+  page.drawText(
+    args.invoiceRequested && args.customerTaxId?.trim()
+      ? "FACTURA"
+      : "TICKET / FACTURA SIMPLIFICADA",
+    {
+    x: args.invoiceRequested && args.customerTaxId?.trim() ? 230 : 180,
     y,
     size: 16,
     font: fontBold,
     color: textColor,
-  });
+  },
+  );
   y -= 28;
 
   const issuedAt = args.issuedAt ?? new Date();
   const ticketNumber = buildSimplifiedInvoiceNumber(args.orderRef, issuedAt);
+  const documentLabel = args.invoiceRequested && args.customerTaxId?.trim() ? "Factura" : "Ticket";
 
   const headerLines = [
     `${businessLegalName}`,
     `NIF/CIF: ${businessTaxId}`,
     `${businessAddressLine1}${businessAddressLine2 ? `, ${businessAddressLine2}` : ""}`,
     `${businessCity}, ${businessCountry}`,
-    `Ticket: ${ticketNumber}`,
+    `${documentLabel}: ${ticketNumber}`,
     `Fecha: ${formatInvoiceDateEs(issuedAt)}`,
   ];
   for (const line of headerLines) {
@@ -257,12 +305,16 @@ export async function generatePurchaseTicketPdfBase64(
   }
 
   y -= 8;
-  page.drawText(`Cliente: ${args.email}`, { x: 40, y, size: 10, font, color: textColor });
-  y -= 14;
-  if (args.shippingAddress?.name) {
-    page.drawText(`Envio a: ${args.shippingAddress.name}`, { x: 40, y, size: 10, font, color: textColor });
-    y -= 14;
-  }
+  y = drawCustomerBlock({
+    page,
+    email: args.email,
+    shippingAddress: args.shippingAddress,
+    invoiceRequested: args.invoiceRequested,
+    customerTaxId: args.customerTaxId,
+    yStart: y,
+    font,
+    textColor,
+  });
 
   y -= 10;
   page.drawText("Concepto", { x: 40, y, size: 10, font: fontBold, color: textColor });

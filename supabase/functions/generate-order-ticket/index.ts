@@ -118,7 +118,7 @@ serve(async (req) => {
   const { data: order, error: orderErr } = await admin
     .from("orders")
     .select(
-      "id, email, status, subtotal, shipping, total, stripe_session_id, shipping_address, created_at, refund_status, returned",
+      "id, email, status, subtotal, shipping, total, stripe_session_id, shipping_address, created_at, refund_status, returned, invoice_requested, customer_tax_id",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -178,6 +178,8 @@ serve(async (req) => {
   const originalIssuedAt = order.created_at ? new Date(String(order.created_at)) : new Date();
   const refundStatus = String(order.refund_status ?? "none");
   const returned = Boolean(order.returned);
+  const invoiceRequested = Boolean(order.invoice_requested);
+  const customerTaxId = order.customer_tax_id ? String(order.customer_tax_id).trim() : null;
 
   const { data: refundedReturns } = await admin
     .from("return_requests")
@@ -224,6 +226,8 @@ serve(async (req) => {
         total: refundContext.refundGrossTotal,
         lines: refundContext.lines,
         shippingAddress: shippingAddressName(order.shipping_address),
+        invoiceRequested,
+        customerTaxId,
       });
 
       return new Response(
@@ -248,6 +252,8 @@ serve(async (req) => {
       lines,
       shippingAddress: shippingAddressName(order.shipping_address),
       issuedAt: originalIssuedAt,
+      invoiceRequested,
+      customerTaxId,
     });
 
     return new Response(

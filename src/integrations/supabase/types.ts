@@ -63,8 +63,10 @@ export type Database = {
         Row: {
           correos_shipment_code: string | null
           created_at: string | null
+          customer_tax_id: string | null
           email: string
           id: string
+          invoice_requested: boolean
           pending_cart_snapshot: Json | null
           redsys_auth_code: string | null
           refund_status: string
@@ -81,8 +83,10 @@ export type Database = {
         Insert: {
           correos_shipment_code?: string | null
           created_at?: string | null
+          customer_tax_id?: string | null
           email: string
           id?: string
+          invoice_requested?: boolean
           pending_cart_snapshot?: Json | null
           redsys_auth_code?: string | null
           refund_status?: string
@@ -99,7 +103,9 @@ export type Database = {
         Update: {
           correos_shipment_code?: string | null
           created_at?: string | null
+          customer_tax_id?: string | null
           email?: string
+          invoice_requested?: boolean
           id?: string
           pending_cart_snapshot?: Json | null
           redsys_auth_code?: string | null
