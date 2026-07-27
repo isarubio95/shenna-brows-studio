@@ -220,11 +220,7 @@ const Login = () => {
                 onExpire={() => setTurnstileToken("")}
                 onError={() => setTurnstileToken("")}
               />
-            ) : (
-              <p className="text-xs text-center text-carbon/50">
-                Protección Cloudflare desactivada en entorno local.
-              </p>
-            )}
+            ) : null}
             <Button type="submit" disabled={loading} className="w-full bg-gold hover:bg-gold/90 text-white py-5 tracking-wide rounded-full">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : isRegister ? "Registrarse" : "Entrar"}
             </Button>
