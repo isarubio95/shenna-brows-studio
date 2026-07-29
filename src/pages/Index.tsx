@@ -21,6 +21,19 @@ const HERO_IMAGES = {
   xl: { avif: "/hero/hero-xl.avif", webp: "/hero/hero-xl.webp", jpg: "/hero/hero-xl.jpg" },
 } as const;
 
+/** Estilos compartidos del CTA del hero (tamaño / tipografía). */
+const HERO_CTA_BASE =
+  "text-[0.65rem] tracking-[0.22em] uppercase px-7 py-3 transition-all duration-300 active:scale-95 font-sans";
+
+/** CTA activo: crema opaco (referencia de diseño). */
+const HERO_CTA_SOLID = `${HERO_CTA_BASE} border border-[#F7F2E6] bg-[#F7F2E6] text-[#8F7F5D] hover:bg-[#EFE7D4] hover:border-[#EFE7D4]`;
+
+/**
+ * Alternativa previa (vidrio translúcido blanco).
+ * Para volver a ella: usa `HERO_CTA_GLASS` en el botón del hero en lugar de `HERO_CTA_SOLID`.
+ */
+const HERO_CTA_GLASS = `${HERO_CTA_BASE} border border-white/80 bg-white/15 backdrop-blur-sm text-white hover:bg-white/25`;
+
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,20 +88,22 @@ const Index = () => {
                 <img 
                   src={logoMetalico} 
                   alt="Shenna Brows Logo" 
-                  className="w-full sm:w-10/12 md:w-8/12 lg:w-full max-w-[280px] h-auto object-contain mb-6 drop-shadow-2xl"
+                  className="hidden sm:block w-[clamp(10rem,38vw,17.5rem)] h-auto object-contain mb-6 drop-shadow-2xl"
                 />
-                <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-left tracking-[0.05em] mb-2 sm:mb-3">
-                  LA PRECISIÓN
+                <h1 className="font-playfair font-normal text-[#F7F0E2] text-[1.7rem] md:text-[2.1rem] lg:text-[3rem] text-left tracking-[0.05em] uppercase leading-[1.35] mb-8 drop-shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
+                  <span className="block">La precisión</span>
+                  <span className="block">
+                    Que te{" "}
+                    <span className="italic">
+                      define
+                    </span>
+                  </span>
                 </h1>
-                <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-left leading-tight tracking-[0.05em]">
-                  QUE TE DEFINE
-                </h1>
-                <div className="w-16 sm:w-24 h-[2px] bg-gold mt-4 sm:mt-6 mb-6 sm:mb-8" />
               </AnimatedSection>
 
               <AnimatedSection delay={0.15}>
                 <Link to="/tienda">
-                  <button className="border border-white/80 bg-white/15 backdrop-blur-sm text-white text-[0.65rem] tracking-[0.22em] uppercase px-7 py-3 transition-all duration-300 hover:bg-white/25 active:scale-95 font-sans">
+                  <button className={HERO_CTA_SOLID}>
                     Explorar tienda
                   </button>
                 </Link>
