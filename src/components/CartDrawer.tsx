@@ -90,7 +90,7 @@ const CartDrawer = () => {
               <div className="flex items-start gap-2 text-xs text-carbon/50">
                 <Truck size={14} className="shrink-0 mt-0.5" />
                 <span>
-                  El envío (7–15 € según provincia o Portugal) se calcula al finalizar la compra al elegir tu provincia.
+                  Envío gratis a partir de 50 €. Si no, 7–15 € según provincia o Portugal (se calcula al elegir tu provincia en el checkout).
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm text-carbon/60">

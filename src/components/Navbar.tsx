@@ -31,7 +31,6 @@ const navLinks: { label: string; to: string; icon: LucideIcon }[] = [
 ];
 
 const Navbar = () => {
-  const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -63,12 +62,10 @@ const Navbar = () => {
     return location.pathname === to;
   };
   const isHome = location.pathname === "/";
-  const isSolid = !isHome || scrolled;
 
   useEffect(() => {
     const onScroll = () => {
       const currentY = window.scrollY;
-      setScrolled(currentY > 20);
       setHidden(currentY > lastScrollY && currentY > 60);
       setLastScrollY(currentY);
     };
@@ -80,21 +77,15 @@ const Navbar = () => {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // En barra transparente (hero): texto e iconos claros. En barra clara (scroll): oscuros.
-  const linkColor = isSolid ? "text-carbon/90 hover:text-gold" : "text-white/90 hover:text-gold";
-  const iconColor = isSolid ? "text-carbon/70 hover:text-gold" : "text-white/90 hover:text-gold";
+  const linkColor = "text-carbon/80 hover:text-gold";
+  const iconColor = "text-carbon/60 hover:text-gold";
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out bg-cream border-b border-carbon/10 ${
         hidden ? "-translate-y-full" : "translate-y-0"
-      } ${
-        isSolid
-          ? "bg-cream/85 backdrop-blur-lg shadow-sm"
-          : "bg-transparent"
       }`}
     >
-      {/* Añadido "relative" al nav para que el centrado absoluto funcione correctamente */}
       <nav className="relative container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
         <Link to="/" onClick={scrollToTop}>
           <img
@@ -111,7 +102,7 @@ const Navbar = () => {
                 to={link.to}
                 onClick={link.to === "/" ? scrollToTop : undefined}
                 className={`text-sm font-medium tracking-wide p-1 transition-colors duration-300 ${
-                  isLinkActive(link.to) ? (isSolid ? "text-gold" : "text-amber-200") : linkColor
+                  isLinkActive(link.to) ? "text-gold" : linkColor
                 }`}
               >
                 {link.label}

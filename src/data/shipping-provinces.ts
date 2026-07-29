@@ -1,6 +1,7 @@
 /**
  * Tarifas de envío (EUR) por zona. Códigos INE de provincia (01–52) y PT para Portugal.
  * Península y Ceuta/Melilla: 7 € · Illes Balears: 10 € · Canarias: 15 € · Portugal: 11 €
+ * Envío gratuito a partir de FREE_SHIPPING_MIN_SUBTOTAL_EUR (subtotal del pedido).
  */
 export const SHIPPING_RATES_EUR = {
   peninsula: 7,
@@ -8,6 +9,9 @@ export const SHIPPING_RATES_EUR = {
   canarias: 15,
   portugal: 11,
 } as const;
+
+/** Subtotal mínimo (EUR) para envío gratuito en cualquier destino. */
+export const FREE_SHIPPING_MIN_SUBTOTAL_EUR = 50;
 
 export type ShippingZoneKey = keyof typeof SHIPPING_RATES_EUR;
 
@@ -43,11 +47,21 @@ export function qualifiesForFreeLogronoShipping(
   return normalizeShippingCity(city ?? "") === "logrono";
 }
 
+/** Envío gratuito por importe: subtotal del pedido ≥ umbral. */
+export function qualifiesForFreeShippingBySubtotal(
+  subtotalEur: number | undefined | null,
+): boolean {
+  if (subtotalEur == null || !Number.isFinite(subtotalEur)) return false;
+  return subtotalEur >= FREE_SHIPPING_MIN_SUBTOTAL_EUR;
+}
+
 export function getShippingEurForProvinceCode(
   code: string | undefined | null,
   city?: string | undefined | null,
+  subtotalEur?: number | undefined | null,
 ): number | null {
   if (!code) return null;
+  if (qualifiesForFreeShippingBySubtotal(subtotalEur)) return 0;
   if (qualifiesForFreeLogronoShipping(code, city)) return 0;
   const z = shippingZoneForProvinceCode(code);
   return z ? SHIPPING_RATES_EUR[z] : null;
@@ -138,4 +152,4 @@ export function getProvinceOptionsGrouped(): Array<{ ccaa: string; provinces: Pr
 }
 
 export const SHIPPING_PRICE_LEGEND =
-  "Península y ciudades autónomas (salvo Canarias/Baleares) 7 € · Illes Balears 10 € · Canarias 15 € · Portugal 11 € · Envío gratuito en Logroño (La Rioja).";
+  "Península y ciudades autónomas (salvo Canarias/Baleares) 7 € · Illes Balears 10 € · Canarias 15 € · Portugal 11 € · Envío gratuito a partir de 50 € de pedido y en Logroño (La Rioja).";

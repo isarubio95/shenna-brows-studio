@@ -13,14 +13,17 @@ import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import CeoSection from "@/components/CeoSection";
 
-const VIDEO_POSTER_TIME = 2; // segundo del que extraer la portada
-
-const HERO_BACKGROUND_URL = "/products/_LABZERODIGITAL_LOW_DSC07311.jpg";
+/** Variantes optimizadas en /public/hero — el navegador solo descarga la que coincida con el viewport. */
+const HERO_IMAGES = {
+  sm: { avif: "/hero/hero-sm.avif", webp: "/hero/hero-sm.webp", jpg: "/hero/hero-sm.jpg" },
+  md: { avif: "/hero/hero-md.avif", webp: "/hero/hero-md.webp", jpg: "/hero/hero-md.jpg" },
+  lg: { avif: "/hero/hero-lg.avif", webp: "/hero/hero-lg.webp", jpg: "/hero/hero-lg.jpg" },
+  xl: { avif: "/hero/hero-xl.avif", webp: "/hero/hero-xl.webp", jpg: "/hero/hero-xl.jpg" },
+} as const;
 
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [videoPoster, setVideoPoster] = useState<string | null>(null);
 
   useEffect(() => {
     (supabase as any).from("products").select("*").order("name").then(({ data }: any) => {
@@ -33,115 +36,69 @@ const Index = () => {
     document.getElementById("coleccion")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // Extraer el frame del segundo 1 del vídeo para usarlo como portada
-  useEffect(() => {
-    const video = document.createElement("video");
-    video.crossOrigin = "anonymous";
-    video.muted = true;
-    video.preload = "metadata";
-    const onLoadedData = () => {
-      video.currentTime = VIDEO_POSTER_TIME;
-    };
-    const onSeeked = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(video, 0, 0);
-          setVideoPoster(canvas.toDataURL("image/jpeg", 0.9));
-        }
-      } finally {
-        video.remove();
-      }
-    };
-    video.addEventListener("loadeddata", onLoadedData);
-    video.addEventListener("seeked", onSeeked);
-    video.src = "/video-presentacion2-vertical.mp4";
-    video.load();
-    return () => {
-      video.removeEventListener("loadeddata", onLoadedData);
-      video.removeEventListener("seeked", onSeeked);
-      video.remove();
-    };
-  }, []);
-
   return (
     <main>
       {/* Hero */}
-      <section
-        className="relative w-full min-h-dvh flex flex-col items-center justify-between px-4 sm:px-6 bg-cover bg-no-repeat overflow-hidden max-lg:bg-position-[center_calc(50%+4rem)] lg:bg-center"
-        style={{ backgroundImage: `url(${HERO_BACKGROUND_URL})` }}
-      >
-        {/* Overlay de degradado para aclarar la parte superior y dar profundidad abajo */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.7)_0%,rgba(0,0,0,0.3)_10%,transparent_20%,transparent_70%,rgba(26,26,26,0.4)_100%)] z-0 pointer-events-none" />
+      <section className="relative w-full min-h-dvh flex flex-col items-start justify-center px-4 sm:px-6 overflow-hidden pt-24 pb-12">
+        {/* Fondo: picture + media — el navegador solo descarga la variante del viewport */}
+        <picture className="absolute inset-0 z-0 pointer-events-none">
+          <source media="(max-width: 639px)" type="image/avif" srcSet={HERO_IMAGES.sm.avif} />
+          <source media="(max-width: 639px)" type="image/webp" srcSet={HERO_IMAGES.sm.webp} />
+          <source media="(max-width: 639px)" type="image/jpeg" srcSet={HERO_IMAGES.sm.jpg} />
+          <source media="(max-width: 1023px)" type="image/avif" srcSet={HERO_IMAGES.md.avif} />
+          <source media="(max-width: 1023px)" type="image/webp" srcSet={HERO_IMAGES.md.webp} />
+          <source media="(max-width: 1023px)" type="image/jpeg" srcSet={HERO_IMAGES.md.jpg} />
+          <source media="(max-width: 1535px)" type="image/avif" srcSet={HERO_IMAGES.lg.avif} />
+          <source media="(max-width: 1535px)" type="image/webp" srcSet={HERO_IMAGES.lg.webp} />
+          <source media="(max-width: 1535px)" type="image/jpeg" srcSet={HERO_IMAGES.lg.jpg} />
+          <source type="image/avif" srcSet={HERO_IMAGES.xl.avif} />
+          <source type="image/webp" srcSet={HERO_IMAGES.xl.webp} />
+          <img
+            src={HERO_IMAGES.lg.jpg}
+            alt=""
+            width={2640}
+            height={1470}
+            decoding="async"
+            fetchPriority="high"
+            className="absolute inset-0 h-full w-full object-cover max-lg:object-[center_calc(50%+4rem)] lg:object-[55%_35%]"
+          />
+        </picture>
 
-        {/* Top spacer to push content down */}
-        <div className="flex-1" />
+        {/* Overlay de degradado para aclarar la parte superior y dar profundidad abajo */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35)_0%,rgba(0,0,0,0.18)_10%,transparent_25%,transparent_70%,rgba(0,0,0,0.18)_100%)] z-[1] pointer-events-none" />
 
         {/* Center content */}
-        <div className="relative z-10 w-full max-w-6xl mx-auto">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12">
-            <div className="w-full lg:w-[58%] flex flex-col items-center pb-14 lg:pb-0">
+        <div className="relative z-[2] w-full max-w-6xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-start justify-between gap-8 lg:gap-12">
+            <div className="w-full lg:w-[58%] flex flex-col items-start pb-14 lg:pb-0">
               <AnimatedSection>
                 <img 
                   src={logoMetalico} 
                   alt="Shenna Brows Logo" 
-                  className="w-full sm:w-10/12 md:w-8/12 lg:w-full max-w-xl h-auto object-contain mb-4 drop-shadow-2xl" 
+                  className="w-full sm:w-10/12 md:w-8/12 lg:w-full max-w-[280px] h-auto object-contain mb-6 drop-shadow-2xl"
                 />
-                <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-center tracking-[0.05em] mb-2 sm:mb-3">
+                <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-left tracking-[0.05em] mb-2 sm:mb-3">
                   LA PRECISIÓN
                 </h1>
-                <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-center leading-tight tracking-[0.05em]">
+                <h1 className="font-playfair text-carbon text-2xl md:text-3xl lg:text-4xl font-bold text-left leading-tight tracking-[0.05em]">
                   QUE TE DEFINE
                 </h1>
-                <div className="w-16 sm:w-24 h-[2px] bg-gold mt-4 sm:mt-6 mb-6 sm:mb-8 mx-auto" />
+                <div className="w-16 sm:w-24 h-[2px] bg-gold mt-4 sm:mt-6 mb-6 sm:mb-8" />
               </AnimatedSection>
 
               <AnimatedSection delay={0.15}>
                 <Link to="/tienda">
-                  <div className="relative inline-flex rounded-full p-[2px] shadow-[0_8px_30px_rgba(197,160,89,0.35)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.5)] transition-all duration-300 transform hover:-translate-y-1 active:scale-95 active:translate-y-0">
-                    <div 
-                      className="absolute inset-0 z-0 rounded-full overflow-hidden pointer-events-none"
-                      style={{
-                        padding: "2px",
-                        WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-                        WebkitMaskComposite: "xor",
-                        maskComposite: "exclude"
-                      }}
-                    >
-                      <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#92400e_0%,#fef08a_50%,#92400e_100%)]" />
-                    </div>
-                    <Button className="relative z-10 block bg-transparent bg-linear-to-r from-gold/50 to-[hsla(38,61%,47%,0.5)] hover:from-gold/30 hover:to-[hsla(38,61%,47%,0.3)] backdrop-blur-md text-white px-8 sm:px-10 py-5 text-xs sm:text-sm md:text-base tracking-[0.25em] uppercase rounded-full transition-colors duration-300 w-full h-full shadow-inner font-playfair">
-                      Explorar tienda →
-                    </Button>
-                  </div>
+                  <button className="border border-white/80 bg-white/15 backdrop-blur-sm text-white text-[0.65rem] tracking-[0.22em] uppercase px-7 py-3 transition-all duration-300 hover:bg-white/25 active:scale-95 font-sans">
+                    Explorar tienda
+                  </button>
                 </Link>
               </AnimatedSection>
             </div>
-
-            <AnimatedSection delay={0.1} className="hidden lg:block w-full lg:w-[34%]">
-              <div className="max-w-[320px] sm:max-w-[360px] mx-auto rounded-2xl overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.25)] border border-white/25 backdrop-blur-sm">
-                <video
-                  className="w-full aspect-9/16 object-cover"
-                  src="/video-presentacion2-vertical.mp4"
-                  poster={videoPoster ?? undefined}
-                  autoPlay
-                  muted
-                  controls
-                  playsInline
-                  preload="metadata"
-                >
-                  Tu navegador no soporta la reproducción de video.
-                </video>
-              </div>
-            </AnimatedSection>
           </div>
         </div>
 
         {/* Bottom section */}
-        <div className="flex-1 flex flex-col items-center justify-end pb-12 relative z-10">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[3]">
           <AnimatedSection delay={0.3}>
             <motion.button
               type="button"
@@ -157,22 +114,6 @@ const Index = () => {
             </motion.button>
           </AnimatedSection>
         </div>
-      </section>
-
-      {/* Video móvil debajo del hero */}
-      <section className="lg:hidden relative w-full h-dvh overflow-hidden">
-        <video
-          className="w-full h-full object-cover"
-          src="/video-presentacion2-vertical.mp4"
-          poster={videoPoster ?? undefined}
-          autoPlay
-          muted
-          controls
-          playsInline
-          preload="metadata"
-        >
-          Tu navegador no soporta la reproducción de video.
-        </video>
       </section>
 
       {/* Products Grid */}

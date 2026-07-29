@@ -13,6 +13,11 @@
     <meta property="og:description" content="Todo lo que necesitas para tener unas cejas perfectas todo el día 🤍" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <!-- Preload LCP del hero según viewport (AVIF; el <picture> hace fallback) -->
+    <link rel="preload" as="image" href="/hero/hero-sm.avif" type="image/avif" media="(max-width: 639px)" fetchpriority="high" />
+    <link rel="preload" as="image" href="/hero/hero-md.avif" type="image/avif" media="(min-width: 640px) and (max-width: 1023px)" fetchpriority="high" />
+    <link rel="preload" as="image" href="/hero/hero-lg.avif" type="image/avif" media="(min-width: 1024px) and (max-width: 1535px)" fetchpriority="high" />
+    <link rel="preload" as="image" href="/hero/hero-xl.avif" type="image/avif" media="(min-width: 1536px)" fetchpriority="high" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />

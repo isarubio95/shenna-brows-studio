@@ -68,7 +68,11 @@ const Checkout = () => {
     () => [...PROVINCE_OPTIONS].sort((a, b) => a.label.localeCompare(b.label, "es")),
     [],
   );
-  const shippingEur = getShippingEurForProvinceCode(shipping.province_code, shipping.city);
+  const shippingEur = getShippingEurForProvinceCode(
+    shipping.province_code,
+    shipping.city,
+    totalPrice,
+  );
   const canQuoteShipping = shippingEur != null;
   const total = totalPrice + (shippingEur ?? 0);
 
@@ -77,7 +81,11 @@ const Checkout = () => {
       toast({ title: "Introduce tu email", variant: "destructive" });
       return;
     }
-    const quoted = getShippingEurForProvinceCode(shipping.province_code.trim(), shipping.city.trim());
+    const quoted = getShippingEurForProvinceCode(
+      shipping.province_code.trim(),
+      shipping.city.trim(),
+      totalPrice,
+    );
     if (!shipping.province_code.trim() || quoted == null) {
       toast({
         title: "Elige tu provincia",

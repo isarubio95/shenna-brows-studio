@@ -1,5 +1,8 @@
 /** Debe coincidir con `src/data/shipping-provinces.ts` (importación cruzada no disponible en Edge). */
 
+/** Debe coincidir con FREE_SHIPPING_MIN_SUBTOTAL_EUR en shipping-provinces.ts */
+export const FREE_SHIPPING_MIN_SUBTOTAL_EUR = 50;
+
 export function normalizeProvinceCode(raw: unknown): string | null {
   const s = String(raw ?? "").trim().toUpperCase();
   if (s === "PT") return "PT";
@@ -24,6 +27,11 @@ function qualifiesForFreeLogronoShipping(provinceCode: string, city: string): bo
   return normalizeShippingCity(city) === "logrono";
 }
 
+/** Debe coincidir con `qualifiesForFreeShippingBySubtotal` en shipping-provinces.ts */
+function qualifiesForFreeShippingBySubtotal(subtotalEur: number): boolean {
+  return Number.isFinite(subtotalEur) && subtotalEur >= FREE_SHIPPING_MIN_SUBTOTAL_EUR;
+}
+
 export function shippingEurForNormalizedProvinceCode(code: string): number | null {
   if (code === "PT") return 11;
   if (code === "07") return 10;
@@ -36,7 +44,9 @@ export function shippingEurForNormalizedProvinceCode(code: string): number | nul
 export function shippingEurForShippingAddress(
   provinceCode: string,
   city: string,
+  subtotalEur?: number,
 ): number | null {
+  if (subtotalEur != null && qualifiesForFreeShippingBySubtotal(subtotalEur)) return 0;
   if (qualifiesForFreeLogronoShipping(provinceCode, city)) return 0;
   return shippingEurForNormalizedProvinceCode(provinceCode);
 }

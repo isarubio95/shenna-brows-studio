@@ -29,7 +29,7 @@ export const products: Product[] = [
     description: "Espuma fijadora de cejas de larga duración que aporta volumen y estructura sin apelmazar. Su textura ultraligera permite modelar cada vello con precisión, manteniéndolos en su lugar durante todo el día. Enriquecida con pantenol y extracto de bambú para fortalecer el vello.",
     materials: "Fórmula vegana y cruelty-free. Ingredientes clave: Pantenol, Extracto de bambú, Vitamina E. Sin parabenos ni sulfatos. Envase airless de 50ml.",
     shipping_info:
-      "Gastos de envío según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
+      "Envío gratuito en pedidos a partir de 50 €. Si no, gastos según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
     tagline: "Volumen y fijación sin esfuerzo",
     stripe_price_id: "price_1T16FqHU2ua1cIqbqUxepbBu",
   },
@@ -44,7 +44,7 @@ export const products: Product[] = [
     description: "Pinzas de precisión profesional diseñadas para un agarre perfecto. Cada par está calibrado a mano para garantizar un cierre milimétrico que atrapa incluso el vello más fino. La herramienta esencial para artistas de cejas que no aceptan menos que la perfección.",
     materials: "Acero inoxidable italiano 430. Acabado satinado antideslizante. Punta calibrada a mano con cierre hermético.",
     shipping_info:
-      "Gastos de envío según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
+      "Envío gratuito en pedidos a partir de 50 €. Si no, gastos según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
     tagline: "Precisión milimétrica en cada agarre",
     stripe_price_id: "price_1T16FCHU2ua1cIqbfBUxN6ku",
   },
@@ -59,7 +59,7 @@ export const products: Product[] = [
     description: "Tijeras de corte preciso con hojas micro-serradas que permiten un recorte limpio y controlado. Diseñadas ergonómicamente para sesiones prolongadas sin fatiga. El complemento perfecto para dar forma y definición.",
     materials: "Acero inoxidable japonés de alta dureza. Hojas micro-serradas. Mangos ergonómicos con revestimiento soft-touch.",
     shipping_info:
-      "Gastos de envío según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
+      "Envío gratuito en pedidos a partir de 50 €. Si no, gastos según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
     tagline: "Corte limpio, forma perfecta",
     stripe_price_id: "price_1T16FTHU2ua1cIqbvBmeuqgK",
   },
@@ -74,7 +74,7 @@ export const products: Product[] = [
     description: "Stick de protección cutánea diseñado para crear una barrera invisible alrededor de la ceja durante el tinte o la depilación. Protege la piel sensible de irritaciones y manchas no deseadas. Fórmula dermatológicamente testada con aloe vera y vitamina E.",
     materials: "Fórmula hipoalergénica y dermatológicamente testada. Ingredientes clave: Aloe vera, Vitamina E, Cera de abeja natural. Sin fragancias artificiales. Formato stick de 15g.",
     shipping_info:
-      "Gastos de envío según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
+      "Envío gratuito en pedidos a partir de 50 €. Si no, gastos según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
     tagline: "Protección invisible, resultados impecables",
     stripe_price_id: "",
   },
@@ -89,7 +89,7 @@ export const products: Product[] = [
     description: "Lápiz de cejas de punta ultrafina que permite trazos pelo a pelo para un resultado hiperrealista y natural. Su fórmula waterproof garantiza una duración impecable de hasta 24 horas. Incluye cepillo spoolie integrado para difuminar y peinar.",
     materials: "Punta ultrafina de 0.1mm. Fórmula waterproof de larga duración. Cepillo spoolie integrado. Disponible en tono universal. Sin testado en animales.",
     shipping_info:
-      "Gastos de envío según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
+      "Envío gratuito en pedidos a partir de 50 €. Si no, gastos según provincia o Portugal (desde 7 € en península). Entrega estimada en 3-5 días laborables en España peninsular. Empaque cuidado.",
     tagline: "Trazos que imitan la naturaleza",
     stripe_price_id: "",
   },

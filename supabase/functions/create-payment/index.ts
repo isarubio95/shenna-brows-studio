@@ -334,7 +334,7 @@ serve(async (req) => {
       );
     }
 
-    const shippingEur = shippingEurForShippingAddress(provinceCodeNorm, shipCity);
+    const shippingEur = shippingEurForShippingAddress(provinceCodeNorm, shipCity, subtotalEur);
     if (shippingEur == null) {
       return new Response(JSON.stringify({ error: "Código de provincia de envío no válido" }), {
         status: 400,
