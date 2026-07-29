@@ -33,3 +33,5 @@ postman_correos.json
 notas.txt
 package.txt
 .temp/
+.vercel
+.env*

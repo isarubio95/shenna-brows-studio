@@ -32,4 +32,4 @@ npm run dev
 
 ## Licencia
 
-Este proyecto se distribuye bajo `AGPL-3.0-only`. Consulta `LICENSE`.
+Este proyecto es privado y no está licenciado (`UNLICENSED`). Todos los derechos reservados.

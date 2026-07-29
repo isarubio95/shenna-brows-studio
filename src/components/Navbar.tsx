@@ -3,9 +3,10 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo-shenna.png";
 import {
   ShoppingBag, User, Menu, Shield,
-  Sparkles, HeartHandshake, Instagram,
+  Sparkles, HeartHandshake,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -128,7 +129,7 @@ const Navbar = () => {
             className={`hidden lg:flex p-1 transition-colors duration-300 ${iconColor}`}
             aria-label="Instagram"
           >
-            <Instagram size={21} className="drop-shadow-sm" />
+            <InstagramIcon width={21} height={21} className="drop-shadow-sm" />
           </a>
 
           {isAdmin && (
@@ -245,7 +246,7 @@ const Navbar = () => {
                 className="text-carbon/70 hover:text-gold transition-colors"
                 aria-label="Instagram"
               >
-                <Instagram size={21} />
+                <InstagramIcon width={21} height={21} />
               </a>
             </div>
 

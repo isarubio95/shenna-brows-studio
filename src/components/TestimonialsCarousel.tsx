@@ -11,10 +11,13 @@ import {
 } from "@/components/ui/carousel";
 import { Quote } from "lucide-react";
 import Autoplay from "embla-carousel-autoplay";
-import { useRef } from "react";
+import { useMemo } from "react";
 
 const TestimonialsCarousel = () => {
-  const plugin = useRef(Autoplay({ delay: 5000, stopOnInteraction: false }));
+  const autoplayPlugin = useMemo(
+    () => Autoplay({ delay: 5000, stopOnInteraction: false }),
+    [],
+  );
 
   const { data: testimonials = [] } = useQuery({
     queryKey: ["featured-testimonials"],
@@ -57,7 +60,7 @@ const TestimonialsCarousel = () => {
 
         <AnimatedSection delay={0.1}>
           <Carousel
-            plugins={[plugin.current]}
+            plugins={[autoplayPlugin]}
             opts={{ loop: true, align: "center" }}
             className="w-full"
           >
