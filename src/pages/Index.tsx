@@ -23,7 +23,7 @@ const HERO_IMAGES = {
 
 /** Estilos compartidos del CTA del hero (tamaño / tipografía). */
 const HERO_CTA_BASE =
-  "text-[0.65rem] tracking-[0.22em] uppercase px-7 py-3 transition-all duration-300 active:scale-95 font-sans";
+  "text-[0.65rem] tracking-[0.22em] uppercase px-6 sm:px-7 py-3 transition-all duration-300 active:scale-95 font-sans";
 
 /** CTA activo: crema opaco (referencia de diseño). */
 const HERO_CTA_SOLID = `${HERO_CTA_BASE} border border-[#F7F2E6] bg-[#F7F2E6] text-[#8F7F5D] hover:bg-[#EFE7D4] hover:border-[#EFE7D4]`;
@@ -104,7 +104,7 @@ const Index = () => {
               <AnimatedSection delay={0.15}>
                 <Link to="/tienda">
                   <button className={HERO_CTA_SOLID}>
-                    Explorar tienda
+                    DESCUBRIR LA COLECCIÓN
                   </button>
                 </Link>
               </AnimatedSection>
