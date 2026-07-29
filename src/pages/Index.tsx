@@ -34,6 +34,15 @@ const HERO_CTA_SOLID = `${HERO_CTA_BASE} border border-[#F7F2E6] bg-[#F7F2E6] te
  */
 const HERO_CTA_GLASS = `${HERO_CTA_BASE} border border-white/80 bg-white/15 backdrop-blur-sm text-white hover:bg-white/25`;
 
+const MARQUEE_ITEMS = [
+  "PARA MICROPIGMENTACIÓN",
+  "MOUSSE LIMPIADORA",
+  "HERRAMIENTAS ARTESANALES GOLD EDITION",
+  "FÓRMULAS DISEÑADAS PARA CEJAS",
+  "RUTINA COMPLETA",
+  "SHENNA",
+] as const;
+
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,6 +139,33 @@ const Index = () => {
           </AnimatedSection>
         </div>
       </section>
+
+      {/* Marquesina */}
+      <div
+        className="relative overflow-hidden border-y border-carbon/10 bg-[#F8F3EB] py-3.5"
+        aria-hidden="true"
+      >
+        <div className="flex w-max animate-marquee motion-reduce:animate-none">
+          {[0, 1].map((copy) => (
+            <ul
+              key={copy}
+              className="flex shrink-0 items-center gap-8 px-4 sm:gap-12"
+            >
+              {MARQUEE_ITEMS.map((item) => (
+                <li
+                  key={`${copy}-${item}`}
+                  className="flex shrink-0 items-center gap-8 sm:gap-12"
+                >
+                  <span className="whitespace-nowrap font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em] text-carbon/70 sm:text-xs">
+                    {item}
+                  </span>
+                  <span className="h-1 w-1 shrink-0 rounded-full bg-gold/80" aria-hidden />
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
+      </div>
 
       {/* Products Grid */}
       <section
