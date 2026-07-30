@@ -1,17 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { motion } from "framer-motion";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import logoMetalico from "@/assets/logo-metalico.png";
 import { getProductImageUrl } from "@/lib/product-images";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import CeoSection from "@/components/CeoSection";
+import { useSiteContent } from "@/hooks/use-site-content";
+import { parseMarqueeConfig } from "@/lib/marquee-content";
 
 /** Variantes optimizadas en /public/hero — el navegador solo descarga la que coincida con el viewport. */
 const HERO_IMAGES = {
@@ -34,18 +34,15 @@ const HERO_CTA_SOLID = `${HERO_CTA_BASE} border border-[#F7F2E6] bg-[#F7F2E6] te
  */
 const HERO_CTA_GLASS = `${HERO_CTA_BASE} border border-white/80 bg-white/15 backdrop-blur-sm text-white hover:bg-white/25`;
 
-const MARQUEE_ITEMS = [
-  "PARA MICROPIGMENTACIÓN",
-  "MOUSSE LIMPIADORA",
-  "HERRAMIENTAS ARTESANALES GOLD EDITION",
-  "FÓRMULAS DISEÑADAS PARA CEJAS",
-  "RUTINA COMPLETA",
-  "SHENNA",
-] as const;
-
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { data: siteContent } = useSiteContent(["index_marquee"]);
+
+  const marquee = useMemo(
+    () => parseMarqueeConfig(siteContent.index_marquee?.content),
+    [siteContent.index_marquee?.content],
+  );
 
   useEffect(() => {
     (supabase as any).from("products").select("*").order("name").then(({ data }: any) => {
@@ -94,11 +91,6 @@ const Index = () => {
           <div className="flex flex-col lg:flex-row items-start justify-between gap-8 lg:gap-12">
             <div className="w-full lg:w-[58%] flex flex-col items-start pb-14 lg:pb-0">
               <AnimatedSection>
-                <img 
-                  src={logoMetalico} 
-                  alt="Shenna Brows Logo" 
-                  className="hidden sm:block w-[clamp(10rem,38vw,17.5rem)] h-auto object-contain mb-6 drop-shadow-2xl"
-                />
                 <h1 className="font-playfair font-normal text-[#F7F0E2] text-[1.7rem] md:text-[2.1rem] lg:text-[3rem] text-left tracking-[0.05em] uppercase leading-[1.35] mb-8 drop-shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
                   <span className="block">La precisión</span>
                   <span className="block">
@@ -142,7 +134,12 @@ const Index = () => {
 
       {/* Marquesina */}
       <div
-        className="relative overflow-hidden border-y border-carbon/10 bg-[#F8F3EB] py-3.5"
+        className="relative overflow-hidden border-y border-carbon/10"
+        style={{
+          backgroundColor: marquee.background,
+          paddingTop: marquee.paddingY,
+          paddingBottom: marquee.paddingY,
+        }}
         aria-hidden="true"
       >
         <div className="flex w-max animate-marquee motion-reduce:animate-none">
@@ -151,9 +148,9 @@ const Index = () => {
               key={copy}
               className="flex shrink-0 items-center gap-8 px-4 sm:gap-12"
             >
-              {MARQUEE_ITEMS.map((item) => (
+              {marquee.items.map((item, i) => (
                 <li
-                  key={`${copy}-${item}`}
+                  key={`${copy}-${i}-${item}`}
                   className="flex shrink-0 items-center gap-8 sm:gap-12"
                 >
                   <span className="whitespace-nowrap font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em] text-carbon/70 sm:text-xs">

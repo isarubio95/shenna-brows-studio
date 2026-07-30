@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getProductImageUrl } from "@/lib/product-images";
@@ -92,6 +92,54 @@ const parseGalleryFromImageUrl = (imageUrl: string | null | undefined): string[]
   return [normalized];
 };
 
+const EMPTY_CREATE_FORM = {
+  category: "",
+  name: "",
+  tagline: "",
+  description: "",
+  materials: "",
+  shipping_info: "",
+  price: 0,
+  stock: 0,
+  image_url: null as string | null,
+  materials_label: "materiales",
+  is_pack: false,
+  is_on_sale: false,
+  sale_price: null as number | null,
+};
+
+const buildProductSnapshot = (args: {
+  form: Partial<Product & { materials_label?: string }>;
+  materialItems: string[];
+  imageUrls: string[];
+  colorVariantRows: ColorVariantFormRow[];
+}) => {
+  const colors = args.colorVariantRows
+    .map((r) => ({
+      id: r.id,
+      name: r.name.trim(),
+      hex: (normalizeHex(r.hexDraft ?? r.hex) ?? "").toUpperCase(),
+    }))
+    .filter((c) => c.name || c.hex);
+
+  return JSON.stringify({
+    category: (args.form.category ?? "").trim(),
+    name: (args.form.name ?? "").trim(),
+    tagline: args.form.tagline ?? "",
+    description: normalizeDescriptionHtml(String(args.form.description || "")),
+    materials: args.materialItems.map((m) => m.trim()).filter(Boolean),
+    materials_label: (args.form as { materials_label?: string }).materials_label || "materiales",
+    shipping_info: args.form.shipping_info ?? "",
+    price: Number(args.form.price) || 0,
+    stock: Number(args.form.stock) || 0,
+    image_urls: args.imageUrls,
+    is_pack: Boolean(args.form.is_pack),
+    is_on_sale: Boolean(args.form.is_on_sale),
+    sale_price: args.form.is_on_sale ? Number(args.form.sale_price) : null,
+    color_variants: colors,
+  });
+};
+
 const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: ProductEditDialogProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +154,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const descriptionEditorRef = useRef<HTMLDivElement>(null);
   const [slugConflict, setSlugConflict] = useState<SlugConflict | null>(null);
   const [slugChecking, setSlugChecking] = useState(false);
+  const [baselineSnapshot, setBaselineSnapshot] = useState("");
 
   const currentProduct = product;
   useEffect(() => {
@@ -120,23 +169,17 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     setSlugChecking(false);
     if (mode === "create") {
       setMaterialItems([""]);
-      setForm({
-        category: "",
-        name: "",
-        tagline: "",
-        description: "",
-        materials: "",
-        shipping_info: "",
-        price: 0,
-        stock: 0,
-        image_url: null,
-        materials_label: "materiales",
-        is_pack: false,
-        is_on_sale: false,
-        sale_price: null,
-      });
+      setForm({ ...EMPTY_CREATE_FORM });
       setImageUrls([]);
       setColorVariantRows([]);
+      setBaselineSnapshot(
+        buildProductSnapshot({
+          form: EMPTY_CREATE_FORM,
+          materialItems: [""],
+          imageUrls: [],
+          colorVariantRows: [],
+        }),
+      );
       if (descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = "";
       return;
     }
@@ -144,8 +187,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     const items = (currentProduct as any).materials
       ? (currentProduct as any).materials.split("\n").filter((s: string) => s.trim())
       : [""];
-    setMaterialItems(items.length > 0 ? items : [""]);
-    setForm({
+    const nextMaterials = items.length > 0 ? items : [""];
+    const nextForm = {
       category: currentProduct.category,
       name: currentProduct.name,
       tagline: currentProduct.tagline,
@@ -159,11 +202,30 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       is_pack: currentProduct.is_pack ?? false,
       is_on_sale: currentProduct.is_on_sale ?? false,
       sale_price: currentProduct.sale_price ?? null,
-    });
-    setImageUrls(parseGalleryFromImageUrl(currentProduct.image_url));
+    };
+    const nextImages = parseGalleryFromImageUrl(currentProduct.image_url);
     const parsed = parseColorVariants(currentProduct.color_variants);
-    setColorVariantRows(parsed.map((v) => ({ ...v, hexDraft: null })));
+    const nextColors = parsed.map((v) => ({ ...v, hexDraft: null as string | null }));
+    setMaterialItems(nextMaterials);
+    setForm(nextForm);
+    setImageUrls(nextImages);
+    setColorVariantRows(nextColors);
+    setBaselineSnapshot(
+      buildProductSnapshot({
+        form: nextForm,
+        materialItems: nextMaterials,
+        imageUrls: nextImages,
+        colorVariantRows: nextColors,
+      }),
+    );
   }, [currentProduct, mode, open]);
+
+  const isDirty = useMemo(() => {
+    if (!baselineSnapshot) return false;
+    return (
+      buildProductSnapshot({ form, materialItems, imageUrls, colorVariantRows }) !== baselineSnapshot
+    );
+  }, [baselineSnapshot, form, materialItems, imageUrls, colorVariantRows]);
 
   const updateField = (field: keyof Product, value: string | number | boolean | null) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -1050,8 +1112,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           {/* Save */}
           <Button
             onClick={handleSave}
-            disabled={saving || !!slugConflict || slugChecking}
-            className="w-full bg-gold hover:bg-gold/90 text-white h-11 text-sm font-medium"
+            disabled={!isDirty || saving || !!slugConflict || slugChecking}
+            className="w-full bg-gold hover:bg-gold/90 text-white h-11 text-sm font-medium disabled:opacity-40"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             {mode === "create" ? "Crear producto" : "Guardar cambios"}

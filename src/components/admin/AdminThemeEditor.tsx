@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, RotateCcw } from "lucide-react";
 import { ThemeConfig, DEFAULT_THEME } from "@/hooks/use-theme-config";
+import { HexColorField } from "@/components/admin/HexColorField";
 
 interface ColorField {
   key: keyof ThemeConfig;
@@ -35,35 +36,10 @@ const TYPOGRAPHY_COLORS: ColorField[] = [
   { key: "colorAccent", label: "Color de acento (dorado)" },
 ];
 
-const ColorPicker = ({
-  value,
-  onChange,
-  label,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  label: string;
-}) => (
-  <div className="flex items-center gap-3">
-    <div className="relative">
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-10 h-10 rounded-lg border border-border cursor-pointer appearance-none bg-transparent p-0"
-        style={{ WebkitAppearance: "none" }}
-      />
-    </div>
-    <div className="flex-1 min-w-0">
-      <Label className="text-foreground text-sm">{label}</Label>
-      <p className="text-muted-foreground text-xs font-mono">{value}</p>
-    </div>
-  </div>
-);
-
 const AdminThemeEditor = () => {
   const { toast } = useToast();
   const [theme, setTheme] = useState<ThemeConfig>(DEFAULT_THEME);
+  const [savedTheme, setSavedTheme] = useState<ThemeConfig>(DEFAULT_THEME);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rowId, setRowId] = useState<string | null>(null);
@@ -78,7 +54,9 @@ const AdminThemeEditor = () => {
         if (data) {
           setRowId(data.id);
           try {
-            setTheme({ ...DEFAULT_THEME, ...JSON.parse(data.content) });
+            const merged = { ...DEFAULT_THEME, ...JSON.parse(data.content) };
+            setTheme(merged);
+            setSavedTheme(merged);
           } catch {
             /* keep defaults */
           }
@@ -91,7 +69,11 @@ const AdminThemeEditor = () => {
     setTheme((prev) => ({ ...prev, [key]: value }));
   };
 
+  const isDirty = JSON.stringify(theme) !== JSON.stringify(savedTheme);
+  const isDefault = JSON.stringify(theme) === JSON.stringify(DEFAULT_THEME);
+
   const save = async () => {
+    if (!isDirty) return;
     setSaving(true);
     const json = JSON.stringify(theme);
 
@@ -136,6 +118,7 @@ const AdminThemeEditor = () => {
       for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
         root.style.setProperty(cssVar, theme[key as keyof ThemeConfig]);
       }
+      setSavedTheme(theme);
       toast({ title: "Tema guardado", description: "Los cambios se han aplicado." });
     }
     setSaving(false);
@@ -160,12 +143,15 @@ const AdminThemeEditor = () => {
       </h4>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {fields.map((f) => (
-          <ColorPicker
-            key={f.key}
-            value={theme[f.key]}
-            onChange={(v) => updateColor(f.key, v)}
-            label={f.label}
-          />
+          <div key={f.key} className="space-y-2">
+            <Label className="text-foreground text-sm">{f.label}</Label>
+            <HexColorField
+              value={theme[f.key]}
+              onChange={(v) => updateColor(f.key, v)}
+              fallback={DEFAULT_THEME[f.key]}
+              aria-label={f.label}
+            />
+          </div>
         ))}
       </div>
     </div>
@@ -180,8 +166,8 @@ const AdminThemeEditor = () => {
       <div className="flex gap-3 pt-2">
         <Button
           onClick={save}
-          disabled={saving}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          disabled={!isDirty || saving}
+          className="bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-40"
           size="sm"
         >
           {saving ? (
@@ -195,7 +181,8 @@ const AdminThemeEditor = () => {
           onClick={resetDefaults}
           variant="outline"
           size="sm"
-          className="border-border text-muted-foreground"
+          disabled={isDefault}
+          className="border-border text-muted-foreground disabled:opacity-40"
         >
           <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
           Restaurar valores

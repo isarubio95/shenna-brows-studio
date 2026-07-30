@@ -1957,7 +1957,7 @@ const Admin = () => {
           <>
         <AnimatedSection delay={0.05}>
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Contenido de la Web</h2>
-          <p className="text-carbon/40 text-sm mb-4">Edita los textos del inicio y la página "Sobre mí".</p>
+          <p className="text-carbon/40 text-sm mb-4">Edita la marquesina del inicio y los textos de la página "Sobre mí".</p>
           <AdminContentEditor />
         </AnimatedSection>
 
