@@ -367,7 +367,7 @@ const Tienda = () => {
           </p>
         </AnimatedSection>
 
-        <div className="relative md:px-12">
+        <div className="relative md:px-12 lg:px-16">
           <Carousel
             plugins={loading ? undefined : [productsAutoplay]}
             opts={{ align: "start", loop: false, containScroll: "trimSnaps" }}
@@ -406,8 +406,8 @@ const Tienda = () => {
                     </CarouselItem>
                   ))}
             </CarouselContent>
-            <CarouselPrevious className="hidden md:flex border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/90" />
-            <CarouselNext className="hidden md:flex border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/90" />
+            <CarouselPrevious className="hidden md:flex h-10 w-10 lg:-left-14 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/90 [&_svg]:h-5 [&_svg]:w-5" />
+            <CarouselNext className="hidden md:flex h-10 w-10 lg:-right-14 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/90 [&_svg]:h-5 [&_svg]:w-5" />
           </Carousel>
         </div>
 

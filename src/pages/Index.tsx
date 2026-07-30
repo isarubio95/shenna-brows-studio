@@ -229,7 +229,7 @@ const Index = () => {
             <Carousel
               plugins={loading ? undefined : [productsAutoplay]}
               opts={{ align: "start", loop: false, containScroll: "trimSnaps" }}
-              className="w-full md:px-12"
+              className="w-full md:px-12 lg:px-16"
             >
               <CarouselContent className="-ml-4">
                 {loading
@@ -285,8 +285,8 @@ const Index = () => {
                       </CarouselItem>
                     ))}
               </CarouselContent>
-              <CarouselPrevious className="hidden md:flex border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/80 backdrop-blur-sm" />
-              <CarouselNext className="hidden md:flex border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/80 backdrop-blur-sm" />
+              <CarouselPrevious className="hidden md:flex h-10 w-10 lg:-left-14 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/80 backdrop-blur-sm [&_svg]:h-5 [&_svg]:w-5" />
+              <CarouselNext className="hidden md:flex h-10 w-10 lg:-right-14 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/80 backdrop-blur-sm [&_svg]:h-5 [&_svg]:w-5" />
             </Carousel>
           </AnimatedSection>
         </div>
