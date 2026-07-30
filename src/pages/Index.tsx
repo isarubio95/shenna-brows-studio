@@ -85,7 +85,7 @@ const Index = () => {
   return (
     <main>
       {/* Hero */}
-      <section className="relative w-full min-h-dvh flex flex-col items-start justify-center px-4 sm:px-6 overflow-hidden pt-24 pb-12">
+      <section className="relative w-full min-h-dvh flex flex-col items-start justify-center lg:justify-end px-4 sm:px-6 overflow-hidden pt-24 pb-12 lg:pb-36">
         {/* Fondo: picture + media — el navegador solo descarga la variante del viewport */}
         <picture className="absolute inset-0 z-0 pointer-events-none">
           <source media="(max-width: 639px)" type="image/avif" srcSet={HERO_IMAGES.sm.avif} />
@@ -114,7 +114,7 @@ const Index = () => {
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35)_0%,rgba(0,0,0,0.18)_10%,transparent_25%,transparent_70%,rgba(0,0,0,0.18)_100%)] z-[1] pointer-events-none" />
 
         {/* Center content */}
-        <div className="relative z-[2] w-full max-w-6xl mx-auto">
+        <div className="relative z-[2] w-full max-w-6xl mx-auto lg:ml-12 xl:ml-20 lg:mr-auto">
           <div className="flex flex-col lg:flex-row items-start justify-between gap-8 lg:gap-12">
             <div className="w-full lg:w-[58%] flex flex-col items-start pb-14 lg:pb-0">
               <AnimatedSection>
