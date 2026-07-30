@@ -61,10 +61,18 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
 
     const scrollPrev = React.useCallback(() => {
       api?.scrollPrev();
+      const autoplay = api?.plugins()?.autoplay;
+      if (autoplay && autoplay.options.stopOnInteraction !== false) {
+        autoplay.stop();
+      }
     }, [api]);
 
     const scrollNext = React.useCallback(() => {
       api?.scrollNext();
+      const autoplay = api?.plugins()?.autoplay;
+      if (autoplay && autoplay.options.stopOnInteraction !== false) {
+        autoplay.stop();
+      }
     }, [api]);
 
     const handleKeyDown = React.useCallback(
@@ -166,7 +174,7 @@ const CarouselItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLD
 CarouselItem.displayName = "CarouselItem";
 
 const CarouselPrevious = React.forwardRef<HTMLButtonElement, React.ComponentProps<typeof Button>>(
-  ({ className, variant = "outline", size = "icon", ...props }, ref) => {
+  ({ className, variant = "outline", size = "icon", onClick, ...props }, ref) => {
     const { orientation, scrollPrev, canScrollPrev } = useCarousel();
 
     return (
@@ -182,7 +190,10 @@ const CarouselPrevious = React.forwardRef<HTMLButtonElement, React.ComponentProp
           className,
         )}
         disabled={!canScrollPrev}
-        onClick={scrollPrev}
+        onClick={(event) => {
+          onClick?.(event);
+          scrollPrev();
+        }}
         {...props}
       >
         <ArrowLeft className="h-4 w-4" />
@@ -194,7 +205,7 @@ const CarouselPrevious = React.forwardRef<HTMLButtonElement, React.ComponentProp
 CarouselPrevious.displayName = "CarouselPrevious";
 
 const CarouselNext = React.forwardRef<HTMLButtonElement, React.ComponentProps<typeof Button>>(
-  ({ className, variant = "outline", size = "icon", ...props }, ref) => {
+  ({ className, variant = "outline", size = "icon", onClick, ...props }, ref) => {
     const { orientation, scrollNext, canScrollNext } = useCarousel();
 
     return (
@@ -210,7 +221,10 @@ const CarouselNext = React.forwardRef<HTMLButtonElement, React.ComponentProps<ty
           className,
         )}
         disabled={!canScrollNext}
-        onClick={scrollNext}
+        onClick={(event) => {
+          onClick?.(event);
+          scrollNext();
+        }}
         {...props}
       >
         <ArrowRight className="h-4 w-4" />

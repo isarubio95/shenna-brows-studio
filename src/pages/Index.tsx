@@ -4,14 +4,26 @@ import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { motion } from "framer-motion";
+import Autoplay from "embla-carousel-autoplay";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { getProductImageUrl } from "@/lib/product-images";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import CeoSection from "@/components/CeoSection";
 import { useSiteContent } from "@/hooks/use-site-content";
 import { parseMarqueeConfig } from "@/lib/marquee-content";
+import {
+  parseCollectionHeadlineConfig,
+  splitHeadlineByAccent,
+} from "@/lib/collection-headline-content";
 
 /** Variantes optimizadas en /public/hero — el navegador solo descarga la que coincida con el viewport. */
 const HERO_IMAGES = {
@@ -37,11 +49,26 @@ const HERO_CTA_GLASS = `${HERO_CTA_BASE} border border-white/80 bg-white/15 back
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { data: siteContent } = useSiteContent(["index_marquee"]);
+  const { data: siteContent } = useSiteContent(["index_marquee", "index_collection_headline"]);
 
   const marquee = useMemo(
     () => parseMarqueeConfig(siteContent.index_marquee?.content),
     [siteContent.index_marquee?.content],
+  );
+
+  const collectionHeadline = useMemo(
+    () => parseCollectionHeadlineConfig(siteContent.index_collection_headline?.content),
+    [siteContent.index_collection_headline?.content],
+  );
+
+  const headlineParts = useMemo(
+    () => splitHeadlineByAccent(collectionHeadline.text, collectionHeadline.accent),
+    [collectionHeadline.text, collectionHeadline.accent],
+  );
+
+  const productsAutoplay = useMemo(
+    () => Autoplay({ delay: 4000, stopOnInteraction: true }),
+    [],
   );
 
   useEffect(() => {
@@ -172,6 +199,25 @@ const Index = () => {
       >
         <div className="container mx-auto px-6">
           <AnimatedSection>
+            <p
+              className="font-playfair text-center leading-snug mb-10 md:mb-14"
+              style={{
+                color: collectionHeadline.color,
+                fontSize: `clamp(1.35rem, 2.5vw + 0.75rem, ${collectionHeadline.fontSize}px)`,
+              }}
+            >
+              {headlineParts ? (
+                <>
+                  {headlineParts.before}
+                  <span className="italic" style={{ color: collectionHeadline.accentColor }}>
+                    {headlineParts.accent}
+                  </span>
+                  {headlineParts.after}
+                </>
+              ) : (
+                collectionHeadline.text
+              )}
+            </p>
             <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center mb-4" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
               Nuestra colección
             </h2>
@@ -179,50 +225,70 @@ const Index = () => {
               Cinco herramientas esenciales para la artista que busca perfección.
             </p>
           </AnimatedSection>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl overflow-hidden">
-                  <Skeleton className="aspect-square" />
-                  <div className="p-6 space-y-2">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-6 w-40" />
-                    <Skeleton className="h-4 w-32" />
-                  </div>
-                </div>
-              ))
-            ) : (
-              products.map((product, i) => (
-                <AnimatedSection key={product.id} delay={i * 0.1} className="h-full">
-                  <Link to={`/${product.slug}`} className="block h-full">
-                    <motion.div
-                      whileHover={{ y: -8 }}
-                      transition={{ duration: 0.3 }}
-                      className="group h-full bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-shadow duration-500 flex flex-col"
-                    >
-                      <div className="relative aspect-square bg-muted overflow-hidden">
-                        <ProductSaleBadge product={product} />
-                        <img
-                          src={getProductImageUrl(product.image_url, product.slug)}
-                          alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                          loading="lazy"
-                        />
-                      </div>
-                      <div className="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                          <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">{product.category}</p>
-                          <h3 className="font-playfair text-xl font-semibold text-carbon mb-1">{product.name}</h3>
-                          <p className="text-sm text-carbon/50">{product.tagline}</p>
+          <AnimatedSection delay={0.1}>
+            <Carousel
+              plugins={loading ? undefined : [productsAutoplay]}
+              opts={{ align: "start", loop: false, containScroll: "trimSnaps" }}
+              className="w-full md:px-12"
+            >
+              <CarouselContent className="-ml-4">
+                {loading
+                  ? Array.from({ length: 5 }).map((_, i) => (
+                      <CarouselItem
+                        key={i}
+                        className="pl-4 basis-[88%] sm:basis-[55%] md:basis-[42%] lg:basis-[33%] xl:basis-[27%]"
+                      >
+                        <div className="bg-white rounded-2xl overflow-hidden h-full">
+                          <Skeleton className="aspect-square" />
+                          <div className="p-6 space-y-2">
+                            <Skeleton className="h-4 w-20" />
+                            <Skeleton className="h-6 w-40" />
+                            <Skeleton className="h-4 w-32" />
+                          </div>
                         </div>
-                        <ProductPriceDisplay product={product} className="mt-4" />
-                      </div>
-                    </motion.div>
-                  </Link>
-                </AnimatedSection>
-              ))
-            )}
-          </div>
+                      </CarouselItem>
+                    ))
+                  : products.map((product) => (
+                      <CarouselItem
+                        key={product.id}
+                        className="pl-4 basis-[88%] sm:basis-[55%] md:basis-[42%] lg:basis-[33%] xl:basis-[27%]"
+                      >
+                        <Link to={`/${product.slug}`} className="block h-full">
+                          <motion.div
+                            whileHover={{ y: -8 }}
+                            transition={{ duration: 0.3 }}
+                            className="group h-full bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-shadow duration-500 flex flex-col"
+                          >
+                            <div className="relative aspect-square bg-muted overflow-hidden">
+                              <ProductSaleBadge product={product} />
+                              <img
+                                src={getProductImageUrl(product.image_url, product.slug)}
+                                alt={product.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                                loading="lazy"
+                              />
+                            </div>
+                            <div className="p-6 flex-1 flex flex-col justify-between">
+                              <div>
+                                <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">
+                                  {product.category}
+                                </p>
+                                <h3 className="font-playfair text-xl font-semibold text-carbon mb-1">
+                                  {product.name}
+                                </h3>
+                                <p className="text-sm text-carbon/50">{product.tagline}</p>
+                              </div>
+                              <ProductPriceDisplay product={product} className="mt-4" />
+                            </div>
+                          </motion.div>
+                        </Link>
+                      </CarouselItem>
+                    ))}
+              </CarouselContent>
+              <CarouselPrevious className="hidden md:flex border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/80 backdrop-blur-sm" />
+              <CarouselNext className="hidden md:flex border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/80 backdrop-blur-sm" />
+            </Carousel>
+          </AnimatedSection>
         </div>
       </section>
 

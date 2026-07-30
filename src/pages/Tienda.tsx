@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ShieldCheck, ShoppingCart, Plus, Truck, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import Autoplay from "embla-carousel-autoplay";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { getProductImageGallery } from "@/lib/product-images";
@@ -11,6 +12,13 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import { Button } from "@/components/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEffectivePrice } from "@/lib/product-pricing";
 
@@ -255,6 +263,11 @@ const Tienda = () => {
     return { individualProducts: individuals, packProducts: packs };
   }, [products]);
 
+  const productsAutoplay = useMemo(
+    () => Autoplay({ delay: 4500, stopOnInteraction: true }),
+    [],
+  );
+
   const catalogForSeo = useMemo(
     () => [...individualProducts, ...packProducts],
     [individualProducts, packProducts],
@@ -354,31 +367,48 @@ const Tienda = () => {
           </p>
         </AnimatedSection>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {loading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl overflow-hidden border border-gold/10">
-                <Skeleton className="aspect-square" />
-                <div className="p-6 space-y-3">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-6 w-36" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-10 w-full mt-4" />
-                </div>
-              </div>
-            ))
-          ) : (
-            individualProducts.map((product, i) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                delay={i * 0.06}
-                onOpenProduct={(nextSlug) => navigate(`/${nextSlug}`)}
-                onAddToCart={handleAddToCart}
-                addToCartDisabled={isAddToCartDisabled}
-              />
-            ))
-          )}
+        <div className="relative md:px-12">
+          <Carousel
+            plugins={loading ? undefined : [productsAutoplay]}
+            opts={{ align: "start", loop: false, containScroll: "trimSnaps" }}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-4">
+              {loading
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <CarouselItem
+                      key={i}
+                      className="pl-4 basis-[88%] sm:basis-[55%] lg:basis-[40%] xl:basis-[31%]"
+                    >
+                      <div className="bg-white rounded-2xl overflow-hidden border border-gold/10 h-full">
+                        <Skeleton className="aspect-square" />
+                        <div className="p-6 space-y-3">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-6 w-36" />
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-10 w-full mt-4" />
+                        </div>
+                      </div>
+                    </CarouselItem>
+                  ))
+                : individualProducts.map((product, i) => (
+                    <CarouselItem
+                      key={product.id}
+                      className="pl-4 basis-[88%] sm:basis-[55%] lg:basis-[40%] xl:basis-[31%]"
+                    >
+                      <ProductCard
+                        product={product}
+                        delay={i * 0.06}
+                        onOpenProduct={(nextSlug) => navigate(`/${nextSlug}`)}
+                        onAddToCart={handleAddToCart}
+                        addToCartDisabled={isAddToCartDisabled}
+                      />
+                    </CarouselItem>
+                  ))}
+            </CarouselContent>
+            <CarouselPrevious className="hidden md:flex border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/90" />
+            <CarouselNext className="hidden md:flex border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/90" />
+          </Carousel>
         </div>
 
         {(loading || packProducts.length > 0) && (
