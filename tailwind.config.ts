@@ -64,6 +64,7 @@ export default {
       },
       fontFamily: {
         playfair: ["Playfair Display", "serif"],
+        cormorant: ["Cormorant Garamond", "serif"],
         sans: ["Lato", "sans-serif"],
         inter: ["Inter", "sans-serif"],
       },

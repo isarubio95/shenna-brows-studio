@@ -609,7 +609,7 @@ const AdminContentEditor = () => {
                     style={{ backgroundColor: "#F8F3EB" }}
                   >
                     <p
-                      className="font-playfair leading-snug"
+                      className="font-cormorant leading-snug"
                       style={{
                         color: isHex(headlineDraft.color)
                           ? headlineDraft.color

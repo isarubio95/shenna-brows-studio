@@ -200,7 +200,7 @@ const Index = () => {
         <div className="container mx-auto px-6">
           <AnimatedSection>
             <p
-              className="font-playfair text-center leading-snug mb-10 md:mb-14"
+              className="font-cormorant text-center leading-snug mb-10 md:mb-14"
               style={{
                 color: collectionHeadline.color,
                 fontSize: `clamp(1.35rem, 2.5vw + 0.75rem, ${collectionHeadline.fontSize}px)`,
