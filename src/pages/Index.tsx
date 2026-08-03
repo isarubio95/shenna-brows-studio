@@ -106,7 +106,7 @@ const Index = () => {
             height={1470}
             decoding="async"
             fetchPriority="high"
-            className="absolute inset-0 h-full w-full object-cover max-lg:object-[center_calc(50%+4rem)] lg:object-[55%_35%]"
+            className="absolute inset-0 h-full w-full object-cover max-sm:object-center sm:max-lg:object-[center_calc(50%+4rem)] lg:object-[55%_35%]"
           />
         </picture>
 
@@ -114,7 +114,7 @@ const Index = () => {
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35)_0%,rgba(0,0,0,0.18)_10%,transparent_25%,transparent_70%,rgba(0,0,0,0.18)_100%)] z-[1] pointer-events-none" />
 
         {/* Center content */}
-        <div className="relative z-[2] w-full max-w-6xl mx-auto lg:ml-12 xl:ml-20 lg:mr-auto">
+        <div className="relative z-[2] w-full max-w-6xl mx-auto max-lg:translate-y-36 lg:ml-12 xl:ml-20 lg:mr-auto lg:translate-y-0">
           <div className="flex flex-col lg:flex-row items-start justify-between gap-8 lg:gap-12">
             <div className="w-full lg:w-[58%] flex flex-col items-start pb-14 lg:pb-0">
               <AnimatedSection>
