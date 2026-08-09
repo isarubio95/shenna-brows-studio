@@ -37,7 +37,11 @@ import {
 import { optimizeImageForUpload, type OptimizeImageVariant } from "@/lib/optimize-image-upload";
 import { HexColorField, toPickerColor } from "@/components/admin/HexColorField";
 import ProductImageCropDialog from "@/components/admin/ProductImageCropDialog";
-import CampaignBanner from "@/components/CampaignBanner";
+import CampaignBanner, {
+  CampaignPreviewFrame,
+  CAMPAIGN_PREVIEW_VIEWPORT,
+  type CampaignPreviewDevice,
+} from "@/components/CampaignBanner";
 import HeroSection, {
   HeroPreviewFrame,
   HERO_PREVIEW_VIEWPORT,
@@ -146,6 +150,8 @@ const AdminContentEditor = () => {
   const [heroCropSrc, setHeroCropSrc] = useState<string | null>(null);
   const [heroCropVariant, setHeroCropVariant] = useState<OptimizeImageVariant>("desktop");
   const [heroPreviewDevice, setHeroPreviewDevice] = useState<HeroPreviewDevice>("desktop");
+  const [campaignPreviewDevice, setCampaignPreviewDevice] =
+    useState<CampaignPreviewDevice>("desktop");
   const heroDesktopInputRef = useRef<HTMLInputElement>(null);
   const heroMobileInputRef = useRef<HTMLInputElement>(null);
 
@@ -221,6 +227,8 @@ const AdminContentEditor = () => {
       alt: campaignDraft.alt.trim() || DEFAULT_CAMPAIGN.alt,
       textPosX: campaignDraft.textPosX,
       textPosY: campaignDraft.textPosY,
+      textPosMobileX: campaignDraft.textPosMobileX,
+      textPosMobileY: campaignDraft.textPosMobileY,
     };
     return {
       title: "Campaña publicitaria",
@@ -252,6 +260,8 @@ const AdminContentEditor = () => {
       alt: heroDraft.alt.trim() || DEFAULT_HERO.alt,
       textPosX: heroDraft.textPosX,
       textPosY: heroDraft.textPosY,
+      textPosMobileX: heroDraft.textPosMobileX,
+      textPosMobileY: heroDraft.textPosMobileY,
     };
     return {
       title: "Hero del inicio",
@@ -1466,15 +1476,26 @@ const AdminContentEditor = () => {
                           variant="outline"
                           size="sm"
                           disabled={
-                            heroDraft.textPosX === DEFAULT_HERO.textPosX &&
-                            heroDraft.textPosY === DEFAULT_HERO.textPosY
+                            heroPreviewDevice === "mobile"
+                              ? heroDraft.textPosMobileX === DEFAULT_HERO.textPosMobileX &&
+                                heroDraft.textPosMobileY === DEFAULT_HERO.textPosMobileY
+                              : heroDraft.textPosX === DEFAULT_HERO.textPosX &&
+                                heroDraft.textPosY === DEFAULT_HERO.textPosY
                           }
                           onClick={() =>
-                            setHeroDraft((prev) => ({
-                              ...prev,
-                              textPosX: DEFAULT_HERO.textPosX,
-                              textPosY: DEFAULT_HERO.textPosY,
-                            }))
+                            setHeroDraft((prev) =>
+                              heroPreviewDevice === "mobile"
+                                ? {
+                                    ...prev,
+                                    textPosMobileX: DEFAULT_HERO.textPosMobileX,
+                                    textPosMobileY: DEFAULT_HERO.textPosMobileY,
+                                  }
+                                : {
+                                    ...prev,
+                                    textPosX: DEFAULT_HERO.textPosX,
+                                    textPosY: DEFAULT_HERO.textPosY,
+                                  },
+                            )
                           }
                           className="border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-8"
                         >
@@ -1490,11 +1511,19 @@ const AdminContentEditor = () => {
                           preview
                           previewDevice={heroPreviewDevice}
                           onTextPositionChange={(pos) =>
-                            setHeroDraft((prev) => ({
-                              ...prev,
-                              textPosX: pos.x,
-                              textPosY: pos.y,
-                            }))
+                            setHeroDraft((prev) =>
+                              heroPreviewDevice === "mobile"
+                                ? {
+                                    ...prev,
+                                    textPosMobileX: pos.x,
+                                    textPosMobileY: pos.y,
+                                  }
+                                : {
+                                    ...prev,
+                                    textPosX: pos.x,
+                                    textPosY: pos.y,
+                                  },
+                            )
                           }
                         />
                       </HeroPreviewFrame>
@@ -1505,7 +1534,7 @@ const AdminContentEditor = () => {
                         ? `${HERO_PREVIEW_VIEWPORT.mobile.width}×${HERO_PREVIEW_VIEWPORT.mobile.height}`
                         : `${HERO_PREVIEW_VIEWPORT.desktop.width}×${HERO_PREVIEW_VIEWPORT.desktop.height}`}
                       : mismo recorte de la foto y misma franja superior tapada por la barra de navegación.
-                      La foto se recorta igual que en la web, así que lo que no ves aquí tampoco se verá allí.
+                      La posición del texto se guarda aparte para escritorio y para móvil.
                     </p>
                   </div>
                 </>
@@ -1927,42 +1956,107 @@ const AdminContentEditor = () => {
                   <div>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
-                        Vista previa (arrastra los textos para colocarlos)
+                        Vista previa (escala real · arrastra los textos)
                       </Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          campaignDraft.textPosX === DEFAULT_CAMPAIGN.textPosX &&
-                          campaignDraft.textPosY === DEFAULT_CAMPAIGN.textPosY
-                        }
-                        onClick={() =>
-                          setCampaignDraft((prev) => ({
-                            ...prev,
-                            textPosX: DEFAULT_CAMPAIGN.textPosX,
-                            textPosY: DEFAULT_CAMPAIGN.textPosY,
-                          }))
-                        }
-                        className="border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-8"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                        Restablecer posición
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex rounded-md border border-gold/20 overflow-hidden">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setCampaignPreviewDevice("desktop")}
+                            className={cn(
+                              "h-8 rounded-none px-3 text-xs",
+                              campaignPreviewDevice === "desktop"
+                                ? "bg-gold/15 text-carbon"
+                                : "text-carbon/50",
+                            )}
+                          >
+                            Escritorio
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setCampaignPreviewDevice("mobile")}
+                            className={cn(
+                              "h-8 rounded-none px-3 text-xs",
+                              campaignPreviewDevice === "mobile"
+                                ? "bg-gold/15 text-carbon"
+                                : "text-carbon/50",
+                            )}
+                          >
+                            Móvil
+                          </Button>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            campaignPreviewDevice === "mobile"
+                              ? campaignDraft.textPosMobileX ===
+                                  DEFAULT_CAMPAIGN.textPosMobileX &&
+                                campaignDraft.textPosMobileY ===
+                                  DEFAULT_CAMPAIGN.textPosMobileY
+                              : campaignDraft.textPosX === DEFAULT_CAMPAIGN.textPosX &&
+                                campaignDraft.textPosY === DEFAULT_CAMPAIGN.textPosY
+                          }
+                          onClick={() =>
+                            setCampaignDraft((prev) =>
+                              campaignPreviewDevice === "mobile"
+                                ? {
+                                    ...prev,
+                                    textPosMobileX: DEFAULT_CAMPAIGN.textPosMobileX,
+                                    textPosMobileY: DEFAULT_CAMPAIGN.textPosMobileY,
+                                  }
+                                : {
+                                    ...prev,
+                                    textPosX: DEFAULT_CAMPAIGN.textPosX,
+                                    textPosY: DEFAULT_CAMPAIGN.textPosY,
+                                  },
+                            )
+                          }
+                          className="border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-8"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                          Restablecer posición
+                        </Button>
+                      </div>
                     </div>
-                    <div className="-mx-6 border-y border-carbon/10 overflow-hidden bg-muted">
-                      <CampaignBanner
-                        config={campaignPreviewConfig}
-                        preview
-                        onTextPositionChange={(pos) =>
-                          setCampaignDraft((prev) => ({
-                            ...prev,
-                            textPosX: pos.x,
-                            textPosY: pos.y,
-                          }))
-                        }
-                      />
+                    <div className="-mx-6 border-y border-carbon/10 overflow-hidden">
+                      <CampaignPreviewFrame device={campaignPreviewDevice}>
+                        <CampaignBanner
+                          config={campaignPreviewConfig}
+                          preview
+                          previewDevice={campaignPreviewDevice}
+                          onTextPositionChange={(pos) =>
+                            setCampaignDraft((prev) =>
+                              campaignPreviewDevice === "mobile"
+                                ? {
+                                    ...prev,
+                                    textPosMobileX: pos.x,
+                                    textPosMobileY: pos.y,
+                                  }
+                                : {
+                                    ...prev,
+                                    textPosX: pos.x,
+                                    textPosY: pos.y,
+                                  },
+                            )
+                          }
+                        />
+                      </CampaignPreviewFrame>
                     </div>
+                    <p className="text-xs text-carbon/35 mt-2">
+                      Vista fiel de{" "}
+                      {campaignPreviewDevice === "mobile"
+                        ? `móvil (${CAMPAIGN_PREVIEW_VIEWPORT.mobile.width}px, ratio 4:5)`
+                        : `escritorio (${CAMPAIGN_PREVIEW_VIEWPORT.desktop.width}px, ratio 21:9 · máx. 720px de alto)`}
+                      : misma tipografía, imagen y proporción que en la web. Las bandas laterales
+                      marcan el ancho real del dispositivo; la posición del texto se guarda aparte
+                      para escritorio y para móvil.
+                    </p>
                   </div>
                 </>
               )}

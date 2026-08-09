@@ -7,6 +7,7 @@ import {
   type HeroConfig,
 } from "@/lib/hero-content";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 const HERO_CTA_BASE =
@@ -56,12 +57,16 @@ const HeroSection = ({
     originY: number;
   } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const isMobileViewport = useIsMobile();
 
   const mobileSrc = config.mobileImageUrl.trim() || config.desktopImageUrl;
   const desktopSrc = config.desktopImageUrl.trim() || mobileSrc;
   const line2Parts = splitHeadlineByAccent(config.line2, config.line2Accent);
   const canDrag = Boolean(preview && onTextPositionChange);
   const previewMobile = preview && previewDevice === "mobile";
+  const useMobilePos = preview ? previewMobile : isMobileViewport;
+  const textPosX = useMobilePos ? config.textPosMobileX : config.textPosX;
+  const textPosY = useMobilePos ? config.textPosMobileY : config.textPosY;
 
   const handlePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -72,12 +77,12 @@ const HeroSection = ({
         pointerId: e.pointerId,
         startX: e.clientX,
         startY: e.clientY,
-        originX: config.textPosX,
-        originY: config.textPosY,
+        originX: textPosX,
+        originY: textPosY,
       };
       setDragging(true);
     },
-    [canDrag, config.textPosX, config.textPosY, onTextPositionChange],
+    [canDrag, textPosX, textPosY, onTextPositionChange],
   );
 
   const handlePointerMove = useCallback(
@@ -245,8 +250,8 @@ const HeroSection = ({
           dragging && "cursor-grabbing",
         )}
         style={{
-          left: `${config.textPosX}%`,
-          top: `${config.textPosY}%`,
+          left: `${textPosX}%`,
+          top: `${textPosY}%`,
         }}
         onPointerDown={canDrag ? handlePointerDown : undefined}
         onPointerMove={canDrag ? handlePointerMove : undefined}
@@ -315,34 +320,44 @@ export function HeroPreviewFrame({
     return () => ro.disconnect();
   }, []);
 
+  // No ampliar por encima del tamaño real: en móvil deja bandas laterales claras.
   const scale =
     containerWidth > 0
       ? Math.min(
+          1,
           containerWidth / viewport.width,
           HERO_PREVIEW_MAX_HEIGHT / viewport.height,
         )
       : 0;
 
+  const stageW = Math.round(viewport.width * scale);
+  const stageH = Math.round(viewport.height * scale);
+
   return (
     <div
       ref={outerRef}
-      className="relative flex w-full justify-center overflow-hidden bg-carbon/15"
-      style={{ height: Math.round(viewport.height * scale) }}
+      className="relative flex w-full items-start justify-center overflow-hidden bg-carbon/15"
+      style={{ height: stageH || undefined, minHeight: scale === 0 ? 120 : undefined }}
     >
       <div
-        className="relative shrink-0 origin-top"
-        style={{
-          width: viewport.width,
-          height: viewport.height,
-          transform: `scale(${scale})`,
-        }}
+        className="relative shrink-0 overflow-hidden bg-carbon/5 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]"
+        style={{ width: stageW, height: stageH }}
       >
-        {children}
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 z-10 border-b border-carbon/10 bg-cream"
-          style={{ height: viewport.navbarHeight }}
-          aria-hidden
-        />
+          className="origin-top-left"
+          style={{
+            width: viewport.width,
+            height: viewport.height,
+            transform: `scale(${scale})`,
+          }}
+        >
+          {children}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 border-b border-carbon/10 bg-cream"
+            style={{ height: viewport.navbarHeight }}
+            aria-hidden
+          />
+        </div>
       </div>
     </div>
   );

@@ -16,8 +16,12 @@ export interface HeroConfig {
   ctaBg: string;
   ctaTextColor: string;
   alt: string;
+  /** Posición del bloque de texto en escritorio (0–100 %). */
   textPosX: number;
   textPosY: number;
+  /** Posición del bloque de texto en móvil (0–100 %). */
+  textPosMobileX: number;
+  textPosMobileY: number;
 }
 
 /** Contenido actual del hero (assets en /public/hero). */
@@ -36,6 +40,8 @@ export const DEFAULT_HERO: HeroConfig = {
   alt: "Shenna Brows",
   textPosX: 5,
   textPosY: 42,
+  textPosMobileX: 5,
+  textPosMobileY: 42,
 };
 
 const isHexColor = (value: unknown): value is string =>
@@ -72,9 +78,14 @@ export function parseHeroConfig(raw?: string | null): HeroConfig {
 
   try {
     const parsed = JSON.parse(trimmed) as Partial<HeroConfig>;
-    const pos = clampHeroTextPos(
+    const desktopPos = clampHeroTextPos(
       parsePos(parsed.textPosX, DEFAULT_HERO.textPosX),
       parsePos(parsed.textPosY, DEFAULT_HERO.textPosY),
+    );
+    // Si aún no hay posición móvil guardada, hereda la de escritorio.
+    const mobilePos = clampHeroTextPos(
+      parsePos(parsed.textPosMobileX, desktopPos.x),
+      parsePos(parsed.textPosMobileY, desktopPos.y),
     );
     return {
       desktopImageUrl:
@@ -99,8 +110,10 @@ export function parseHeroConfig(raw?: string | null): HeroConfig {
         ? parsed.ctaTextColor.trim()
         : DEFAULT_HERO.ctaTextColor,
       alt: asString(parsed.alt, DEFAULT_HERO.alt).trim() || DEFAULT_HERO.alt,
-      textPosX: pos.x,
-      textPosY: pos.y,
+      textPosX: desktopPos.x,
+      textPosY: desktopPos.y,
+      textPosMobileX: mobilePos.x,
+      textPosMobileY: mobilePos.y,
     };
   } catch {
     return { ...DEFAULT_HERO };
@@ -108,7 +121,8 @@ export function parseHeroConfig(raw?: string | null): HeroConfig {
 }
 
 export function serializeHeroConfig(config: HeroConfig): string {
-  const pos = clampHeroTextPos(config.textPosX, config.textPosY);
+  const desktopPos = clampHeroTextPos(config.textPosX, config.textPosY);
+  const mobilePos = clampHeroTextPos(config.textPosMobileX, config.textPosMobileY);
   return JSON.stringify({
     desktopImageUrl: config.desktopImageUrl,
     mobileImageUrl: config.mobileImageUrl,
@@ -122,7 +136,9 @@ export function serializeHeroConfig(config: HeroConfig): string {
     ctaBg: config.ctaBg,
     ctaTextColor: config.ctaTextColor,
     alt: config.alt,
-    textPosX: pos.x,
-    textPosY: pos.y,
+    textPosX: desktopPos.x,
+    textPosY: desktopPos.y,
+    textPosMobileX: mobilePos.x,
+    textPosMobileY: mobilePos.y,
   });
 }

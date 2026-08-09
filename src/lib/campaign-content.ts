@@ -9,10 +9,12 @@ export interface CampaignConfig {
   subheadlineAccentColor: string;
   dividerColor: string;
   alt: string;
-  /** Posición horizontal del bloque de texto (0–100 %, desde la izquierda). */
+  /** Posición del bloque de texto en escritorio (0–100 %). */
   textPosX: number;
-  /** Posición vertical del bloque de texto (0–100 %, desde arriba). */
   textPosY: number;
+  /** Posición del bloque de texto en móvil (0–100 %). */
+  textPosMobileX: number;
+  textPosMobileY: number;
 }
 
 export const DEFAULT_CAMPAIGN: CampaignConfig = {
@@ -28,6 +30,8 @@ export const DEFAULT_CAMPAIGN: CampaignConfig = {
   alt: "Campaña publicitaria",
   textPosX: 6,
   textPosY: 32,
+  textPosMobileX: 6,
+  textPosMobileY: 32,
 };
 
 const isHexColor = (value: unknown): value is string =>
@@ -64,9 +68,14 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
 
   try {
     const parsed = JSON.parse(trimmed) as Partial<CampaignConfig>;
-    const pos = clampCampaignTextPos(
+    const desktopPos = clampCampaignTextPos(
       parsePos(parsed.textPosX, DEFAULT_CAMPAIGN.textPosX),
       parsePos(parsed.textPosY, DEFAULT_CAMPAIGN.textPosY),
+    );
+    // Si aún no hay posición móvil guardada, hereda la de escritorio.
+    const mobilePos = clampCampaignTextPos(
+      parsePos(parsed.textPosMobileX, desktopPos.x),
+      parsePos(parsed.textPosMobileY, desktopPos.y),
     );
     return {
       desktopImageUrl: asString(parsed.desktopImageUrl, DEFAULT_CAMPAIGN.desktopImageUrl).trim(),
@@ -92,8 +101,10 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
         ? parsed.dividerColor.trim()
         : DEFAULT_CAMPAIGN.dividerColor,
       alt: asString(parsed.alt, DEFAULT_CAMPAIGN.alt).trim() || DEFAULT_CAMPAIGN.alt,
-      textPosX: pos.x,
-      textPosY: pos.y,
+      textPosX: desktopPos.x,
+      textPosY: desktopPos.y,
+      textPosMobileX: mobilePos.x,
+      textPosMobileY: mobilePos.y,
     };
   } catch {
     return { ...DEFAULT_CAMPAIGN };
@@ -101,7 +112,8 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
 }
 
 export function serializeCampaignConfig(config: CampaignConfig): string {
-  const pos = clampCampaignTextPos(config.textPosX, config.textPosY);
+  const desktopPos = clampCampaignTextPos(config.textPosX, config.textPosY);
+  const mobilePos = clampCampaignTextPos(config.textPosMobileX, config.textPosMobileY);
   return JSON.stringify({
     desktopImageUrl: config.desktopImageUrl,
     mobileImageUrl: config.mobileImageUrl,
@@ -113,7 +125,9 @@ export function serializeCampaignConfig(config: CampaignConfig): string {
     subheadlineAccentColor: config.subheadlineAccentColor,
     dividerColor: config.dividerColor,
     alt: config.alt,
-    textPosX: pos.x,
-    textPosY: pos.y,
+    textPosX: desktopPos.x,
+    textPosY: desktopPos.y,
+    textPosMobileX: mobilePos.x,
+    textPosMobileY: mobilePos.y,
   });
 }
