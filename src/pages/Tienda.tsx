@@ -6,7 +6,7 @@ import { ShieldCheck, ShoppingCart, Plus, Truck, Sparkles, ChevronLeft, ChevronR
 import Autoplay from "embla-carousel-autoplay";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { getProductImageGallery } from "@/lib/product-images";
+import { getProductImageGallery, getProductImageUrl } from "@/lib/product-images";
 import { useCart } from "@/context/CartContext";
 import AnimatedSection from "@/components/AnimatedSection";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
@@ -287,7 +287,7 @@ const Tienda = () => {
           "@type": "Product",
           name: product.name,
           description: stripHtml(product.description) || product.tagline || "",
-          image: getProductImageGallery(product.image_url, product.slug)[0],
+          image: getProductImageUrl(product.image_url, product.slug),
           brand: { "@type": "Brand", name: "Shenna Brows" },
           offers: {
             "@type": "Offer",
