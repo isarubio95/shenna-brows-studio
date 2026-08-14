@@ -23,7 +23,7 @@ const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL ?? "https://vanhsuisvxvclxdgutaw.supabase.co";
 const NEWSLETTER_ENDPOINT = `${SUPABASE_URL}/functions/v1/newsletter-subscribe`;
 /** Fondo sólido hasta que el admin suba una imagen. */
-const FALLBACK_BG = "#F4EDE3";
+const FALLBACK_BG = "#E8DFD0";
 
 const HIDDEN_PATHS = [
   "/checkout",

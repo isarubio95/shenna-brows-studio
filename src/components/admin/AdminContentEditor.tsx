@@ -2010,7 +2010,7 @@ const AdminContentEditor = () => {
                   <div
                     className="mx-auto w-full max-w-[220px] overflow-hidden rounded-2xl border border-gold/15 shadow-sm"
                     style={{
-                      backgroundColor: "#F4EDE3",
+                      backgroundColor: "#E8DFD0",
                       backgroundImage: welcomePopupDraft.imageUrl
                         ? `url(${welcomePopupDraft.imageUrl})`
                         : undefined,
