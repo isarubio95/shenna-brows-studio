@@ -38,8 +38,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Pencil, Plus, RefreshCw, Trash2, Users } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Pencil, Plus, RefreshCw, Trash2, Users, X } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import {
+  buildCustomerContacts,
+  displayContactName,
+  type CustomerContact,
+} from "@/lib/customer-contacts";
 
 type DiscountCode = Tables<"discount_codes">;
 
@@ -76,12 +82,24 @@ const emptyForm = (): FormState => ({
   min_subtotal: "50",
   max_uses: "",
   max_uses_per_email: "1",
-  first_order_only: true,
+  first_order_only: false,
   starts_at: "",
   ends_at: "",
   is_active: true,
   is_welcome_offer: false,
 });
+
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+const isLikelyEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const parseEmailList = (raw: string): string[] => {
+  const parts = raw
+    .split(/[\s,;]+/)
+    .map(normalizeEmail)
+    .filter(Boolean);
+  return [...new Set(parts.filter(isLikelyEmail))];
+};
 
 const toDatetimeLocal = (iso: string | null): string => {
   if (!iso) return "";
@@ -107,15 +125,57 @@ const formatValue = (row: DiscountCode) =>
     ? `${Number(row.discount_value)}%`
     : formatMoney(Number(row.discount_value));
 
+const isExpired = (row: DiscountCode, now = Date.now()) => {
+  if (!row.ends_at) return false;
+  const end = new Date(row.ends_at).getTime();
+  return Number.isFinite(end) && end < now;
+};
+
+const formatCaducidad = (row: DiscountCode, now = Date.now()) => {
+  if (!row.ends_at) return "—";
+  const end = new Date(row.ends_at).getTime();
+  if (!Number.isFinite(end)) return "—";
+  const msLeft = end - now;
+  if (msLeft < 0) return "0 días";
+  const days = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+  return days === 1 ? "1 día" : `${days} días`;
+};
+
+const statusBadge = (row: DiscountCode) => {
+  if (isExpired(row)) {
+    return {
+      label: "Caducado",
+      className: "border-amber-200 text-amber-800 bg-amber-50",
+    };
+  }
+  if (row.is_active) {
+    return {
+      label: "Activo",
+      className: "border-emerald-200 text-emerald-700 bg-emerald-50",
+    };
+  }
+  return {
+    label: "Inactivo",
+    className: "border-carbon/15 text-carbon/50",
+  };
+};
+
 const AdminDiscountCodes = () => {
   const { toast } = useToast();
   const [codes, setCodes] = useState<DiscountCode[]>([]);
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
+  const [emailCounts, setEmailCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DiscountCode | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [restrictToEmails, setRestrictToEmails] = useState(false);
+  const [allowedEmails, setAllowedEmails] = useState<string[]>([]);
+  const [emailDraft, setEmailDraft] = useState("");
+  const [contactSearch, setContactSearch] = useState("");
+  const [contacts, setContacts] = useState<CustomerContact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DiscountCode | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -138,6 +198,8 @@ const AdminDiscountCodes = () => {
         variant: "destructive",
       });
       setCodes([]);
+      setUsageCounts({});
+      setEmailCounts({});
       setLoading(false);
       return;
     }
@@ -148,34 +210,77 @@ const AdminDiscountCodes = () => {
     const ids = rows.map((r) => r.id);
     if (ids.length === 0) {
       setUsageCounts({});
+      setEmailCounts({});
       setLoading(false);
       return;
     }
 
-    const { data: orderRows, error: ordersErr } = await supabase
-      .from("orders")
-      .select("discount_code_id")
-      .in("discount_code_id", ids)
-      .neq("status", "pending_payment");
+    const [ordersRes, emailsRes] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("discount_code_id")
+        .in("discount_code_id", ids)
+        .neq("status", "pending_payment"),
+      supabase.from("discount_code_emails").select("discount_code_id").in("discount_code_id", ids),
+    ]);
 
-    if (ordersErr) {
-      console.warn("discount_codes_usage_count", ordersErr.message);
+    if (ordersRes.error) {
+      console.warn("discount_codes_usage_count", ordersRes.error.message);
       setUsageCounts({});
     } else {
       const counts: Record<string, number> = {};
-      for (const row of orderRows ?? []) {
+      for (const row of ordersRes.data ?? []) {
         const id = String((row as { discount_code_id?: string | null }).discount_code_id ?? "");
         if (!id) continue;
         counts[id] = (counts[id] ?? 0) + 1;
       }
       setUsageCounts(counts);
     }
+
+    if (emailsRes.error) {
+      console.warn("discount_codes_email_count", emailsRes.error.message);
+      setEmailCounts({});
+    } else {
+      const counts: Record<string, number> = {};
+      for (const row of emailsRes.data ?? []) {
+        const id = String((row as { discount_code_id?: string | null }).discount_code_id ?? "");
+        if (!id) continue;
+        counts[id] = (counts[id] ?? 0) + 1;
+      }
+      setEmailCounts(counts);
+    }
     setLoading(false);
   }, [toast]);
+
+  const fetchContacts = useCallback(async () => {
+    setContactsLoading(true);
+    try {
+      const [ordersRes, profilesRes] = await Promise.all([
+        supabase
+          .from("orders")
+          .select("email, shipping_address, created_at")
+          .order("created_at", { ascending: false }),
+        supabase.from("profiles").select("email, full_name").not("email", "is", null),
+      ]);
+      if (ordersRes.error) throw ordersRes.error;
+      if (profilesRes.error) throw profilesRes.error;
+      setContacts(buildCustomerContacts(ordersRes.data ?? [], profilesRes.data ?? []));
+    } catch (error) {
+      console.warn("discount_codes_contacts", error);
+      setContacts([]);
+    } finally {
+      setContactsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     void fetchCodes();
   }, [fetchCodes]);
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+    void fetchContacts();
+  }, [dialogOpen, fetchContacts]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -187,13 +292,114 @@ const AdminDiscountCodes = () => {
     );
   }, [codes, search]);
 
+  const filteredContacts = useMemo(() => {
+    const q = contactSearch.trim().toLowerCase();
+    if (!q) return contacts;
+    return contacts.filter((c) => {
+      const name = displayContactName(c).toLowerCase();
+      return name.includes(q) || c.email.includes(q);
+    });
+  }, [contacts, contactSearch]);
+
+  /** Solo puede haber un código marcado como oferta del pop-up. */
+  const otherWelcomeOffer = useMemo(
+    () => codes.find((c) => c.is_welcome_offer && c.id !== editing?.id) ?? null,
+    [codes, editing?.id],
+  );
+  const welcomeSwitchBlocked = Boolean(otherWelcomeOffer) && !form.is_welcome_offer;
+
+  const canSave = useMemo(() => {
+    if (!form.code.trim()) return false;
+
+    const discountValue = Number(form.discount_value.replace(",", "."));
+    if (!Number.isFinite(discountValue) || discountValue <= 0) return false;
+    if (form.discount_type === "percent" && discountValue > 100) return false;
+
+    const minSubtotalRaw = form.min_subtotal.trim();
+    if (minSubtotalRaw !== "") {
+      const minSubtotal = Number(minSubtotalRaw.replace(",", "."));
+      if (!Number.isFinite(minSubtotal) || minSubtotal < 0) return false;
+    }
+
+    const maxUsesRaw = form.max_uses.trim();
+    if (maxUsesRaw !== "") {
+      const maxUses = Math.floor(Number(maxUsesRaw));
+      if (!Number.isFinite(maxUses) || maxUses < 1) return false;
+    }
+
+    const maxPerEmailRaw = form.max_uses_per_email.trim();
+    if (maxPerEmailRaw !== "") {
+      const maxPerEmail = Math.floor(Number(maxPerEmailRaw));
+      if (!Number.isFinite(maxPerEmail) || maxPerEmail < 1) return false;
+    }
+
+    if (form.is_welcome_offer && otherWelcomeOffer) return false;
+
+    if (restrictToEmails) {
+      const emailsToSave = [
+        ...new Set([...allowedEmails, ...parseEmailList(emailDraft)]),
+      ];
+      if (emailsToSave.length === 0) return false;
+    }
+
+    return true;
+  }, [
+    form.code,
+    form.discount_value,
+    form.discount_type,
+    form.min_subtotal,
+    form.max_uses,
+    form.max_uses_per_email,
+    form.is_welcome_offer,
+    otherWelcomeOffer,
+    restrictToEmails,
+    allowedEmails,
+    emailDraft,
+  ]);
+
+  const resetEmailRestriction = () => {
+    setRestrictToEmails(false);
+    setAllowedEmails([]);
+    setEmailDraft("");
+    setContactSearch("");
+  };
+
+  const addAllowedEmails = (emails: string[]) => {
+    if (emails.length === 0) return;
+    setAllowedEmails((prev) => [...new Set([...prev, ...emails])].sort());
+  };
+
+  const removeAllowedEmail = (email: string) => {
+    setAllowedEmails((prev) => prev.filter((e) => e !== email));
+  };
+
+  const toggleContactEmail = (email: string, checked: boolean) => {
+    const normalized = normalizeEmail(email);
+    if (checked) addAllowedEmails([normalized]);
+    else removeAllowedEmail(normalized);
+  };
+
+  const syncAllowedEmails = async (codeId: string, emails: string[]) => {
+    const { error: delErr } = await supabase
+      .from("discount_code_emails")
+      .delete()
+      .eq("discount_code_id", codeId);
+    if (delErr) throw delErr;
+    if (emails.length === 0) return;
+    const { error: insErr } = await supabase.from("discount_code_emails").insert(
+      emails.map((email) => ({ discount_code_id: codeId, email })),
+    );
+    if (insErr) throw insErr;
+  };
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm());
+    resetEmailRestriction();
     setDialogOpen(true);
   };
 
-  const openEdit = (row: DiscountCode) => {
+  const openEdit = async (row: DiscountCode) => {
     setEditing(row);
     setForm({
       code: row.code,
@@ -209,19 +415,24 @@ const AdminDiscountCodes = () => {
       is_active: row.is_active,
       is_welcome_offer: row.is_welcome_offer,
     });
+    setEmailDraft("");
+    setContactSearch("");
     setDialogOpen(true);
-  };
 
-  const clearOtherWelcomeOffers = async (exceptId?: string) => {
-    let query = supabase
-      .from("discount_codes")
-      .update({ is_welcome_offer: false })
-      .eq("is_welcome_offer", true);
-    if (exceptId) {
-      query = query.neq("id", exceptId);
+    const { data, error } = await supabase
+      .from("discount_code_emails")
+      .select("email")
+      .eq("discount_code_id", row.id)
+      .order("email");
+    if (error) {
+      console.warn("discount_code_emails_load", error.message);
+      setRestrictToEmails(false);
+      setAllowedEmails([]);
+      return;
     }
-    const { error } = await query;
-    if (error) throw error;
+    const emails = (data ?? []).map((r) => normalizeEmail(r.email)).filter(Boolean);
+    setAllowedEmails(emails);
+    setRestrictToEmails(emails.length > 0);
   };
 
   const handleSave = async (event: FormEvent) => {
@@ -264,12 +475,30 @@ const AdminDiscountCodes = () => {
       return;
     }
 
+    if (form.is_welcome_offer && otherWelcomeOffer) {
+      toast({
+        title: "Ya hay un código de pop-up",
+        description: `Solo puede haber uno. Desmarca el de «${otherWelcomeOffer.code}» antes de asignar otro.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const emailsFromDraft = parseEmailList(emailDraft);
+    const emailsToSave = restrictToEmails
+      ? [...new Set([...allowedEmails, ...emailsFromDraft])].sort()
+      : [];
+    if (restrictToEmails && emailsToSave.length === 0) {
+      toast({
+        title: "Añade al menos un email",
+        description: "O desactiva la restricción por email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
-      if (form.is_welcome_offer && form.is_active) {
-        await clearOtherWelcomeOffers(editing?.id);
-      }
-
       const payload = {
         code,
         description: form.description.trim() || null,
@@ -285,18 +514,27 @@ const AdminDiscountCodes = () => {
         is_welcome_offer: form.is_welcome_offer,
       };
 
+      let codeId = editing?.id ?? null;
       if (editing) {
         const { error } = await supabase
           .from("discount_codes")
           .update(payload)
           .eq("id", editing.id);
         if (error) throw error;
-        toast({ title: "Código actualizado" });
       } else {
-        const { error } = await supabase.from("discount_codes").insert(payload);
+        const { data, error } = await supabase
+          .from("discount_codes")
+          .insert(payload)
+          .select("id")
+          .single();
         if (error) throw error;
-        toast({ title: "Código creado" });
+        codeId = data.id;
       }
+
+      if (!codeId) throw new Error("No se pudo obtener el id del código");
+      await syncAllowedEmails(codeId, emailsToSave);
+
+      toast({ title: editing ? "Código actualizado" : "Código creado" });
       setDialogOpen(false);
       await fetchCodes();
     } catch (error) {
@@ -418,6 +656,7 @@ const AdminDiscountCodes = () => {
                 <TableHead className="text-carbon/60">Descuento</TableHead>
                 <TableHead className="text-carbon/60">Mínimo</TableHead>
                 <TableHead className="text-carbon/60">Usos</TableHead>
+                <TableHead className="text-carbon/60">Caducidad</TableHead>
                 <TableHead className="text-carbon/60">Estado</TableHead>
                 <TableHead className="text-carbon/60 text-right">Acciones</TableHead>
               </TableRow>
@@ -439,21 +678,26 @@ const AdminDiscountCodes = () => {
                     {usageCounts[row.id] ?? 0}
                     {row.max_uses != null ? ` / ${row.max_uses}` : ""}
                   </TableCell>
+                  <TableCell
+                    className={
+                      isExpired(row) ? "text-amber-700" : "text-carbon/70"
+                    }
+                  >
+                    {formatCaducidad(row)}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      <Badge
-                        variant="outline"
-                        className={
-                          row.is_active
-                            ? "border-emerald-200 text-emerald-700 bg-emerald-50"
-                            : "border-carbon/15 text-carbon/50"
-                        }
-                      >
-                        {row.is_active ? "Activo" : "Inactivo"}
+                      <Badge variant="outline" className={statusBadge(row).className}>
+                        {statusBadge(row).label}
                       </Badge>
                       {row.is_welcome_offer ? (
                         <Badge variant="outline" className="border-gold/30 text-gold bg-gold/5">
-                          Welcome
+                          Pop-up
+                        </Badge>
+                      ) : null}
+                      {(emailCounts[row.id] ?? 0) > 0 ? (
+                        <Badge variant="outline" className="border-sky-200 text-sky-700 bg-sky-50">
+                          {emailCounts[row.id]} email{emailCounts[row.id] === 1 ? "" : "s"}
                         </Badge>
                       ) : null}
                       {row.first_order_only ? (
@@ -478,7 +722,7 @@ const AdminDiscountCodes = () => {
                         type="button"
                         size="icon"
                         variant="ghost"
-                        onClick={() => openEdit(row)}
+                        onClick={() => void openEdit(row)}
                         title="Editar"
                       >
                         <Pencil className="h-4 w-4" />
@@ -595,7 +839,7 @@ const AdminDiscountCodes = () => {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="dc-starts">Inicio</Label>
+                <Label htmlFor="dc-starts">Inicio de validez</Label>
                 <Input
                   id="dc-starts"
                   type="datetime-local"
@@ -603,9 +847,10 @@ const AdminDiscountCodes = () => {
                   onChange={(e) => setForm((f) => ({ ...f, starts_at: e.target.value }))}
                   className="border-gold/20"
                 />
+                <p className="text-xs text-carbon/55">Vacío = empieza ya.</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dc-ends">Fin</Label>
+                <Label htmlFor="dc-ends">Fin de validez</Label>
                 <Input
                   id="dc-ends"
                   type="datetime-local"
@@ -613,6 +858,7 @@ const AdminDiscountCodes = () => {
                   onChange={(e) => setForm((f) => ({ ...f, ends_at: e.target.value }))}
                   className="border-gold/20"
                 />
+                <p className="text-xs text-carbon/55">Vacío = sin caducidad.</p>
               </div>
             </div>
             <div className="space-y-3 rounded-lg border border-gold/15 bg-white/60 p-3">
@@ -630,18 +876,156 @@ const AdminDiscountCodes = () => {
                   onCheckedChange={(v) => setForm((f) => ({ ...f, first_order_only: v }))}
                 />
               </label>
-              <label className="flex items-center justify-between gap-3 text-sm text-carbon">
-                <span>Oferta del popup de bienvenida</span>
-                <Switch
-                  checked={form.is_welcome_offer}
-                  onCheckedChange={(v) => setForm((f) => ({ ...f, is_welcome_offer: v }))}
-                />
-              </label>
+              <div className="space-y-1.5">
+                <label className="flex items-center justify-between gap-3 text-sm text-carbon">
+                  <span>Oferta del pop-up de bienvenida</span>
+                  <Switch
+                    checked={form.is_welcome_offer}
+                    disabled={welcomeSwitchBlocked}
+                    onCheckedChange={(v) => setForm((f) => ({ ...f, is_welcome_offer: v }))}
+                  />
+                </label>
+                {welcomeSwitchBlocked && otherWelcomeOffer ? (
+                  <p className="text-xs text-carbon/55">
+                    Ya está asignado a «{otherWelcomeOffer.code}». Desmárcalo ahí para usar
+                    este.
+                  </p>
+                ) : (
+                  <p className="text-xs text-carbon/55">
+                    Solo puede haber un código de pop-up a la vez.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 border-t border-gold/10 pt-3">
+                <label className="flex items-center justify-between gap-3 text-sm text-carbon">
+                  <span>Restringir a emails</span>
+                  <Switch
+                    checked={restrictToEmails}
+                    onCheckedChange={(v) => {
+                      setRestrictToEmails(v);
+                      if (!v) {
+                        setAllowedEmails([]);
+                        setEmailDraft("");
+                      }
+                    }}
+                  />
+                </label>
+                <p className="text-xs text-carbon/55">
+                  Si está activo, solo los emails seleccionados podrán usar el código.
+                </p>
+                {restrictToEmails ? (
+                  <div className="space-y-3">
+                    {allowedEmails.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {allowedEmails.map((email) => (
+                          <Badge
+                            key={email}
+                            variant="outline"
+                            className="gap-1 border-gold/25 bg-white text-carbon/80"
+                          >
+                            {email}
+                            <button
+                              type="button"
+                              onClick={() => removeAllowedEmail(email)}
+                              className="rounded-full p-0.5 hover:bg-carbon/10"
+                              aria-label={`Quitar ${email}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-carbon/45">Ningún email seleccionado aún.</p>
+                    )}
+                    <div className="flex gap-2">
+                      <Input
+                        value={emailDraft}
+                        onChange={(e) => setEmailDraft(e.target.value)}
+                        placeholder="Añadir email o pegar varios…"
+                        className="border-gold/20"
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter") return;
+                          e.preventDefault();
+                          const parsed = parseEmailList(emailDraft);
+                          if (parsed.length === 0) return;
+                          addAllowedEmails(parsed);
+                          setEmailDraft("");
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-gold/20 shrink-0"
+                        onClick={() => {
+                          const parsed = parseEmailList(emailDraft);
+                          if (parsed.length === 0) {
+                            toast({
+                              title: "Email no válido",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          addAllowedEmails(parsed);
+                          setEmailDraft("");
+                        }}
+                      >
+                        Añadir
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Input
+                        value={contactSearch}
+                        onChange={(e) => setContactSearch(e.target.value)}
+                        placeholder="Buscar clientes…"
+                        className="border-gold/20"
+                      />
+                      <div className="max-h-40 overflow-y-auto rounded-md border border-gold/15 bg-white">
+                        {contactsLoading ? (
+                          <div className="flex justify-center py-6">
+                            <Loader2 className="h-4 w-4 animate-spin text-gold" />
+                          </div>
+                        ) : filteredContacts.length === 0 ? (
+                          <p className="px-3 py-4 text-xs text-carbon/45">
+                            No hay contactos que coincidan.
+                          </p>
+                        ) : (
+                          filteredContacts.slice(0, 80).map((contact) => {
+                            const checked = allowedEmails.includes(contact.email);
+                            return (
+                              <label
+                                key={contact.email}
+                                className="flex cursor-pointer items-start gap-2 border-b border-gold/5 px-3 py-2 last:border-0 hover:bg-cream/60"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(v) =>
+                                    toggleContactEmail(contact.email, v === true)
+                                  }
+                                  className="mt-0.5 border-carbon/30 data-[state=checked]:border-gold data-[state=checked]:bg-gold"
+                                />
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm text-carbon">
+                                    {displayContactName(contact)}
+                                  </span>
+                                  <span className="block truncate text-xs text-carbon/50">
+                                    {contact.email}
+                                  </span>
+                                </span>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
             <Button
               type="submit"
-              disabled={saving}
-              className="w-full bg-gold hover:bg-gold/90 text-white"
+              disabled={saving || !canSave}
+              className="w-full bg-gold hover:bg-gold/90 text-white disabled:opacity-50"
             >
               {saving ? (
                 <>

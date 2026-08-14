@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, RotateCcw, Save, Trash2, Upload } from "lucide-react";
+import { Loader2, Play, RotateCcw, Save, Sparkle, Trash2, Upload } from "lucide-react";
 import {
   DEFAULT_MARQUEE_CONFIG,
   DEFAULT_MARQUEE_ITEMS,
@@ -54,6 +54,7 @@ import HeroSection, {
   type HeroPreviewDevice,
 } from "@/components/HeroSection";
 import { Switch } from "@/components/ui/switch";
+import { WelcomePromoDialogView } from "@/components/WelcomePromoDialog";
 import { cn } from "@/lib/utils";
 
 const CAMPAIGN_BUCKET = "campaign-images";
@@ -172,6 +173,7 @@ const AdminContentEditor = () => {
   const [welcomePopupDragOver, setWelcomePopupDragOver] = useState(false);
   const [welcomePopupCropOpen, setWelcomePopupCropOpen] = useState(false);
   const [welcomePopupCropSrc, setWelcomePopupCropSrc] = useState<string | null>(null);
+  const [welcomePopupPreviewOpen, setWelcomePopupPreviewOpen] = useState(false);
   const welcomePopupInputRef = useRef<HTMLInputElement>(null);
 
   const parsePaddingY = (raw: string): number => {
@@ -1994,63 +1996,135 @@ const AdminContentEditor = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
-                      Texto alt imagen
-                    </Label>
-                    <Input
-                      value={welcomePopupDraft.alt}
-                      onChange={(e) =>
-                        setWelcomePopupDraft((prev) => ({ ...prev, alt: e.target.value }))
-                      }
-                      className="mt-1 border-gold/20"
-                    />
-                  </div>
-
-                  <div
-                    className="mx-auto w-full max-w-[220px] overflow-hidden rounded-2xl border border-gold/15 shadow-sm"
-                    style={{
-                      backgroundColor: "#E8DFD0",
-                      backgroundImage: welcomePopupDraft.imageUrl
-                        ? `url(${welcomePopupDraft.imageUrl})`
-                        : undefined,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                    }}
-                  >
-                    <div className="bg-gradient-to-b from-white/70 via-white/30 to-black/20 px-4 py-6 text-center min-h-[280px] flex flex-col">
-                      <p className="text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-carbon/80">
-                        {welcomePopupDraft.eyebrow || DEFAULT_WELCOME_POPUP.eyebrow}
-                      </p>
-                      <p
-                        className="mt-1 font-playfair text-4xl font-bold"
-                        style={{ color: welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold }}
-                      >
-                        {welcomePopupDraft.offerAmount || DEFAULT_WELCOME_POPUP.offerAmount}
-                      </p>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/80">
-                        {welcomePopupDraft.offerSuffix || DEFAULT_WELCOME_POPUP.offerSuffix}
-                      </p>
-                      <span
-                        className="mt-3 self-center rounded-full px-3 py-1 text-[0.55rem] font-semibold uppercase tracking-wider text-white"
-                        style={{
-                          backgroundColor: welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink,
-                        }}
-                      >
-                        {welcomePopupDraft.badgeText || DEFAULT_WELCOME_POPUP.badgeText}
-                      </span>
-                      <div className="mt-auto space-y-1.5 pt-8">
-                        <div
-                          className="rounded-full py-2 text-[0.6rem] font-bold uppercase tracking-wider text-white"
+                  <div className="flex flex-wrap items-start justify-center gap-4">
+                    <div
+                      className="w-full max-w-[220px] overflow-hidden rounded-2xl border border-gold/15 shadow-sm"
+                      style={{
+                        backgroundColor: "#E8DFD0",
+                        backgroundImage: welcomePopupDraft.imageUrl
+                          ? `url(${welcomePopupDraft.imageUrl})`
+                          : undefined,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                      }}
+                    >
+                      <div className="bg-gradient-to-b from-white/70 via-white/30 to-black/20 px-4 py-6 text-center min-h-[280px] flex flex-col items-center">
+                        <p className="font-sans text-[0.55rem] font-semibold uppercase tracking-[0.22em] text-carbon/80">
+                          {welcomePopupDraft.eyebrow || DEFAULT_WELCOME_POPUP.eyebrow}
+                        </p>
+                        <p
+                          className="mt-1 font-playfair text-4xl font-bold leading-none tracking-tight"
                           style={{
-                            backgroundColor:
-                              welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink,
+                            backgroundImage: `linear-gradient(180deg, #E8D5A3 0%, ${welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold} 45%, #8B6914 100%)`,
+                            WebkitBackgroundClip: "text",
+                            backgroundClip: "text",
+                            color: "transparent",
                           }}
                         >
-                          {welcomePopupDraft.primaryCta || DEFAULT_WELCOME_POPUP.primaryCta}
+                          {welcomePopupDraft.offerAmount || DEFAULT_WELCOME_POPUP.offerAmount}
+                        </p>
+                        <p className="mt-1 font-playfair text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-carbon/85">
+                          {welcomePopupDraft.offerSuffix || DEFAULT_WELCOME_POPUP.offerSuffix}
+                        </p>
+                        <div className="my-2.5 flex w-full max-w-[7rem] items-center gap-1.5">
+                          <span
+                            className="h-px flex-1"
+                            style={{
+                              backgroundColor:
+                                welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold,
+                            }}
+                          />
+                          <Sparkle
+                            className="h-2.5 w-2.5"
+                            style={{
+                              color: welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold,
+                            }}
+                            fill={welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold}
+                          />
+                          <span
+                            className="h-px flex-1"
+                            style={{
+                              backgroundColor:
+                                welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold,
+                            }}
+                          />
                         </div>
-                        <div className="rounded-full border border-gold/40 py-1.5 text-[0.55rem] font-semibold uppercase tracking-wider text-carbon/70">
-                          {welcomePopupDraft.secondaryCta || DEFAULT_WELCOME_POPUP.secondaryCta}
+                        <p className="font-playfair text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-carbon/85">
+                          {welcomePopupDraft.badgeText || DEFAULT_WELCOME_POPUP.badgeText}
+                        </p>
+                        <div className="mt-auto w-full space-y-1.5 pt-8">
+                          <div
+                            className="flex items-center justify-center gap-1 rounded-full border border-white/70 py-2 text-[0.6rem] font-bold uppercase tracking-wider text-white shadow-sm"
+                            style={{
+                              background: `linear-gradient(90deg, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 0%, #F0A0AB 50%, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 100%)`,
+                            }}
+                          >
+                            <Sparkle className="h-2.5 w-2.5" fill="currentColor" />
+                            {welcomePopupDraft.primaryCta || DEFAULT_WELCOME_POPUP.primaryCta}
+                            <Sparkle className="h-2.5 w-2.5" fill="currentColor" />
+                          </div>
+                          <div
+                            className="rounded-full border py-1.5 text-[0.55rem] font-semibold uppercase tracking-wider text-carbon/80"
+                            style={{
+                              borderColor: `${welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold}99`,
+                              backgroundColor: "rgba(249,247,242,0.55)",
+                            }}
+                          >
+                            {welcomePopupDraft.secondaryCta || DEFAULT_WELCOME_POPUP.secondaryCta}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className="w-full max-w-[220px] overflow-hidden rounded-2xl border border-gold/15 shadow-sm"
+                      style={{
+                        backgroundColor: "#E8DFD0",
+                        backgroundImage: welcomePopupDraft.imageUrl
+                          ? `url(${welcomePopupDraft.imageUrl})`
+                          : undefined,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                      }}
+                    >
+                      <div className="flex min-h-[280px] flex-col bg-gradient-to-b from-white/70 via-white/30 to-black/20 px-4 py-6">
+                        <p className="text-center font-playfair text-base font-bold text-carbon">
+                          {welcomePopupDraft.emailTitle || DEFAULT_WELCOME_POPUP.emailTitle}
+                        </p>
+                        <p className="mt-1.5 text-center text-[0.65rem] leading-snug text-carbon/70">
+                          {welcomePopupDraft.emailDescription ||
+                            DEFAULT_WELCOME_POPUP.emailDescription}
+                        </p>
+                        <div className="mt-4 space-y-2.5 rounded-xl bg-white/85 p-2.5">
+                          <div className="rounded-md border border-gold/30 bg-white px-2 py-1.5 text-[0.6rem] text-carbon/40">
+                            tu@email.com
+                          </div>
+                          <div className="flex items-start gap-1.5 text-[0.55rem] leading-relaxed text-carbon/70">
+                            <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-sm border border-carbon/40" />
+                            <span>
+                              Acepto la política de privacidad y doy mi consentimiento para
+                              recibir la newsletter.
+                            </span>
+                          </div>
+                        </div>
+                        <div className="mt-auto w-full space-y-1.5 pt-6">
+                          <div
+                            className="rounded-full border border-white/70 py-2 text-center text-[0.6rem] font-bold uppercase tracking-wider text-white shadow-sm"
+                            style={{
+                              background: `linear-gradient(90deg, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 0%, #F0A0AB 50%, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 100%)`,
+                            }}
+                          >
+                            {welcomePopupDraft.emailCta || DEFAULT_WELCOME_POPUP.emailCta}
+                          </div>
+                          <div
+                            className="rounded-full border py-1.5 text-center text-[0.55rem] font-semibold uppercase tracking-wider text-carbon/80"
+                            style={{
+                              borderColor: `${welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold}99`,
+                              backgroundColor: "rgba(249,247,242,0.55)",
+                            }}
+                          >
+                            Volver
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2619,19 +2693,56 @@ const AdminContentEditor = () => {
                 </div>
               )}
 
-              <Button
-                onClick={() => saveBlock(block)}
-                disabled={!dirty || saving === block.key}
-                className="bg-gold hover:bg-gold/90 text-white disabled:opacity-40"
-                size="sm"
-              >
-                {saving === block.key ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                ) : (
-                  <Save className="h-3.5 w-3.5 mr-1.5" />
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => saveBlock(block)}
+                  disabled={!dirty || saving === block.key}
+                  className="bg-gold hover:bg-gold/90 text-white disabled:opacity-40"
+                  size="sm"
+                >
+                  {saving === block.key ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Guardar
+                </Button>
+                {isWelcomePopup && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setWelcomePopupPreviewOpen(true)}
+                      className="border-gold/30 text-carbon hover:bg-gold/10"
+                    >
+                      <Play className="h-3.5 w-3.5 mr-1.5" />
+                      Probar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setWelcomePopupDraft((prev) => ({
+                          ...DEFAULT_WELCOME_POPUP,
+                          enabled: prev.enabled,
+                          imageUrl: prev.imageUrl,
+                        }));
+                        toast({
+                          title: "Diseño restablecido",
+                          description:
+                            "Textos y colores vuelven a la versión por defecto. Guarda para aplicar.",
+                        });
+                      }}
+                      className="border-gold/30 text-carbon/70 hover:bg-gold/10 hover:text-carbon"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                      Restablecer diseño
+                    </Button>
+                  </>
                 )}
-                Guardar
-              </Button>
+              </div>
             </div>
           </div>
         );
@@ -2679,7 +2790,13 @@ const AdminContentEditor = () => {
         await uploadWelcomePopupImage(file);
       }}
     />
-    </>
+    <WelcomePromoDialogView
+      preview
+      open={welcomePopupPreviewOpen}
+      onOpenChange={setWelcomePopupPreviewOpen}
+      config={buildWelcomePopupPayload().config}
+    />
+  </>
   );
 };
 

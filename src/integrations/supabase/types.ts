@@ -113,6 +113,35 @@ export type Database = {
         }
         Relationships: []
       }
+      discount_code_emails: {
+        Row: {
+          created_at: string
+          discount_code_id: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          discount_code_id: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          discount_code_id?: string
+          email?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_code_emails_discount_code_id_fkey"
+            columns: ["discount_code_id"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           correos_shipment_code: string | null

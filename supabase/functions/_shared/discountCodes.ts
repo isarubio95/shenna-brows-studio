@@ -161,6 +161,24 @@ export async function resolveDiscountCode(args: {
     }
   }
 
+  const emailNormalized = String(args.email ?? "").trim().toLowerCase();
+  const { data: allowedRows, error: allowedErr } = await args.admin
+    .from("discount_code_emails")
+    .select("email")
+    .eq("discount_code_id", discountRow.id);
+  if (allowedErr) {
+    console.error("resolve_discount_allowed_emails", allowedErr);
+    return { ok: false, error: "No se pudo validar el código" };
+  }
+  if ((allowedRows ?? []).length > 0) {
+    const allowed = new Set(
+      (allowedRows as { email: string }[]).map((r) => String(r.email).trim().toLowerCase()),
+    );
+    if (!allowed.has(emailNormalized)) {
+      return { ok: false, error: "Este código no está disponible para tu email" };
+    }
+  }
+
   const amount = computeDiscountAmount(discountRow, args.subtotalEur);
   if (amount <= 0) {
     return { ok: false, error: "Este código no aplica a tu pedido" };

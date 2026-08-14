@@ -120,6 +120,17 @@ serve(async (req) => {
       .eq("email", normalizedEmail)
       .maybeSingle();
 
+    // Popup de bienvenida: no permitir emails ya registrados
+    if (sourceStr === "welcome_popup" && existingSub) {
+      return new Response(
+        JSON.stringify({ error: "Este email ya está registrado" }),
+        {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const nowIso = new Date().toISOString();
     const payload = {
       email: normalizedEmail,
@@ -139,9 +150,8 @@ serve(async (req) => {
     }
 
     let welcomeCouponSent = false;
-    const alreadySent = Boolean(existingSub?.welcome_coupon_sent_at);
 
-    if (sourceStr === "welcome_popup" && !alreadySent) {
+    if (sourceStr === "welcome_popup") {
       const { data: welcomeCode, error: welcomeErr } = await adminClient
         .from("discount_codes")
         .select(

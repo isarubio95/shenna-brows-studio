@@ -16,7 +16,9 @@ import { useSiteContent } from "@/hooks/use-site-content";
 import {
   DEFAULT_WELCOME_POPUP,
   parseWelcomePopupConfig,
+  type WelcomePopupConfig,
 } from "@/lib/welcome-popup-content";
+import "animate.css";
 
 const STORAGE_KEY = "sb_welcome_promo_seen";
 const SUPABASE_URL =
@@ -37,49 +39,47 @@ const HIDDEN_PATHS = [
   "/politica-cookies",
 ];
 
-const WelcomePromoDialog = () => {
-  const location = useLocation();
-  const { toast } = useToast();
-  const { data: siteContent, loading: contentLoading } = useSiteContent([
-    "index_welcome_popup",
-  ]);
-  const config = useMemo(
-    () => parseWelcomePopupConfig(siteContent.index_welcome_popup?.content),
-    [siteContent.index_welcome_popup?.content],
-  );
+export type WelcomePromoDialogViewProps = {
+  config: WelcomePopupConfig;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Vista de prueba en admin: no marca el popup como visto. */
+  preview?: boolean;
+};
 
-  const [open, setOpen] = useState(false);
+export const WelcomePromoDialogView = ({
+  config,
+  open,
+  onOpenChange,
+  preview = false,
+}: WelcomePromoDialogViewProps) => {
+  const { toast } = useToast();
   const [step, setStep] = useState<"offer" | "email">("offer");
   const [email, setEmail] = useState("");
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  const pathHidden = HIDDEN_PATHS.some(
-    (p) => location.pathname === p || location.pathname.startsWith(`${p}/`),
-  );
 
   const bgImage = config.imageUrl.trim();
   const pink = config.pink || DEFAULT_WELCOME_POPUP.pink;
   const gold = config.gold || DEFAULT_WELCOME_POPUP.gold;
 
   useEffect(() => {
-    if (pathHidden || contentLoading || !config.enabled) return;
-    try {
-      if (localStorage.getItem(STORAGE_KEY) === "1") return;
-    } catch {
-      return;
+    if (open) {
+      setStep("offer");
+      setEmail("");
+      setPrivacyAccepted(false);
     }
-    const timer = window.setTimeout(() => setOpen(true), config.delayMs);
-    return () => window.clearTimeout(timer);
-  }, [pathHidden, contentLoading, config.enabled, config.delayMs]);
+  }, [open]);
 
   const dismiss = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, "1");
-    } catch {
-      /* ignore */
+    if (!preview) {
+      try {
+        localStorage.setItem(STORAGE_KEY, "1");
+      } catch {
+        /* ignore */
+      }
     }
-    setOpen(false);
+    onOpenChange(false);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -87,7 +87,7 @@ const WelcomePromoDialog = () => {
       dismiss();
       return;
     }
-    setOpen(true);
+    onOpenChange(true);
   };
 
   const handleSubscribe = async (event: FormEvent) => {
@@ -146,18 +146,17 @@ const WelcomePromoDialog = () => {
     }
   };
 
-  if (pathHidden || (!contentLoading && !config.enabled)) return null;
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className={cn(
           "max-w-[min(100vw-1.5rem,22rem)] gap-0 overflow-hidden border-0 p-0 shadow-2xl sm:rounded-2xl",
           "bg-transparent [&>button]:right-3 [&>button]:top-3 [&>button]:z-20 [&>button]:rounded-full [&>button]:bg-black/25 [&>button]:p-1.5 [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-black/40 [&>button]:ring-offset-0",
+          "duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none",
         )}
       >
         <div
-          className="relative flex min-h-[32rem] flex-col bg-cover bg-center"
+          className="animate__animated animate__fadeInDown relative flex min-h-128 flex-col bg-cover bg-center"
           style={{
             backgroundColor: FALLBACK_BG,
             ...(bgImage ? { backgroundImage: `url(${bgImage})` } : {}),
@@ -166,7 +165,7 @@ const WelcomePromoDialog = () => {
           aria-label={config.alt}
         >
           {bgImage ? (
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/55 via-white/20 to-black/35" />
+            <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/55 via-white/20 to-black/35" />
           ) : null}
 
           <div className="relative z-10 flex flex-1 flex-col px-5 pb-5 pt-8">
@@ -199,18 +198,15 @@ const WelcomePromoDialog = () => {
                     {config.offerSuffix}
                   </p>
 
-                  <div className="my-4 flex w-full max-w-[14rem] items-center gap-2">
+                  <div className="my-4 flex w-full max-w-56 items-center gap-2">
                     <span className="h-px flex-1" style={{ backgroundColor: gold }} />
                     <Sparkle className="h-3.5 w-3.5" style={{ color: gold }} fill={gold} />
                     <span className="h-px flex-1" style={{ backgroundColor: gold }} />
                   </div>
 
-                  <span
-                    className="rounded-full px-5 py-1.5 font-sans text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-white"
-                    style={{ backgroundColor: pink }}
-                  >
+                  <p className="font-playfair text-sm font-semibold uppercase tracking-[0.12em] text-carbon/85">
                     {config.badgeText}
-                  </span>
+                  </p>
 
                   <div className="mt-auto w-full space-y-2.5 pt-36">
                     <button
@@ -255,7 +251,7 @@ const WelcomePromoDialog = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
-                    className="border-gold/30 bg-white text-carbon placeholder:text-carbon/40"
+                    className="border-gold/30 bg-white text-carbon placeholder:text-carbon/60"
                     required
                   />
                   <label className="flex items-start gap-2 text-xs leading-relaxed text-carbon/70">
@@ -308,6 +304,38 @@ const WelcomePromoDialog = () => {
       </DialogContent>
     </Dialog>
   );
+};
+
+const WelcomePromoDialog = () => {
+  const location = useLocation();
+  const { data: siteContent, loading: contentLoading } = useSiteContent([
+    "index_welcome_popup",
+  ]);
+  const config = useMemo(
+    () => parseWelcomePopupConfig(siteContent.index_welcome_popup?.content),
+    [siteContent.index_welcome_popup?.content],
+  );
+
+  const [open, setOpen] = useState(false);
+
+  const pathHidden = HIDDEN_PATHS.some(
+    (p) => location.pathname === p || location.pathname.startsWith(`${p}/`),
+  );
+
+  useEffect(() => {
+    if (pathHidden || contentLoading || !config.enabled) return;
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === "1") return;
+    } catch {
+      return;
+    }
+    const timer = window.setTimeout(() => setOpen(true), config.delayMs);
+    return () => window.clearTimeout(timer);
+  }, [pathHidden, contentLoading, config.enabled, config.delayMs]);
+
+  if (pathHidden || (!contentLoading && !config.enabled)) return null;
+
+  return <WelcomePromoDialogView config={config} open={open} onOpenChange={setOpen} />;
 };
 
 export default WelcomePromoDialog;

@@ -541,7 +541,7 @@ const Checkout = () => {
                         setDiscountInput(e.target.value.toUpperCase());
                         if (appliedDiscount) setAppliedDiscount(null);
                       }}
-                      placeholder="BIENVENIDA10"
+                      placeholder="Tu código"
                       className="bg-white border-gold/15 focus:border-gold uppercase"
                       autoComplete="off"
                     />
