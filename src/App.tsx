@@ -14,6 +14,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CartDrawer from "@/components/CartDrawer";
+import WelcomePromoDialog from "@/components/WelcomePromoDialog";
 import ScrollToTop from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import ProductPage from "./pages/ProductPage";
@@ -184,6 +185,7 @@ const App = () => {
                 <ScrollToTop />
                 <Navbar />
                 <CartDrawer />
+                <WelcomePromoDialog />
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/tienda" element={<Tienda />} />

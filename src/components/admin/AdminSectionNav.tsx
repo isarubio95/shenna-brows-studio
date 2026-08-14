@@ -5,16 +5,24 @@ import {
   Megaphone,
   Package,
   ShoppingBag,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 
-export type AdminSection = "pedidos" | "catalogo" | "correos" | "newsletter" | "contenido";
+export type AdminSection =
+  | "pedidos"
+  | "catalogo"
+  | "correos"
+  | "newsletter"
+  | "codigos_dto"
+  | "contenido";
 
 const SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
   { id: "pedidos", label: "Pedidos", icon: ShoppingBag },
   { id: "catalogo", label: "Catálogo", icon: Package },
   { id: "correos", label: "Correos", icon: Mail },
   { id: "newsletter", label: "Newsletter", icon: Megaphone },
+  { id: "codigos_dto", label: "Códigos dto.", icon: Ticket },
   { id: "contenido", label: "Contenido", icon: FileText },
 ];
 
@@ -23,6 +31,7 @@ const SECTION_DESCRIPTIONS: Record<AdminSection, string> = {
   catalogo: "Controla stock y productos del catálogo.",
   correos: "Envía correos individuales a clientes.",
   newsletter: "Campañas a suscriptores con consentimiento activo.",
+  codigos_dto: "Crea y gestiona códigos promocionales y sus usos.",
   contenido: "Textos de la web, tema visual y testimonios.",
 };
 

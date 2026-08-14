@@ -13,6 +13,7 @@ import {
   type RedsysMerchantParams,
 } from "../_shared/redsys.ts";
 import { normalizeProvinceCode, shippingEurForShippingAddress } from "../_shared/shipping.ts";
+import { resolveDiscountCode } from "../_shared/discountCodes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -167,10 +168,12 @@ serve(async (req) => {
       payMethods?: string;
       invoiceRequested?: boolean;
       customerTaxId?: string;
+      discountCode?: string;
     };
     const { items, customerEmail, turnstileToken, shippingAddress } = body;
     const invoiceRequested = Boolean(body.invoiceRequested);
     const customerTaxId = normalizeCustomerTaxId(body.customerTaxId);
+    const discountCodeRaw = String(body.discountCode ?? "").trim();
 
     let payMethodsFilter: string;
     try {
@@ -341,7 +344,30 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const totalEur = subtotalEur + shippingEur;
+
+    let discountAmount = 0;
+    let discountCodeId: string | null = null;
+    let discountCode: string | null = null;
+
+    if (discountCodeRaw) {
+      const resolved = await resolveDiscountCode({
+        admin,
+        codeRaw: discountCodeRaw,
+        email,
+        subtotalEur,
+      });
+      if (!resolved.ok) {
+        return new Response(JSON.stringify({ error: resolved.error }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      discountAmount = resolved.discount.amount;
+      discountCodeId = resolved.discount.id;
+      discountCode = resolved.discount.code;
+    }
+
+    const totalEur = Math.max(0, Math.round((subtotalEur - discountAmount + shippingEur) * 100) / 100);
 
     const provinceDisplay = shipProvinceLabel || provinceCodeNorm;
 
@@ -387,6 +413,9 @@ serve(async (req) => {
       subtotal: subtotalEur,
       shipping: shippingEur,
       total: totalEur,
+      discount_code_id: discountCodeId,
+      discount_code: discountCode,
+      discount_amount: discountAmount > 0 ? discountAmount : null,
       stripe_session_id: merchantOrder,
       shipping_address: normalizedShipping,
       pending_cart_snapshot: pendingCartSnapshot,
@@ -408,6 +437,8 @@ serve(async (req) => {
       })),
       shippingEur,
       subtotalEur,
+      discountAmount,
+      discountCode,
       shippingAddress: normalizedShipping,
     };
     const merchantDataB64 = Buffer.from(JSON.stringify(merchantDataPayload), "utf8").toString("base64");

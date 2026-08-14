@@ -14,6 +14,7 @@ import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
 import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import AdminNewsletterSubscribers from "@/components/admin/AdminNewsletterSubscribers";
+import AdminDiscountCodes from "@/components/admin/AdminDiscountCodes";
 import AdminCustomerEmails from "@/components/admin/AdminCustomerEmails";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
@@ -1658,6 +1659,16 @@ const Admin = () => {
                                     <span className="text-carbon/50">Subtotal</span>
                                     <span className="text-carbon">€{Number(o.subtotal ?? 0).toFixed(2)}</span>
                                   </div>
+                                  {Number(o.discount_amount ?? 0) > 0 ? (
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-carbon/50">
+                                        Descuento{o.discount_code ? ` (${o.discount_code})` : ""}
+                                      </span>
+                                      <span className="text-carbon">
+                                        −€{Number(o.discount_amount).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ) : null}
                                   <div className="flex justify-between text-sm">
                                     <span className="text-carbon/50">Gastos de envío</span>
                                     <span className="text-carbon">€{Number(o.shipping ?? 0).toFixed(2)}</span>
@@ -1950,6 +1961,12 @@ const Admin = () => {
             <p className="text-carbon/40 text-sm mb-4">Envía campañas solo a suscriptores con consentimiento activo.</p>
             <AdminEmailSender />
             <AdminNewsletterSubscribers />
+          </AnimatedSection>
+        )}
+
+        {activeSection === "codigos_dto" && (
+          <AnimatedSection delay={0.05}>
+            <AdminDiscountCodes />
           </AnimatedSection>
         )}
 

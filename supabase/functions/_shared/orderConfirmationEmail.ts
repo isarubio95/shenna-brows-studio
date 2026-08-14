@@ -28,6 +28,8 @@ export function buildOrderConfirmationHtml(args: {
   subtotal: number;
   shipping: number;
   total: number;
+  discountAmount?: number | null;
+  discountCode?: string | null;
   lines: OrderConfirmationLine[];
   correosShipmentCode?: string | null;
 }): string {
@@ -117,6 +119,14 @@ export function buildOrderConfirmationHtml(args: {
                 <td style="padding: 4px 0; color: #475569;">Subtotal</td>
                 <td style="padding: 4px 0; text-align: right; color: #0f172a;">${formatEur(args.subtotal)}</td>
               </tr>
+              ${
+                Number(args.discountAmount ?? 0) > 0
+                  ? `<tr>
+                <td style="padding: 4px 0; color: #475569;">Descuento${args.discountCode ? ` (${escapeHtml(String(args.discountCode))})` : ""}</td>
+                <td style="padding: 4px 0; text-align: right; color: #0f172a;">−${formatEur(Number(args.discountAmount))}</td>
+              </tr>`
+                  : ""
+              }
               <tr>
                 <td style="padding: 4px 0; color: #475569;">Envío</td>
                 <td style="padding: 4px 0; text-align: right; color: #0f172a;">${formatEur(args.shipping)}</td>

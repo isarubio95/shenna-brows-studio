@@ -34,6 +34,12 @@ import {
   serializeHeroConfig,
   type HeroConfig,
 } from "@/lib/hero-content";
+import {
+  DEFAULT_WELCOME_POPUP,
+  parseWelcomePopupConfig,
+  serializeWelcomePopupConfig,
+  type WelcomePopupConfig,
+} from "@/lib/welcome-popup-content";
 import { optimizeImageForUpload, type OptimizeImageVariant } from "@/lib/optimize-image-upload";
 import { HexColorField, toPickerColor } from "@/components/admin/HexColorField";
 import ProductImageCropDialog from "@/components/admin/ProductImageCropDialog";
@@ -47,6 +53,7 @@ import HeroSection, {
   HERO_PREVIEW_VIEWPORT,
   type HeroPreviewDevice,
 } from "@/components/HeroSection";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 const CAMPAIGN_BUCKET = "campaign-images";
@@ -59,6 +66,8 @@ const CAMPAIGN_MOBILE_ASPECT = 4 / 5;
 const HERO_DESKTOP_ASPECT = 16 / 9;
 /** Hero a pantalla completa (móvil). */
 const HERO_MOBILE_ASPECT = 9 / 16;
+/** Popup vertical (mockup). */
+const WELCOME_POPUP_ASPECT = 9 / 16;
 
 interface ContentBlock {
   id: string;
@@ -72,6 +81,7 @@ type SavedSnapshot = Record<string, { title: string; content: string }>;
 const CONTENT_LABELS: Record<string, string> = {
   index_brand_story: "Texto principal — Página de inicio",
   index_hero: "Hero — Página de inicio",
+  index_welcome_popup: "Popup bienvenida — Overlay global",
   index_marquee: "Marquesina — Debajo del hero",
   index_collection_headline: "Titular — Entre marquesina y colección",
   index_campaign: "Campaña — Después de la colección",
@@ -86,6 +96,7 @@ const HIDDEN_KEYS = new Set(["index_brand_story", "theme_config"]);
 /** Orden preferido en el panel de Contenido */
 const KEY_ORDER = [
   "index_hero",
+  "index_welcome_popup",
   "index_marquee",
   "index_collection_headline",
   "index_campaign",
@@ -154,6 +165,14 @@ const AdminContentEditor = () => {
     useState<CampaignPreviewDevice>("desktop");
   const heroDesktopInputRef = useRef<HTMLInputElement>(null);
   const heroMobileInputRef = useRef<HTMLInputElement>(null);
+  const [welcomePopupDraft, setWelcomePopupDraft] = useState<WelcomePopupConfig>({
+    ...DEFAULT_WELCOME_POPUP,
+  });
+  const [welcomePopupUploading, setWelcomePopupUploading] = useState(false);
+  const [welcomePopupDragOver, setWelcomePopupDragOver] = useState(false);
+  const [welcomePopupCropOpen, setWelcomePopupCropOpen] = useState(false);
+  const [welcomePopupCropSrc, setWelcomePopupCropSrc] = useState<string | null>(null);
+  const welcomePopupInputRef = useRef<HTMLInputElement>(null);
 
   const parsePaddingY = (raw: string): number => {
     if (raw.trim() === "") return DEFAULT_MARQUEE_CONFIG.paddingY;
@@ -266,6 +285,39 @@ const AdminContentEditor = () => {
     return {
       title: "Hero del inicio",
       content: serializeHeroConfig(config),
+      config,
+    };
+  };
+
+  const buildWelcomePopupPayload = () => {
+    const delayRaw = Number(welcomePopupDraft.delayMs);
+    const config: WelcomePopupConfig = {
+      enabled: Boolean(welcomePopupDraft.enabled),
+      imageUrl: welcomePopupDraft.imageUrl.trim(),
+      eyebrow: welcomePopupDraft.eyebrow.trim() || DEFAULT_WELCOME_POPUP.eyebrow,
+      offerAmount: welcomePopupDraft.offerAmount.trim() || DEFAULT_WELCOME_POPUP.offerAmount,
+      offerSuffix: welcomePopupDraft.offerSuffix.trim() || DEFAULT_WELCOME_POPUP.offerSuffix,
+      badgeText: welcomePopupDraft.badgeText.trim() || DEFAULT_WELCOME_POPUP.badgeText,
+      primaryCta: welcomePopupDraft.primaryCta.trim() || DEFAULT_WELCOME_POPUP.primaryCta,
+      secondaryCta: welcomePopupDraft.secondaryCta.trim() || DEFAULT_WELCOME_POPUP.secondaryCta,
+      emailTitle: welcomePopupDraft.emailTitle.trim() || DEFAULT_WELCOME_POPUP.emailTitle,
+      emailDescription:
+        welcomePopupDraft.emailDescription.trim() || DEFAULT_WELCOME_POPUP.emailDescription,
+      emailCta: welcomePopupDraft.emailCta.trim() || DEFAULT_WELCOME_POPUP.emailCta,
+      pink: isHex(welcomePopupDraft.pink)
+        ? welcomePopupDraft.pink.trim()
+        : DEFAULT_WELCOME_POPUP.pink,
+      gold: isHex(welcomePopupDraft.gold)
+        ? welcomePopupDraft.gold.trim()
+        : DEFAULT_WELCOME_POPUP.gold,
+      delayMs: Number.isFinite(delayRaw)
+        ? Math.min(15000, Math.max(0, Math.round(delayRaw)))
+        : DEFAULT_WELCOME_POPUP.delayMs,
+      alt: welcomePopupDraft.alt.trim() || DEFAULT_WELCOME_POPUP.alt,
+    };
+    return {
+      title: "Popup de bienvenida",
+      content: serializeWelcomePopupConfig(config),
       config,
     };
   };
@@ -404,6 +456,67 @@ const AdminContentEditor = () => {
     if (file) beginHeroCrop(file, variant);
   };
 
+  const uploadWelcomePopupImage = async (file: File) => {
+    setWelcomePopupUploading(true);
+    try {
+      const optimized = await optimizeImageForUpload(file, "mobile");
+      const filePath = `welcome-popup-${Date.now()}.${optimized.extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from(CAMPAIGN_BUCKET)
+        .upload(filePath, optimized.blob, {
+          upsert: true,
+          contentType: optimized.mimeType,
+        });
+      if (uploadError) throw uploadError;
+
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${CAMPAIGN_BUCKET}/${filePath}`;
+      setWelcomePopupDraft((prev) => ({ ...prev, imageUrl: publicUrl }));
+      toast({
+        title: "Imagen subida",
+        description: `Imagen del popup optimizada (${optimized.extension.toUpperCase()}).`,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo subir la imagen.";
+      toast({ title: "Error al subir", description: message, variant: "destructive" });
+      throw err instanceof Error ? err : new Error(message);
+    } finally {
+      setWelcomePopupUploading(false);
+    }
+  };
+
+  const beginWelcomePopupCrop = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Archivo no válido",
+        description: "Selecciona una imagen.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (welcomePopupCropSrc?.startsWith("blob:")) {
+      URL.revokeObjectURL(welcomePopupCropSrc);
+    }
+    setWelcomePopupCropSrc(URL.createObjectURL(file));
+    setWelcomePopupCropOpen(true);
+  };
+
+  const handleWelcomePopupCropOpenChange = (open: boolean) => {
+    setWelcomePopupCropOpen(open);
+    if (!open && welcomePopupCropSrc?.startsWith("blob:")) {
+      URL.revokeObjectURL(welcomePopupCropSrc);
+      setWelcomePopupCropSrc(null);
+    }
+  };
+
+  const handleWelcomePopupDrop = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setWelcomePopupDragOver(false);
+    if (welcomePopupUploading || welcomePopupCropOpen) return;
+    const file = Array.from(e.dataTransfer.files || []).find((f) => f.type.startsWith("image/"));
+    if (file) beginWelcomePopupCrop(file);
+  };
+
   useEffect(() => {
     const load = async () => {
       const { data, error } = await (supabase as any)
@@ -426,6 +539,21 @@ const AdminContentEditor = () => {
             key: "index_hero",
             title: "Hero del inicio",
             content: serializeHeroConfig(DEFAULT_HERO),
+          })
+          .select("*")
+          .single();
+
+        if (inserted) rows = [...rows, inserted];
+      }
+
+      const hasWelcomePopup = rows.some((b) => b.key === "index_welcome_popup");
+      if (!hasWelcomePopup) {
+        const { data: inserted } = await (supabase as any)
+          .from("site_content")
+          .insert({
+            key: "index_welcome_popup",
+            title: "Popup de bienvenida",
+            content: serializeWelcomePopupConfig(DEFAULT_WELCOME_POPUP),
           })
           .select("*")
           .single();
@@ -491,6 +619,14 @@ const AdminContentEditor = () => {
         heroRow.content = serializeHeroConfig(cfg);
       }
 
+      const welcomePopupRow = rows.find((b) => b.key === "index_welcome_popup");
+      if (welcomePopupRow) {
+        const cfg = parseWelcomePopupConfig(welcomePopupRow.content);
+        setWelcomePopupDraft(cfg);
+        welcomePopupRow.title = "Popup de bienvenida";
+        welcomePopupRow.content = serializeWelcomePopupConfig(cfg);
+      }
+
       const marqueeRow = rows.find((b) => b.key === "index_marquee");
       if (marqueeRow) {
         const cfg = parseMarqueeConfig(marqueeRow.content);
@@ -546,6 +682,10 @@ const AdminContentEditor = () => {
       const payload = buildHeroPayload();
       return payload.title !== baseline.title || payload.content !== baseline.content;
     }
+    if (block.key === "index_welcome_popup") {
+      const payload = buildWelcomePopupPayload();
+      return payload.title !== baseline.title || payload.content !== baseline.content;
+    }
     if (block.key === "index_marquee") {
       const payload = buildMarqueePayload();
       return payload.title !== baseline.title || payload.content !== baseline.content;
@@ -574,6 +714,19 @@ const AdminContentEditor = () => {
       setBlocks((prev) =>
         prev.map((b) =>
           b.key === "index_hero" ? { ...b, title: payload.title, content: payload.content } : b
+        )
+      );
+    }
+
+    if (block.key === "index_welcome_popup") {
+      const { title, content, config } = buildWelcomePopupPayload();
+      payload = { title, content };
+      setWelcomePopupDraft(config);
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.key === "index_welcome_popup"
+            ? { ...b, title: payload.title, content: payload.content }
+            : b
         )
       );
     }
@@ -676,6 +829,7 @@ const AdminContentEditor = () => {
     <div className="space-y-6">
       {visibleBlocks.map((block) => {
         const isHero = block.key === "index_hero";
+        const isWelcomePopup = block.key === "index_welcome_popup";
         const isMarquee = block.key === "index_marquee";
         const isHeadline = block.key === "index_collection_headline";
         const isCampaign = block.key === "index_campaign";
@@ -686,7 +840,7 @@ const AdminContentEditor = () => {
             key={block.key}
             className={cn(
               "bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6",
-              (isHero || isCampaign) && "ring-1 ring-gold/20",
+              (isHero || isCampaign || isWelcomePopup) && "ring-1 ring-gold/20",
             )}
           >
             <h3 className="font-playfair text-base font-semibold text-carbon mb-4">
@@ -697,9 +851,15 @@ const AdminContentEditor = () => {
                 Banner principal a pantalla completa. Imágenes, textos, CTA y posición arrastrable.
               </p>
             )}
+            {isWelcomePopup && (
+              <p className="text-xs text-carbon/40 -mt-2 mb-4">
+                Overlay global en la primera visita. El descuento real se configura en Códigos dto.
+                (oferta welcome).
+              </p>
+            )}
 
             <div className="space-y-4">
-              {!isMarquee && !isHeadline && !isCampaign && !isHero && (
+              {!isMarquee && !isHeadline && !isCampaign && !isHero && !isWelcomePopup && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">Título</Label>
                   <Input
@@ -1540,6 +1700,364 @@ const AdminContentEditor = () => {
                 </>
               )}
 
+              {isWelcomePopup && (
+                <>
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-gold/15 bg-cream/40 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-carbon">Mostrar popup</p>
+                      <p className="text-xs text-carbon/45">
+                        Si está desactivado, no aparecerá en la web.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={welcomePopupDraft.enabled}
+                      onCheckedChange={(v) =>
+                        setWelcomePopupDraft((prev) => ({ ...prev, enabled: v }))
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Imagen de fondo
+                    </Label>
+                    <input
+                      ref={welcomePopupInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) beginWelcomePopupCrop(file);
+                      }}
+                    />
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (welcomePopupUploading) return;
+                        welcomePopupInputRef.current?.click();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          if (!welcomePopupUploading) welcomePopupInputRef.current?.click();
+                        }
+                      }}
+                      onDragEnter={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setWelcomePopupDragOver(true);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setWelcomePopupDragOver(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setWelcomePopupDragOver(false);
+                      }}
+                      onDrop={handleWelcomePopupDrop}
+                      className={cn(
+                        "relative mt-2 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed transition-all duration-200",
+                        welcomePopupDragOver
+                          ? "border-gold bg-gold/5 scale-[1.01]"
+                          : "border-gold/20 hover:border-gold/40",
+                        welcomePopupDraft.imageUrl
+                          ? "mx-auto aspect-[9/16] max-w-[220px] bg-muted"
+                          : "min-h-36 bg-muted/40",
+                      )}
+                    >
+                      {welcomePopupUploading && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-carbon/40">
+                          <Loader2 className="h-7 w-7 animate-spin text-white" />
+                        </div>
+                      )}
+                      {welcomePopupDraft.imageUrl ? (
+                        <img
+                          src={welcomePopupDraft.imageUrl}
+                          alt="Vista previa popup"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
+                          <Upload className="h-8 w-8" />
+                          <span className="text-sm text-center">
+                            Arrastra una imagen o haz clic (vertical)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {welcomePopupDraft.imageUrl ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 border-gold/20"
+                        onClick={() =>
+                          setWelcomePopupDraft((prev) => ({ ...prev, imageUrl: "" }))
+                        }
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                        Quitar imagen
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Antetítulo
+                      </Label>
+                      <Input
+                        value={welcomePopupDraft.eyebrow}
+                        onChange={(e) =>
+                          setWelcomePopupDraft((prev) => ({ ...prev, eyebrow: e.target.value }))
+                        }
+                        className="mt-1 border-gold/20"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Importe (display)
+                      </Label>
+                      <Input
+                        value={welcomePopupDraft.offerAmount}
+                        onChange={(e) =>
+                          setWelcomePopupDraft((prev) => ({
+                            ...prev,
+                            offerAmount: e.target.value,
+                          }))
+                        }
+                        className="mt-1 border-gold/20"
+                        placeholder="10€"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Sufijo oferta
+                      </Label>
+                      <Input
+                        value={welcomePopupDraft.offerSuffix}
+                        onChange={(e) =>
+                          setWelcomePopupDraft((prev) => ({
+                            ...prev,
+                            offerSuffix: e.target.value,
+                          }))
+                        }
+                        className="mt-1 border-gold/20"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Badge
+                      </Label>
+                      <Input
+                        value={welcomePopupDraft.badgeText}
+                        onChange={(e) =>
+                          setWelcomePopupDraft((prev) => ({ ...prev, badgeText: e.target.value }))
+                        }
+                        className="mt-1 border-gold/20"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        CTA principal
+                      </Label>
+                      <Input
+                        value={welcomePopupDraft.primaryCta}
+                        onChange={(e) =>
+                          setWelcomePopupDraft((prev) => ({
+                            ...prev,
+                            primaryCta: e.target.value,
+                          }))
+                        }
+                        className="mt-1 border-gold/20"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        CTA secundario
+                      </Label>
+                      <Input
+                        value={welcomePopupDraft.secondaryCta}
+                        onChange={(e) =>
+                          setWelcomePopupDraft((prev) => ({
+                            ...prev,
+                            secondaryCta: e.target.value,
+                          }))
+                        }
+                        className="mt-1 border-gold/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gold/10 pt-4 space-y-4">
+                    <p className="text-xs uppercase tracking-wider text-carbon/45">
+                      Pantalla email
+                    </p>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Título
+                      </Label>
+                      <Input
+                        value={welcomePopupDraft.emailTitle}
+                        onChange={(e) =>
+                          setWelcomePopupDraft((prev) => ({
+                            ...prev,
+                            emailTitle: e.target.value,
+                          }))
+                        }
+                        className="mt-1 border-gold/20"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Descripción
+                      </Label>
+                      <Textarea
+                        value={welcomePopupDraft.emailDescription}
+                        onChange={(e) =>
+                          setWelcomePopupDraft((prev) => ({
+                            ...prev,
+                            emailDescription: e.target.value,
+                          }))
+                        }
+                        className="mt-1 border-gold/20 min-h-[80px]"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Botón suscribir
+                      </Label>
+                      <Input
+                        value={welcomePopupDraft.emailCta}
+                        onChange={(e) =>
+                          setWelcomePopupDraft((prev) => ({ ...prev, emailCta: e.target.value }))
+                        }
+                        className="mt-1 border-gold/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Color rosa
+                      </Label>
+                      <div className="mt-1">
+                        <HexColorField
+                          value={welcomePopupDraft.pink}
+                          onChange={(hex) =>
+                            setWelcomePopupDraft((prev) => ({ ...prev, pink: hex }))
+                          }
+                          fallback={DEFAULT_WELCOME_POPUP.pink}
+                          aria-label="Color rosa del popup"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Color oro
+                      </Label>
+                      <div className="mt-1">
+                        <HexColorField
+                          value={welcomePopupDraft.gold}
+                          onChange={(hex) =>
+                            setWelcomePopupDraft((prev) => ({ ...prev, gold: hex }))
+                          }
+                          fallback={DEFAULT_WELCOME_POPUP.gold}
+                          aria-label="Color oro del popup"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Delay (ms)
+                      </Label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        value={String(welcomePopupDraft.delayMs)}
+                        onChange={(e) => {
+                          const next = e.target.value.replace(/[^\d]/g, "");
+                          setWelcomePopupDraft((prev) => ({
+                            ...prev,
+                            delayMs: next === "" ? 0 : Number(next),
+                          }));
+                        }}
+                        className="mt-1 border-gold/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Texto alt imagen
+                    </Label>
+                    <Input
+                      value={welcomePopupDraft.alt}
+                      onChange={(e) =>
+                        setWelcomePopupDraft((prev) => ({ ...prev, alt: e.target.value }))
+                      }
+                      className="mt-1 border-gold/20"
+                    />
+                  </div>
+
+                  <div
+                    className="mx-auto w-full max-w-[220px] overflow-hidden rounded-2xl border border-gold/15 shadow-sm"
+                    style={{
+                      backgroundColor: "#F4EDE3",
+                      backgroundImage: welcomePopupDraft.imageUrl
+                        ? `url(${welcomePopupDraft.imageUrl})`
+                        : undefined,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }}
+                  >
+                    <div className="bg-gradient-to-b from-white/70 via-white/30 to-black/20 px-4 py-6 text-center min-h-[280px] flex flex-col">
+                      <p className="text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-carbon/80">
+                        {welcomePopupDraft.eyebrow || DEFAULT_WELCOME_POPUP.eyebrow}
+                      </p>
+                      <p
+                        className="mt-1 font-playfair text-4xl font-bold"
+                        style={{ color: welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold }}
+                      >
+                        {welcomePopupDraft.offerAmount || DEFAULT_WELCOME_POPUP.offerAmount}
+                      </p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/80">
+                        {welcomePopupDraft.offerSuffix || DEFAULT_WELCOME_POPUP.offerSuffix}
+                      </p>
+                      <span
+                        className="mt-3 self-center rounded-full px-3 py-1 text-[0.55rem] font-semibold uppercase tracking-wider text-white"
+                        style={{
+                          backgroundColor: welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink,
+                        }}
+                      >
+                        {welcomePopupDraft.badgeText || DEFAULT_WELCOME_POPUP.badgeText}
+                      </span>
+                      <div className="mt-auto space-y-1.5 pt-8">
+                        <div
+                          className="rounded-full py-2 text-[0.6rem] font-bold uppercase tracking-wider text-white"
+                          style={{
+                            backgroundColor:
+                              welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink,
+                          }}
+                        >
+                          {welcomePopupDraft.primaryCta || DEFAULT_WELCOME_POPUP.primaryCta}
+                        </div>
+                        <div className="rounded-full border border-gold/40 py-1.5 text-[0.55rem] font-semibold uppercase tracking-wider text-carbon/70">
+                          {welcomePopupDraft.secondaryCta || DEFAULT_WELCOME_POPUP.secondaryCta}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {isCampaign && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2061,7 +2579,7 @@ const AdminContentEditor = () => {
                 </>
               )}
 
-              {!isHeadline && !isCampaign && !isHero && (
+              {!isHeadline && !isCampaign && !isHero && !isWelcomePopup && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">
                     {isMarquee ? "Textos (uno por línea)" : "Contenido"}
@@ -2148,6 +2666,17 @@ const AdminContentEditor = () => {
       }
       onCropped={async (file) => {
         await uploadHeroImage(file, heroCropVariant);
+      }}
+    />
+    <ProductImageCropDialog
+      open={welcomePopupCropOpen}
+      imageSrc={welcomePopupCropSrc}
+      onOpenChange={handleWelcomePopupCropOpenChange}
+      aspect={WELCOME_POPUP_ASPECT}
+      maxOutputSize={1080}
+      title="Recortar imagen · Popup bienvenida"
+      onCropped={async (file) => {
+        await uploadWelcomePopupImage(file);
       }}
     />
     </>

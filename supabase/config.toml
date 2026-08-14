@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.newsletter-subscribe]
 verify_jwt = false
 
+[functions.validate-discount-code]
+verify_jwt = false
+
 [functions.submit-return-request]
 verify_jwt = false
 

@@ -28,6 +28,8 @@ type MerchantPayload = {
   lines: Array<{ productId: string; quantity: number; productDisplayName?: string }>;
   shippingEur: number;
   subtotalEur: number;
+  discountAmount?: number;
+  discountCode?: string | null;
   shippingAddress?: MerchantShippingAddress;
   shipping_address?: MerchantShippingAddress;
 };
@@ -67,6 +69,8 @@ function parseMerchantPayloadJson(json: string): MerchantPayload | null {
       lines: normalizedLines,
       shippingEur: Number(raw.shippingEur ?? 0),
       subtotalEur: Number(raw.subtotalEur ?? 0),
+      discountAmount: Number(raw.discountAmount ?? 0) || 0,
+      discountCode: typeof raw.discountCode === "string" ? raw.discountCode : null,
       shippingAddress: (raw.shippingAddress ?? raw.shipping_address) as MerchantShippingAddress | undefined,
       shipping_address: (raw.shipping_address ?? raw.shippingAddress) as MerchantShippingAddress | undefined,
     };
@@ -94,6 +98,10 @@ type PendingOrderRow = {
   email?: string | null;
   subtotal?: unknown;
   shipping?: unknown;
+  total?: unknown;
+  discount_amount?: unknown;
+  discount_code?: string | null;
+  discount_code_id?: string | null;
   shipping_address?: unknown;
   pending_cart_snapshot?: unknown;
 };
@@ -139,6 +147,8 @@ function payloadFromPendingRow(row: PendingOrderRow): MerchantPayload | null {
     lines,
     subtotalEur: Number(row.subtotal ?? 0),
     shippingEur: Number(row.shipping ?? 0),
+    discountAmount: Number(row.discount_amount ?? 0) || 0,
+    discountCode: row.discount_code ?? null,
     shipping_address: row.shipping_address as MerchantShippingAddress | undefined,
   };
 }
@@ -196,6 +206,8 @@ async function sendOrderConfirmationEmail(args: {
   subtotal: number;
   shipping: number;
   total: number;
+  discountAmount?: number;
+  discountCode?: string | null;
   lines: Array<{ name: string; quantity: number; unitPrice: number }>;
   shippingAddress?: Record<string, string> | null;
   correosShipmentCode?: string | null;
@@ -211,6 +223,8 @@ async function sendOrderConfirmationEmail(args: {
     subtotal: args.subtotal,
     shipping: args.shipping,
     total: args.total,
+    discountAmount: args.discountAmount,
+    discountCode: args.discountCode,
     lines: args.lines,
     correosShipmentCode: args.correosShipmentCode,
   });
@@ -324,7 +338,7 @@ serve(async (req) => {
 
     const { data: existing } = await admin
       .from("orders")
-      .select("id, status, shipping_address, email, subtotal, shipping, total, pending_cart_snapshot, correos_shipment_code")
+      .select("id, status, shipping_address, email, subtotal, shipping, total, discount_amount, discount_code, discount_code_id, pending_cart_snapshot, correos_shipment_code")
       .eq("stripe_session_id", dsOrder)
       .maybeSingle();
 
@@ -345,7 +359,13 @@ serve(async (req) => {
 
     const subtotal = Number(payload.subtotalEur);
     const shipping = Number(payload.shippingEur);
-    const total = subtotal + shipping;
+    const discountAmount = Math.max(0, Number(payload.discountAmount ?? 0) || 0);
+    const discountCode = payload.discountCode ? String(payload.discountCode) : null;
+    const existingDiscountCodeId =
+      existing && (existing as PendingOrderRow).discount_code_id
+        ? String((existing as PendingOrderRow).discount_code_id)
+        : null;
+    const total = Math.max(0, Math.round((subtotal - discountAmount + shipping) * 100) / 100);
     const shipFromPayload = shippingAddressFromPayload(
       payload.shippingAddress ?? payload.shipping_address,
     );
@@ -402,6 +422,9 @@ serve(async (req) => {
             subtotal,
             shipping,
             total,
+            discount_amount: discountAmount > 0 ? discountAmount : null,
+            discount_code: discountCode,
+            ...(existingDiscountCodeId ? { discount_code_id: existingDiscountCodeId } : {}),
             shipping_address: keepAddress ?? existing.shipping_address,
             pending_cart_snapshot: null,
             ...(linkedUserId ? { user_id: linkedUserId } : {}),
@@ -426,6 +449,8 @@ serve(async (req) => {
             subtotal,
             shipping,
             total,
+            discountAmount,
+            discountCode,
             lines: buildEmailLines(),
             shippingAddress: keepAddress,
             correosShipmentCode: row?.correos_shipment_code ?? (existing as { correos_shipment_code?: string | null }).correos_shipment_code ?? null,
@@ -460,6 +485,8 @@ serve(async (req) => {
         subtotal,
         shipping,
         total,
+        discount_amount: discountAmount > 0 ? discountAmount : null,
+        discount_code: discountCode,
         stripe_session_id: dsOrder,
         shipping_address,
         ...(linkedUserId ? { user_id: linkedUserId } : {}),
@@ -487,6 +514,8 @@ serve(async (req) => {
       subtotal,
       shipping,
       total,
+      discountAmount,
+      discountCode,
       lines: buildEmailLines(),
       shippingAddress: shipping_address,
       correosShipmentCode: inserted.correos_shipment_code ?? null,

@@ -54,6 +54,12 @@ const Checkout = () => {
   const [shipping, setShipping] = useState(emptyShipping);
   const [wantsInvoice, setWantsInvoice] = useState(false);
   const [customerTaxId, setCustomerTaxId] = useState("");
+  const [discountInput, setDiscountInput] = useState("");
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    amount: number;
+  } | null>(null);
+  const [discountLoading, setDiscountLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef<BoundTurnstileObject | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
@@ -74,7 +80,56 @@ const Checkout = () => {
     totalPrice,
   );
   const canQuoteShipping = shippingEur != null;
-  const total = totalPrice + (shippingEur ?? 0);
+  const discountAmount = appliedDiscount?.amount ?? 0;
+  const total = Math.max(0, totalPrice - discountAmount + (shippingEur ?? 0));
+
+  const applyDiscountCode = async () => {
+    const code = discountInput.trim();
+    if (!code) {
+      toast({ title: "Introduce un código", variant: "destructive" });
+      return;
+    }
+    if (!email.trim()) {
+      toast({
+        title: "Introduce tu email",
+        description: "Necesitamos tu email para validar el código promocional.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setDiscountLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("validate-discount-code", {
+        body: {
+          code,
+          customerEmail: email.trim().toLowerCase(),
+          subtotalEur: totalPrice,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      const amount = Number(data?.discountAmount ?? 0);
+      const appliedCode = String(data?.code ?? code).toUpperCase();
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Este código no aplica a tu pedido");
+      }
+      setAppliedDiscount({ code: appliedCode, amount });
+      setDiscountInput(appliedCode);
+      toast({
+        title: "Código aplicado",
+        description: `Descuento de €${amount.toFixed(2)}`,
+      });
+    } catch (err: unknown) {
+      setAppliedDiscount(null);
+      const description = await getEdgeFunctionErrorMessage(
+        err,
+        "Código no válido o no aplicable.",
+      );
+      toast({ title: "No se pudo aplicar el código", description, variant: "destructive" });
+    } finally {
+      setDiscountLoading(false);
+    }
+  };
 
   const submitPayment = async (payMethod?: string) => {
     if (!email) {
@@ -153,6 +208,7 @@ const Checkout = () => {
           invoiceRequested: wantsInvoice,
           customerTaxId: wantsInvoice ? normalizedTaxId : undefined,
           turnstileToken: cloudflareProtectionEnabled ? turnstileToken : "",
+          ...(appliedDiscount?.code ? { discountCode: appliedDiscount.code } : {}),
           ...(payMethod ? { payMethod } : { payMethods: "all" }),
         },
       });
@@ -475,10 +531,43 @@ const Checkout = () => {
                 ))}
               </div>
               <div className="border-t border-gold/10 pt-4 space-y-2">
+                <div className="space-y-2 pb-3">
+                  <Label htmlFor="discount-code" className="text-carbon/70 text-sm">Código promocional</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="discount-code"
+                      value={discountInput}
+                      onChange={(e) => {
+                        setDiscountInput(e.target.value.toUpperCase());
+                        if (appliedDiscount) setAppliedDiscount(null);
+                      }}
+                      placeholder="BIENVENIDA10"
+                      className="bg-white border-gold/15 focus:border-gold uppercase"
+                      autoComplete="off"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={discountLoading || loading}
+                      onClick={() => void applyDiscountCode()}
+                      className="shrink-0 border-gold/30 text-carbon hover:bg-gold/5"
+                    >
+                      {discountLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-carbon/60">Subtotal</span>
                   <span className="text-carbon">€{totalPrice.toFixed(2)}</span>
                 </div>
+                {appliedDiscount ? (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-carbon/60">
+                      Descuento ({appliedDiscount.code})
+                    </span>
+                    <span className="text-carbon">−€{appliedDiscount.amount.toFixed(2)}</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between text-sm">
                   <span className="text-carbon/60">Envío</span>
                   <span className="text-carbon">
