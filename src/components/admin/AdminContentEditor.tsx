@@ -118,7 +118,7 @@ const snapshotFromBlocks = (rows: ContentBlock[]): SavedSnapshot => {
 const isHex = (value: string) =>
   /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(value.trim());
 
-const AdminContentEditor = () => {
+const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   const { toast } = useToast();
   const [blocks, setBlocks] = useState<ContentBlock[]>([]);
   const [saved, setSaved] = useState<SavedSnapshot>({});
@@ -813,6 +813,7 @@ const AdminContentEditor = () => {
 
   const visibleBlocks = blocks
     .filter((block) => !HIDDEN_KEYS.has(block.key))
+    .filter((block) => !filterKeys || filterKeys.includes(block.key))
     .sort((a, b) => {
       const ai = KEY_ORDER.indexOf(a.key);
       const bi = KEY_ORDER.indexOf(b.key);
@@ -825,6 +826,14 @@ const AdminContentEditor = () => {
   const headlinePreviewSize = parseFontSize(headlineDraft.fontSize);
   const heroPreviewConfig = buildHeroPayload().config;
   const campaignPreviewConfig = buildCampaignPayload().config;
+
+  if (visibleBlocks.length === 0) {
+    return (
+      <div className="p-8 text-center text-carbon/40 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        No hay contenido para esta sección.
+      </div>
+    );
+  }
 
   return (
     <>

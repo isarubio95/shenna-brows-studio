@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { useThemeConfig } from "@/hooks/use-theme-config";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -169,6 +169,38 @@ const MaintenancePage = () => {
   );
 };
 
+const AppShell = () => {
+  const { pathname } = useLocation();
+  const isAdminRoute = pathname.startsWith("/admin");
+
+  return (
+    <>
+      <ScrollToTop />
+      {!isAdminRoute && <Navbar />}
+      {!isAdminRoute && <CartDrawer />}
+      <WelcomePromoDialog />
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/tienda" element={<Tienda />} />
+        <Route path="/sobre-mi" element={<About />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/payment-ko" element={<PaymentKo />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/admin" element={<Admin />} />
+        <Route path="/account" element={<Account />} />
+        <Route path="/politica-privacidad" element={<PrivacyPolicy />} />
+        <Route path="/politica-devoluciones" element={<ReturnsPolicy />} />
+        <Route path="/aviso-legal" element={<TermsOfService />} />
+        <Route path="/politica-cookies" element={<CookiesPolicy />} />
+        <Route path="/:slug" element={<ProductPage />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      {!isAdminRoute && <Footer />}
+    </>
+  );
+};
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -182,28 +214,7 @@ const App = () => {
               <MaintenancePage />
             ) : (
               <BrowserRouter>
-                <ScrollToTop />
-                <Navbar />
-                <CartDrawer />
-                <WelcomePromoDialog />
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/tienda" element={<Tienda />} />
-                  <Route path="/sobre-mi" element={<About />} />
-                  <Route path="/checkout" element={<Checkout />} />
-                  <Route path="/payment-success" element={<PaymentSuccess />} />
-                  <Route path="/payment-ko" element={<PaymentKo />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/account" element={<Account />} />
-                  <Route path="/politica-privacidad" element={<PrivacyPolicy />} />
-                  <Route path="/politica-devoluciones" element={<ReturnsPolicy />} />
-                  <Route path="/aviso-legal" element={<TermsOfService />} />
-                  <Route path="/politica-cookies" element={<CookiesPolicy />} />
-                  <Route path="/:slug" element={<ProductPage />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-                <Footer />
+                <AppShell />
               </BrowserRouter>
             )}
           </CartProvider>

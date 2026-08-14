@@ -20,7 +20,6 @@ import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
 import AdminReturnsManager from "@/components/admin/AdminReturnsManager";
 import AdminSectionNav, {
-  getAdminSectionDescription,
   type AdminSection,
 } from "@/components/admin/AdminSectionNav";
 import {
@@ -38,6 +37,7 @@ import { getProductImageUrl } from "@/lib/product-images";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { isProductOnSale } from "@/lib/product-pricing";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -69,6 +69,29 @@ const statusLabels: Record<string, string> = {
 const PAID_ORDER_STATUSES = new Set(["paid", "shipped", "delivered"]);
 const PENDING_ORDER_STATUSES = new Set(["pending", "pending_payment"]);
 const ORDERS_PAGE_SIZE = 10;
+
+type ContenidoTab =
+  | "hero"
+  | "welcome"
+  | "marquee"
+  | "headline"
+  | "campaign"
+  | "about"
+  | "tema";
+
+const CONTENIDO_TABS: { id: ContenidoTab; label: string; keys?: string[] }[] = [
+  { id: "hero", label: "Hero", keys: ["index_hero"] },
+  { id: "welcome", label: "Bienvenida", keys: ["index_welcome_popup"] },
+  { id: "marquee", label: "Marquesina", keys: ["index_marquee"] },
+  { id: "headline", label: "Titular", keys: ["index_collection_headline"] },
+  { id: "campaign", label: "Campaña", keys: ["index_campaign"] },
+  {
+    id: "about",
+    label: "Sobre mí",
+    keys: ["about_section_1", "about_section_2", "about_section_3", "about_section_4"],
+  },
+  { id: "tema", label: "Tema" },
+];
 
 function canPrintShippingLabel(orderStatus: string): boolean {
   return !PENDING_ORDER_STATUSES.has(orderStatus) && orderStatus !== "cancelled";
@@ -756,6 +779,7 @@ const Admin = () => {
   const [orderItemsCache, setOrderItemsCache] = useState<Record<string, unknown[]>>({});
   const [loadingOrderItemsId, setLoadingOrderItemsId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<AdminSection>("pedidos");
+  const [contenidoTab, setContenidoTab] = useState<ContenidoTab>("hero");
 
   const productCatalogById = useMemo(() => {
     const map = new Map<string, ProductCatalogEntry>();
@@ -891,7 +915,7 @@ const Admin = () => {
     fetchData();
   }, [isAdmin, syncAndFetchOrders]);
 
-  if (authLoading) return <main className="min-h-screen bg-cream pt-32 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-gold" /></main>;
+  if (authLoading) return <main className="min-h-screen bg-cream flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-gold" /></main>;
   if (!user || !isAdmin) return <Navigate to="/login" replace />;
 
   const refreshProducts = async () => {
@@ -1391,14 +1415,10 @@ const Admin = () => {
   };
 
   return (
-    <main className="min-h-screen bg-cream pt-28 pb-16">
-      <div className="container mx-auto px-6 max-w-7xl">
-        <AnimatedSection>
-          <h1 className="font-playfair text-3xl font-bold text-carbon mb-2">Panel de Administración</h1>
-          <p className="text-carbon/50 text-sm mb-6">{getAdminSectionDescription(activeSection)}</p>
-          <AdminSectionNav active={activeSection} onChange={setActiveSection} />
-        </AnimatedSection>
-
+    <div className="min-h-screen bg-cream">
+      <AdminSectionNav active={activeSection} onChange={setActiveSection} />
+      <main className="lg:pl-60 min-h-screen">
+        <div className="mx-auto px-4 sm:px-6 py-6 lg:py-8 max-w-7xl pb-16">
         {activeSection === "pedidos" && (
           <>
         <AnimatedSection delay={0.05}>
@@ -1971,22 +1991,45 @@ const Admin = () => {
         )}
 
         {activeSection === "contenido" && (
-          <>
+          <AnimatedSection delay={0.05}>
+            <nav
+              className="flex flex-wrap gap-2 mb-6"
+              aria-label="Subsecciones de contenido"
+            >
+              {CONTENIDO_TABS.map(({ id, label }) => {
+                const isActive = contenidoTab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setContenidoTab(id)}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all",
+                      "border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-cream",
+                      isActive
+                        ? "border-gold bg-gold text-white shadow-[0_4px_14px_rgba(197,160,89,0.35)]"
+                        : "border-gold/15 bg-white text-carbon/65 hover:border-gold/30 hover:text-carbon hover:bg-gold/4",
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </nav>
+
+            {contenidoTab === "tema" ? (
+              <AdminThemeEditor />
+            ) : (
+              <AdminContentEditor
+                filterKeys={CONTENIDO_TABS.find((t) => t.id === contenidoTab)?.keys}
+              />
+            )}
+          </AnimatedSection>
+        )}
+
+        {activeSection === "testimonios" && (
         <AnimatedSection delay={0.05}>
-          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Contenido de la Web</h2>
-          <p className="text-carbon/40 text-sm mb-4">
-            Edita el hero, la marquesina, el titular, la campaña publicitaria y los textos de «Sobre mí».
-          </p>
-          <AdminContentEditor />
-        </AnimatedSection>
-
-        <AnimatedSection delay={0.08} className="mt-12">
-          <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Personalización del Tema</h2>
-          <p className="text-carbon/40 text-sm mb-4">Cambia los colores de fondo de las secciones, del footer y de la tipografía.</p>
-          <AdminThemeEditor />
-        </AnimatedSection>
-
-        <AnimatedSection delay={0.11} className="mt-12">
           <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Gestión de Testimonios</h2>
           <div className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
             {testimonials.length === 0 ? (
@@ -2027,10 +2070,10 @@ const Admin = () => {
             )}
           </div>
         </AnimatedSection>
-          </>
         )}
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
   );
 };
 
