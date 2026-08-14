@@ -12,7 +12,21 @@ const localFallbacks: Record<string, string> = {
   lapiz: productLapiz,
 };
 
-const parseImageUrls = (imageUrl: string | null | undefined): string[] => {
+const isNonEmptyUrl = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+const normalizeEntryUrl = (entry: unknown): string | null => {
+  if (isNonEmptyUrl(entry)) return entry.trim();
+  if (entry && typeof entry === "object" && isNonEmptyUrl((entry as { url?: unknown }).url)) {
+    return (entry as { url: string }).url.trim();
+  }
+  return null;
+};
+
+/**
+ * Parse `products.image_url`: plain URL, `string[]`, or legacy `{ url, fill }[]`.
+ */
+export const parseProductImages = (imageUrl: string | null | undefined): string[] => {
   if (!imageUrl) return [];
   const normalized = imageUrl.trim();
   if (!normalized) return [];
@@ -21,7 +35,7 @@ const parseImageUrls = (imageUrl: string | null | undefined): string[] => {
     try {
       const parsed = JSON.parse(normalized);
       if (Array.isArray(parsed)) {
-        return parsed.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+        return parsed.map(normalizeEntryUrl).filter((entry): entry is string => entry !== null);
       }
     } catch {
       // Fallback to legacy plain string format when parsing fails.
@@ -31,6 +45,11 @@ const parseImageUrls = (imageUrl: string | null | undefined): string[] => {
   return [normalized];
 };
 
+export const serializeProductImages = (urls: string[]): string | null => {
+  if (urls.length === 0) return null;
+  return JSON.stringify(urls);
+};
+
 /**
  * Resolves the display image for a product following strict priority:
  * 1. Dynamic URL from Supabase (if not placeholder/null)
@@ -38,13 +57,13 @@ const parseImageUrls = (imageUrl: string | null | undefined): string[] => {
  * 3. /placeholder.svg
  */
 export const getProductImageUrl = (imageUrl: string | null | undefined, slug: string): string => {
-  const firstDynamicImage = parseImageUrls(imageUrl)[0];
+  const firstDynamicImage = parseProductImages(imageUrl)[0];
   if (firstDynamicImage && firstDynamicImage !== "/placeholder.svg") return firstDynamicImage;
   return localFallbacks[slug] || "/placeholder.svg";
 };
 
 export const getProductImageGallery = (imageUrl: string | null | undefined, slug: string): string[] => {
-  const gallery = parseImageUrls(imageUrl).filter((entry) => entry !== "/placeholder.svg");
+  const gallery = parseProductImages(imageUrl).filter((entry) => entry !== "/placeholder.svg");
   if (gallery.length > 0) return gallery;
   return [localFallbacks[slug] || "/placeholder.svg"];
 };

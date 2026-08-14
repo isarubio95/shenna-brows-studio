@@ -1,17 +1,22 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getProductImageUrl } from "@/lib/product-images";
+import {
+  getProductImageUrl,
+  parseProductImages,
+  serializeProductImages,
+} from "@/lib/product-images";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, ImageIcon, Plus, X, Bold, Italic, List, ListOrdered, Link as LinkIcon, Tag } from "lucide-react";
+import { Loader2, Upload, ImageIcon, Plus, X, Bold, Italic, List, ListOrdered, Link as LinkIcon, Tag, ChevronLeft, ChevronRight, Crop } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { normalizeHex, parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import { cn } from "@/lib/utils";
+import ProductImageCropDialog from "@/components/admin/ProductImageCropDialog";
 
 type Product = Tables<"products">;
 
@@ -75,23 +80,6 @@ const normalizeDescriptionHtml = (html: string) => {
     .replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, "");
 };
 
-const parseGalleryFromImageUrl = (imageUrl: string | null | undefined): string[] => {
-  if (!imageUrl) return [];
-  const normalized = imageUrl.trim();
-  if (!normalized) return [];
-  if (normalized.startsWith("[")) {
-    try {
-      const parsed = JSON.parse(normalized);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
-      }
-    } catch {
-      // Legacy value: continue as single URL.
-    }
-  }
-  return [normalized];
-};
-
 const EMPTY_CREATE_FORM = {
   category: "",
   name: "",
@@ -147,9 +135,13 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const [form, setForm] = useState<Partial<Product & { materials_label?: string }>>({});
   const [materialItems, setMaterialItems] = useState<string[]>([""]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [cropOpen, setCropOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [thumbDragIndex, setThumbDragIndex] = useState<number | null>(null);
+  const [thumbDragOverIndex, setThumbDragOverIndex] = useState<number | null>(null);
   const [colorVariantRows, setColorVariantRows] = useState<ColorVariantFormRow[]>([]);
   const descriptionEditorRef = useRef<HTMLDivElement>(null);
   const [slugConflict, setSlugConflict] = useState<SlugConflict | null>(null);
@@ -171,6 +163,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       setMaterialItems([""]);
       setForm({ ...EMPTY_CREATE_FORM });
       setImageUrls([]);
+      setPreviewIndex(0);
       setColorVariantRows([]);
       setBaselineSnapshot(
         buildProductSnapshot({
@@ -203,12 +196,13 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       is_on_sale: currentProduct.is_on_sale ?? false,
       sale_price: currentProduct.sale_price ?? null,
     };
-    const nextImages = parseGalleryFromImageUrl(currentProduct.image_url);
+    const nextImages = parseProductImages(currentProduct.image_url);
     const parsed = parseColorVariants(currentProduct.color_variants);
     const nextColors = parsed.map((v) => ({ ...v, hexDraft: null as string | null }));
     setMaterialItems(nextMaterials);
     setForm(nextForm);
     setImageUrls(nextImages);
+    setPreviewIndex(0);
     setColorVariantRows(nextColors);
     setBaselineSnapshot(
       buildProductSnapshot({
@@ -389,7 +383,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${filePath}`;
         setImageUrls((prev) => {
           const next = [...prev, publicUrl];
-          setForm((formPrev) => ({ ...formPrev, image_url: JSON.stringify(next) }));
+          setForm((formPrev) => ({ ...formPrev, image_url: serializeProductImages(next) }));
+          setPreviewIndex(next.length - 1);
           return next;
         });
         toast({ title: "Imagen subida correctamente", description: "La imagen se añadió a la galería del producto." });
@@ -400,6 +395,47 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       }
     },
     [currentProduct, form.category, form.name, mode, toast]
+  );
+
+  const replaceImageAtIndex = useCallback(
+    async (index: number, file: File) => {
+      if (mode !== "create" && !currentProduct) return;
+      if (index < 0) return;
+      setUploading(true);
+      try {
+        const ext = file.name.split(".").pop() || "jpg";
+        const nameForSlug = (form.category || "").trim() || (form.name || "").trim();
+        const slugBase =
+          mode === "create"
+            ? (nameForSlug ? slugify(nameForSlug) : `borrador-${Date.now()}`)
+            : (currentProduct?.slug ?? "producto");
+        const filePath = `${slugBase}-crop-${Date.now()}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file, {
+          upsert: true,
+          contentType: file.type || undefined,
+        });
+
+        if (uploadError) throw uploadError;
+
+        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${filePath}`;
+        setImageUrls((prev) => {
+          if (index >= prev.length) return prev;
+          const next = [...prev];
+          next[index] = publicUrl;
+          setForm((formPrev) => ({ ...formPrev, image_url: serializeProductImages(next) }));
+          return next;
+        });
+        toast({ title: "Imagen recortada", description: "Se actualizó la imagen en la galería." });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "No se pudo guardar el recorte.";
+        toast({ title: "Error al guardar recorte", description: message, variant: "destructive" });
+        throw err instanceof Error ? err : new Error(message);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [currentProduct, form.category, form.name, mode, toast],
   );
 
   const handleDrop = useCallback(
@@ -432,20 +468,43 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const removeImageAt = (index: number) => {
     setImageUrls((prev) => {
       const next = prev.filter((_, i) => i !== index);
-      setForm((formPrev) => ({ ...formPrev, image_url: next.length > 0 ? JSON.stringify(next) : null }));
+      setForm((formPrev) => ({ ...formPrev, image_url: serializeProductImages(next) }));
+      setPreviewIndex((current) => {
+        if (next.length === 0) return 0;
+        if (index < current) return current - 1;
+        if (index === current) return Math.min(current, next.length - 1);
+        return current;
+      });
       return next;
     });
   };
 
-  const setPrimaryImage = (index: number) => {
+  const reorderImage = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
     setImageUrls((prev) => {
-      if (index <= 0 || index >= prev.length) return prev;
+      if (fromIndex >= prev.length || toIndex >= prev.length) return prev;
       const next = [...prev];
-      const [selected] = next.splice(index, 1);
-      next.unshift(selected);
-      setForm((formPrev) => ({ ...formPrev, image_url: JSON.stringify(next) }));
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      setForm((formPrev) => ({ ...formPrev, image_url: serializeProductImages(next) }));
+      setPreviewIndex((current) => {
+        if (current === fromIndex) return toIndex;
+        if (fromIndex < current && toIndex >= current) return current - 1;
+        if (fromIndex > current && toIndex <= current) return current + 1;
+        return current;
+      });
       return next;
     });
+  };
+
+  const showPrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPreviewIndex((i) => (imageUrls.length === 0 ? 0 : (i - 1 + imageUrls.length) % imageUrls.length));
+  };
+
+  const showNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPreviewIndex((i) => (imageUrls.length === 0 ? 0 : (i + 1) % imageUrls.length));
   };
 
   const handleSave = async () => {
@@ -517,7 +576,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           shipping_info: form.shipping_info || "",
           price: Number(form.price) || 0,
           stock: Number(form.stock) || 0,
-          image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+          image_url: serializeProductImages(imageUrls),
           is_pack: Boolean(form.is_pack),
           ...salePayload(),
           color_variants: colorVariantsPayload,
@@ -575,7 +634,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         shipping_info: form.shipping_info || "",
         price: Number(form.price) || 0,
         stock: Number(form.stock) || 0,
-        image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+        image_url: serializeProductImages(imageUrls),
         is_pack: Boolean(form.is_pack),
         ...salePayload(),
         color_variants: colorVariantsPayload,
@@ -592,12 +651,17 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     setSaving(false);
   };
 
+  const galleryPreview =
+    imageUrls.length > 0
+      ? imageUrls[Math.min(previewIndex, imageUrls.length - 1)]
+      : null;
   const displayImage =
-    imageUrls[0] ||
+    galleryPreview ||
     (currentProduct
       ? getProductImageUrl(currentProduct.image_url, currentProduct.slug)
       : getProductImageUrl(form.image_url, productSlugFromForm(form.category, form.name)));
   const canAddMaterial = materialItems.length === 0 || (materialItems[materialItems.length - 1]?.trim() ?? "") !== "";
+  const canNavigateGallery = imageUrls.length > 1;
 
   const applyFormat = (command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") => {
     document.execCommand(command);
@@ -614,6 +678,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-cream">
         <DialogHeader>
@@ -634,9 +699,9 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
               onDragLeave={handleDragLeave}
               onClick={() => fileInputRef.current?.click()}
               className={`
-                relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden
+                relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden bg-muted
                 ${isDragging ? "border-gold bg-gold/5 scale-[1.01]" : "border-gold/20 hover:border-gold/40"}
-                ${displayImage ? "aspect-video" : "aspect-video flex items-center justify-center"}
+                ${displayImage ? "aspect-square" : "aspect-square flex items-center justify-center"}
               `}
             >
               {uploading && (
@@ -656,8 +721,51 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                   <span className="text-sm">Arrastra una o varias imágenes, o haz clic</span>
                 </div>
               )}
+              {galleryPreview && !uploading && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="secondary"
+                  className="absolute top-2 right-2 z-20 h-9 w-9 rounded-full bg-white/90 text-carbon shadow-md hover:bg-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCropOpen(true);
+                  }}
+                  aria-label="Recortar imagen"
+                  title="Recortar imagen"
+                >
+                  <Crop className="h-4 w-4" />
+                </Button>
+              )}
+              {canNavigateGallery && !uploading && (
+                <>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="absolute left-2 top-1/2 z-20 h-9 w-9 -translate-y-1/2 rounded-full bg-white/90 text-carbon shadow-md hover:bg-white"
+                    onClick={showPrevImage}
+                    aria-label="Imagen anterior"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="absolute right-2 top-1/2 z-20 h-9 w-9 -translate-y-1/2 rounded-full bg-white/90 text-carbon shadow-md hover:bg-white"
+                    onClick={showNextImage}
+                    aria-label="Imagen siguiente"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <span className="absolute bottom-2 left-1/2 z-20 -translate-x-1/2 rounded-full bg-carbon/60 px-2.5 py-0.5 text-xs text-white pointer-events-none">
+                    {Math.min(previewIndex, imageUrls.length - 1) + 1} / {imageUrls.length}
+                  </span>
+                </>
+              )}
               {displayImage && !uploading && (
-                <div className="absolute inset-0 bg-carbon/0 hover:bg-carbon/30 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+                <div className="absolute inset-0 bg-carbon/0 hover:bg-carbon/30 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 pointer-events-none">
                   <div className="flex items-center gap-2 text-white bg-carbon/60 rounded-lg px-4 py-2 text-sm">
                     <Upload className="h-4 w-4" />
                     Añadir más imágenes
@@ -666,45 +774,85 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
               )}
             </div>
             {imageUrls.length > 0 && (
-              <div className="mt-3 grid grid-cols-4 sm:grid-cols-6 gap-2">
-                {imageUrls.map((url, index) => (
-                  <div key={url} className="relative group aspect-square rounded-lg overflow-hidden border border-gold/20">
-                    <img src={url} alt={`Imagen ${index + 1}`} className="w-full h-full object-cover" />
-                    {index === 0 && (
-                      <span className="absolute top-1 left-1 text-[10px] bg-gold text-white px-1.5 py-0.5 rounded">
-                        Principal
-                      </span>
-                    )}
-                    <div className="absolute inset-0 bg-carbon/0 group-hover:bg-carbon/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                      {index !== 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-carbon/45">Arrastra las miniaturas para cambiar el orden. La primera es la principal.</p>
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  {imageUrls.map((url, index) => (
+                    <div
+                      key={`${url}-${index}`}
+                      role="button"
+                      tabIndex={0}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", String(index));
+                        setThumbDragIndex(index);
+                      }}
+                      onDragEnd={() => {
+                        setThumbDragIndex(null);
+                        setThumbDragOverIndex(null);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (thumbDragOverIndex !== index) setThumbDragOverIndex(index);
+                      }}
+                      onDragLeave={() => {
+                        if (thumbDragOverIndex === index) setThumbDragOverIndex(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const fromRaw = e.dataTransfer.getData("text/plain");
+                        const fromIndex = Number.parseInt(fromRaw, 10);
+                        setThumbDragIndex(null);
+                        setThumbDragOverIndex(null);
+                        if (!Number.isFinite(fromIndex)) return;
+                        reorderImage(fromIndex, index);
+                      }}
+                      onClick={() => setPreviewIndex(index)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setPreviewIndex(index);
+                        }
+                      }}
+                      className={cn(
+                        "relative group aspect-square rounded-lg overflow-hidden border bg-muted cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition-opacity",
+                        index === previewIndex ? "border-gold ring-2 ring-gold/40" : "border-gold/20",
+                        thumbDragIndex === index && "opacity-40",
+                        thumbDragOverIndex === index && thumbDragIndex !== index && "ring-2 ring-gold border-gold",
+                      )}
+                    >
+                      <img
+                        src={url}
+                        alt={`Imagen ${index + 1}`}
+                        className="w-full h-full object-cover pointer-events-none"
+                        draggable={false}
+                      />
+                      {index === 0 && (
+                        <span className="absolute top-1 left-1 text-[10px] bg-gold text-white px-1.5 py-0.5 rounded pointer-events-none">
+                          Principal
+                        </span>
+                      )}
+                      <div className="absolute inset-0 bg-carbon/0 group-hover:bg-carbon/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                         <Button
                           type="button"
-                          size="sm"
-                          variant="secondary"
-                          className="h-7 px-2 text-xs"
+                          size="icon"
+                          variant="destructive"
+                          className="h-7 w-7"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setPrimaryImage(index);
+                            removeImageAt(index);
                           }}
+                          onMouseDown={(e) => e.stopPropagation()}
                         >
-                          Principal
+                          <X size={14} />
                         </Button>
-                      )}
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="destructive"
-                        className="h-7 w-7"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeImageAt(index);
-                        }}
-                      >
-                        <X size={14} />
-                      </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
             <input
@@ -1121,6 +1269,17 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         </div>
       </DialogContent>
     </Dialog>
+
+    <ProductImageCropDialog
+      open={cropOpen}
+      imageSrc={galleryPreview}
+      onOpenChange={setCropOpen}
+      onCropped={async (file) => {
+        const index = Math.min(previewIndex, Math.max(0, imageUrls.length - 1));
+        await replaceImageAtIndex(index, file);
+      }}
+    />
+    </>
   );
 };
 

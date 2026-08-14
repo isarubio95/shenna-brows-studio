@@ -3,8 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
-import { motion } from "framer-motion";
 import Autoplay from "embla-carousel-autoplay";
+import { motion } from "framer-motion";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -18,38 +18,31 @@ import { getProductImageUrl } from "@/lib/product-images";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import CeoSection from "@/components/CeoSection";
+import CampaignBanner from "@/components/CampaignBanner";
+import HeroSection from "@/components/HeroSection";
 import { useSiteContent } from "@/hooks/use-site-content";
 import { parseMarqueeConfig } from "@/lib/marquee-content";
 import {
   parseCollectionHeadlineConfig,
   splitHeadlineByAccent,
 } from "@/lib/collection-headline-content";
-
-/** Variantes optimizadas en /public/hero — el navegador solo descarga la que coincida con el viewport. */
-const HERO_IMAGES = {
-  sm: { avif: "/hero/hero-sm.avif", webp: "/hero/hero-sm.webp", jpg: "/hero/hero-sm.jpg" },
-  md: { avif: "/hero/hero-md.avif", webp: "/hero/hero-md.webp", jpg: "/hero/hero-md.jpg" },
-  lg: { avif: "/hero/hero-lg.avif", webp: "/hero/hero-lg.webp", jpg: "/hero/hero-lg.jpg" },
-  xl: { avif: "/hero/hero-xl.avif", webp: "/hero/hero-xl.webp", jpg: "/hero/hero-xl.jpg" },
-} as const;
-
-/** Estilos compartidos del CTA del hero (tamaño / tipografía). */
-const HERO_CTA_BASE =
-  "text-[0.65rem] tracking-[0.22em] uppercase px-6 sm:px-7 py-3 transition-all duration-300 active:scale-95 font-sans";
-
-/** CTA activo: crema opaco (referencia de diseño). */
-const HERO_CTA_SOLID = `${HERO_CTA_BASE} border border-[#F7F2E6] bg-[#F7F2E6] text-[#8F7F5D] hover:bg-[#EFE7D4] hover:border-[#EFE7D4]`;
-
-/**
- * Alternativa previa (vidrio translúcido blanco).
- * Para volver a ella: usa `HERO_CTA_GLASS` en el botón del hero en lugar de `HERO_CTA_SOLID`.
- */
-const HERO_CTA_GLASS = `${HERO_CTA_BASE} border border-white/80 bg-white/15 backdrop-blur-sm text-white hover:bg-white/25`;
+import { parseCampaignConfig } from "@/lib/campaign-content";
+import { parseHeroConfig } from "@/lib/hero-content";
 
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { data: siteContent } = useSiteContent(["index_marquee", "index_collection_headline"]);
+  const { data: siteContent } = useSiteContent([
+    "index_hero",
+    "index_marquee",
+    "index_collection_headline",
+    "index_campaign",
+  ]);
+
+  const hero = useMemo(
+    () => parseHeroConfig(siteContent.index_hero?.content),
+    [siteContent.index_hero?.content],
+  );
 
   const marquee = useMemo(
     () => parseMarqueeConfig(siteContent.index_marquee?.content),
@@ -59,6 +52,11 @@ const Index = () => {
   const collectionHeadline = useMemo(
     () => parseCollectionHeadlineConfig(siteContent.index_collection_headline?.content),
     [siteContent.index_collection_headline?.content],
+  );
+
+  const campaign = useMemo(
+    () => parseCampaignConfig(siteContent.index_campaign?.content),
+    [siteContent.index_campaign?.content],
   );
 
   const headlineParts = useMemo(
@@ -84,80 +82,7 @@ const Index = () => {
 
   return (
     <main>
-      {/* Hero */}
-      <section className="relative w-full min-h-dvh flex flex-col items-start justify-center lg:justify-end px-4 sm:px-6 overflow-hidden pt-24 pb-12 lg:pb-36">
-        {/* Fondo: picture + media — el navegador solo descarga la variante del viewport */}
-        <picture className="absolute inset-0 z-0 pointer-events-none">
-          <source media="(max-width: 639px)" type="image/avif" srcSet={HERO_IMAGES.sm.avif} />
-          <source media="(max-width: 639px)" type="image/webp" srcSet={HERO_IMAGES.sm.webp} />
-          <source media="(max-width: 639px)" type="image/jpeg" srcSet={HERO_IMAGES.sm.jpg} />
-          <source media="(max-width: 1023px)" type="image/avif" srcSet={HERO_IMAGES.md.avif} />
-          <source media="(max-width: 1023px)" type="image/webp" srcSet={HERO_IMAGES.md.webp} />
-          <source media="(max-width: 1023px)" type="image/jpeg" srcSet={HERO_IMAGES.md.jpg} />
-          <source media="(max-width: 1535px)" type="image/avif" srcSet={HERO_IMAGES.lg.avif} />
-          <source media="(max-width: 1535px)" type="image/webp" srcSet={HERO_IMAGES.lg.webp} />
-          <source media="(max-width: 1535px)" type="image/jpeg" srcSet={HERO_IMAGES.lg.jpg} />
-          <source type="image/avif" srcSet={HERO_IMAGES.xl.avif} />
-          <source type="image/webp" srcSet={HERO_IMAGES.xl.webp} />
-          <img
-            src={HERO_IMAGES.lg.jpg}
-            alt=""
-            width={2640}
-            height={1470}
-            decoding="async"
-            fetchPriority="high"
-            className="absolute inset-0 h-full w-full object-cover max-sm:object-center sm:max-lg:object-[center_calc(50%+4rem)] lg:object-[55%_35%]"
-          />
-        </picture>
-
-        {/* Overlay de degradado para aclarar la parte superior y dar profundidad abajo */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35)_0%,rgba(0,0,0,0.18)_10%,transparent_25%,transparent_70%,rgba(0,0,0,0.18)_100%)] z-[1] pointer-events-none" />
-
-        {/* Center content */}
-        <div className="relative z-[2] w-full max-w-6xl mx-auto max-lg:translate-y-36 lg:ml-12 xl:ml-20 lg:mr-auto lg:translate-y-0">
-          <div className="flex flex-col lg:flex-row items-start justify-between gap-8 lg:gap-12">
-            <div className="w-full lg:w-[58%] flex flex-col items-start pb-14 lg:pb-0">
-              <AnimatedSection>
-                <h1 className="font-playfair font-normal text-[#F7F0E2] text-[1.7rem] md:text-[2.1rem] lg:text-[3rem] text-left tracking-[0.05em] uppercase leading-[1.35] mb-8 drop-shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
-                  <span className="block">La precisión</span>
-                  <span className="block">
-                    Que te{" "}
-                    <span className="italic">
-                      define
-                    </span>
-                  </span>
-                </h1>
-              </AnimatedSection>
-
-              <AnimatedSection delay={0.15}>
-                <Link to="/tienda">
-                  <button className={HERO_CTA_SOLID}>
-                    DESCUBRIR LA COLECCIÓN
-                  </button>
-                </Link>
-              </AnimatedSection>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom section */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[3]">
-          <AnimatedSection delay={0.3}>
-            <motion.button
-              type="button"
-              onClick={scrollToNextSection}
-              aria-label="Bajar a la siguiente sección"
-              animate={{ y: [0, 8, 0] }}
-              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-              className="mb-3 sm:mb-4 text-white/90 hover:text-white transition-colors duration-300 flex items-center justify-center"
-            >
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" className="mx-auto drop-shadow-[0_4px_8px_rgba(0,0,0,0.35)]">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </motion.button>
-          </AnimatedSection>
-        </div>
-      </section>
+      <HeroSection config={hero} onScrollNext={scrollToNextSection} />
 
       {/* Marquesina */}
       <div
@@ -292,10 +217,10 @@ const Index = () => {
         </div>
       </section>
 
-      {/* CEO */}
+      <CampaignBanner config={campaign} />
+
       <CeoSection />
 
-      {/* Testimonials */}
       <TestimonialsCarousel />
     </main>
   );

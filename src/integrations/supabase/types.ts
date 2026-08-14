@@ -59,11 +59,97 @@ export type Database = {
           },
         ]
       }
+      discount_codes: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          discount_type: string
+          discount_value: number
+          ends_at: string | null
+          first_order_only: boolean
+          id: string
+          is_active: boolean
+          is_welcome_offer: boolean
+          max_uses: number | null
+          max_uses_per_email: number | null
+          min_subtotal: number | null
+          starts_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value: number
+          ends_at?: string | null
+          first_order_only?: boolean
+          id?: string
+          is_active?: boolean
+          is_welcome_offer?: boolean
+          max_uses?: number | null
+          max_uses_per_email?: number | null
+          min_subtotal?: number | null
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          ends_at?: string | null
+          first_order_only?: boolean
+          id?: string
+          is_active?: boolean
+          is_welcome_offer?: boolean
+          max_uses?: number | null
+          max_uses_per_email?: number | null
+          min_subtotal?: number | null
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      discount_code_emails: {
+        Row: {
+          created_at: string
+          discount_code_id: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          discount_code_id: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          discount_code_id?: string
+          email?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_code_emails_discount_code_id_fkey"
+            columns: ["discount_code_id"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           correos_shipment_code: string | null
           created_at: string | null
           customer_tax_id: string | null
+          discount_amount: number | null
+          discount_code: string | null
+          discount_code_id: string | null
           email: string
           id: string
           invoice_requested: boolean
@@ -84,6 +170,9 @@ export type Database = {
           correos_shipment_code?: string | null
           created_at?: string | null
           customer_tax_id?: string | null
+          discount_amount?: number | null
+          discount_code?: string | null
+          discount_code_id?: string | null
           email: string
           id?: string
           invoice_requested?: boolean
@@ -104,6 +193,9 @@ export type Database = {
           correos_shipment_code?: string | null
           created_at?: string | null
           customer_tax_id?: string | null
+          discount_amount?: number | null
+          discount_code?: string | null
+          discount_code_id?: string | null
           email?: string
           invoice_requested?: boolean
           id?: string
@@ -120,7 +212,15 @@ export type Database = {
           total?: number | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orders_discount_code_id_fkey"
+            columns: ["discount_code_id"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       return_requests: {
         Row: {
@@ -186,6 +286,7 @@ export type Database = {
           unsubscribed_at: string | null
           updated_at: string
           user_id: string | null
+          welcome_coupon_sent_at: string | null
         }
         Insert: {
           created_at?: string
@@ -197,6 +298,7 @@ export type Database = {
           unsubscribed_at?: string | null
           updated_at?: string
           user_id?: string | null
+          welcome_coupon_sent_at?: string | null
         }
         Update: {
           created_at?: string
@@ -208,6 +310,7 @@ export type Database = {
           unsubscribed_at?: string | null
           updated_at?: string
           user_id?: string | null
+          welcome_coupon_sent_at?: string | null
         }
         Relationships: []
       }

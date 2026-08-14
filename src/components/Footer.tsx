@@ -144,7 +144,7 @@ const Footer = () => {
                   value={newsletterEmail}
                   onChange={(event) => setNewsletterEmail(event.target.value)}
                   placeholder="tu@email.com"
-                  className="bg-cream/10 border-cream/20 text-cream placeholder:text-cream/40"
+                  className="bg-cream/10 border-cream/20 text-cream placeholder:text-cream/60"
                 />
                 <label className="flex items-start gap-2 text-xs text-cream/70 leading-relaxed">
                   <Checkbox
