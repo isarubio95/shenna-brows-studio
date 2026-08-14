@@ -91,9 +91,10 @@ export function parseHeroConfig(raw?: string | null): HeroConfig {
       desktopImageUrl:
         asString(parsed.desktopImageUrl, DEFAULT_HERO.desktopImageUrl).trim() ||
         DEFAULT_HERO.desktopImageUrl,
-      mobileImageUrl:
-        asString(parsed.mobileImageUrl, DEFAULT_HERO.mobileImageUrl).trim() ||
+      mobileImageUrl: asString(
+        parsed.mobileImageUrl,
         DEFAULT_HERO.mobileImageUrl,
+      ).trim(),
       line1: asString(parsed.line1, DEFAULT_HERO.line1).trim() || DEFAULT_HERO.line1,
       line2: asString(parsed.line2, DEFAULT_HERO.line2).trim() || DEFAULT_HERO.line2,
       line2Accent: asString(parsed.line2Accent, DEFAULT_HERO.line2Accent).trim(),

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Play, RotateCcw, Save, Sparkle, Trash2, Upload } from "lucide-react";
+import { Loader2, Monitor, Play, RotateCcw, Save, Smartphone, Sparkle, Trash2, Upload } from "lucide-react";
 import {
   DEFAULT_MARQUEE_CONFIG,
   DEFAULT_MARQUEE_ITEMS,
@@ -1337,8 +1337,7 @@ const AdminContentEditor = () => {
                         )}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {heroDraft.mobileImageUrl &&
-                          heroDraft.mobileImageUrl !== DEFAULT_HERO.mobileImageUrl && (
+                        {heroDraft.mobileImageUrl && (
                           <Button
                             type="button"
                             variant="outline"
@@ -1346,13 +1345,13 @@ const AdminContentEditor = () => {
                             onClick={() =>
                               setHeroDraft((prev) => ({
                                 ...prev,
-                                mobileImageUrl: DEFAULT_HERO.mobileImageUrl,
+                                mobileImageUrl: "",
                               }))
                             }
                             className="border-gold/20 text-carbon/60"
                           >
                             <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                            Restaurar original
+                            Quitar
                           </Button>
                         )}
                         <p className="text-xs text-carbon/30">
@@ -1610,12 +1609,13 @@ const AdminContentEditor = () => {
                             variant="ghost"
                             onClick={() => setHeroPreviewDevice("desktop")}
                             className={cn(
-                              "h-8 rounded-none px-3 text-xs",
+                              "h-8 gap-1.5 rounded-none px-3 text-xs",
                               heroPreviewDevice === "desktop"
                                 ? "bg-gold/15 text-carbon"
                                 : "text-carbon/50",
                             )}
                           >
+                            <Monitor className="h-3.5 w-3.5" aria-hidden />
                             Escritorio
                           </Button>
                           <Button
@@ -1624,12 +1624,13 @@ const AdminContentEditor = () => {
                             variant="ghost"
                             onClick={() => setHeroPreviewDevice("mobile")}
                             className={cn(
-                              "h-8 rounded-none px-3 text-xs",
+                              "h-8 gap-1.5 rounded-none px-3 text-xs",
                               heroPreviewDevice === "mobile"
                                 ? "bg-gold/15 text-carbon"
                                 : "text-carbon/50",
                             )}
                           >
+                            <Smartphone className="h-3.5 w-3.5" aria-hidden />
                             Móvil
                           </Button>
                         </div>
@@ -2558,12 +2559,13 @@ const AdminContentEditor = () => {
                             variant="ghost"
                             onClick={() => setCampaignPreviewDevice("desktop")}
                             className={cn(
-                              "h-8 rounded-none px-3 text-xs",
+                              "h-8 gap-1.5 rounded-none px-3 text-xs",
                               campaignPreviewDevice === "desktop"
                                 ? "bg-gold/15 text-carbon"
                                 : "text-carbon/50",
                             )}
                           >
+                            <Monitor className="h-3.5 w-3.5" aria-hidden />
                             Escritorio
                           </Button>
                           <Button
@@ -2572,12 +2574,13 @@ const AdminContentEditor = () => {
                             variant="ghost"
                             onClick={() => setCampaignPreviewDevice("mobile")}
                             className={cn(
-                              "h-8 rounded-none px-3 text-xs",
+                              "h-8 gap-1.5 rounded-none px-3 text-xs",
                               campaignPreviewDevice === "mobile"
                                 ? "bg-gold/15 text-carbon"
                                 : "text-carbon/50",
                             )}
                           >
+                            <Smartphone className="h-3.5 w-3.5" aria-hidden />
                             Móvil
                           </Button>
                         </div>
