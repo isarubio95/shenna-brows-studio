@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ShieldCheck, ShoppingCart, Truck, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShieldCheck, ShoppingCart, Plus, Truck, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import Autoplay from "embla-carousel-autoplay";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -197,14 +197,20 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
               >
                 {addToCartDisabled ? (
                   <>
-                    <ShoppingCart className="size-4" />
+                    <span className="relative mr-2 inline-flex">
+                      <ShoppingCart size={16} />
+                      <Plus size={11} className="absolute -top-1 -right-1" />
+                    </span>
                     Próximamente
                   </>
                 ) : outOfStock ? (
                   "Sin stock"
                 ) : (
                   <>
-                    <ShoppingCart className="size-4" />
+                    <span className="relative mr-2 inline-flex">
+                      <ShoppingCart size={16} />
+                      <Plus size={11} className="absolute -top-1 -right-1" />
+                    </span>
                     Añadir
                   </>
                 )}

@@ -8,6 +8,12 @@ export interface CampaignConfig {
   subheadlineColor: string;
   subheadlineAccentColor: string;
   dividerColor: string;
+  ctaText: string;
+  /** Slug del producto del catálogo al que enlaza el CTA. Vacío → /tienda. */
+  ctaProductSlug: string;
+  /** Color rosa del botón (mismo default que el popup de bienvenida). */
+  ctaBg: string;
+  ctaTextColor: string;
   alt: string;
   /** Posición del bloque de texto en escritorio (0–100 %). */
   textPosX: number;
@@ -27,6 +33,10 @@ export const DEFAULT_CAMPAIGN: CampaignConfig = {
   subheadlineColor: "#5C4A32",
   subheadlineAccentColor: "#C5A059",
   dividerColor: "#C5A059",
+  ctaText: "DESCUBRIR",
+  ctaProductSlug: "",
+  ctaBg: "#E9808E",
+  ctaTextColor: "#FFFFFF",
   alt: "Campaña publicitaria",
   textPosX: 6,
   textPosY: 32,
@@ -56,6 +66,21 @@ const parsePos = (value: unknown, fallback: number) => {
   return clampPos(value, 0, 100);
 };
 
+/** Ruta del CTA: ficha de producto o tienda si no hay slug. */
+export function campaignCtaPath(config: Pick<CampaignConfig, "ctaProductSlug">): string {
+  const slug = config.ctaProductSlug.trim().replace(/^\/+|\/+$/g, "");
+  return slug ? `/${slug}` : "/tienda";
+}
+
+/** Migra configs antiguas con `ctaHref` libre a un slug de producto. */
+const slugFromLegacyHref = (href: unknown): string => {
+  if (typeof href !== "string") return "";
+  const trimmed = href.trim();
+  if (!trimmed || trimmed === "/" || trimmed === "/tienda" || trimmed === "tienda") return "";
+  const match = trimmed.match(/^\/?([a-zA-Z0-9_-]+)\/?$/);
+  return match?.[1] ?? "";
+};
+
 export function parseCampaignConfig(raw?: string | null): CampaignConfig {
   if (!raw?.trim()) {
     return { ...DEFAULT_CAMPAIGN };
@@ -67,7 +92,7 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
   }
 
   try {
-    const parsed = JSON.parse(trimmed) as Partial<CampaignConfig>;
+    const parsed = JSON.parse(trimmed) as Partial<CampaignConfig> & { ctaHref?: string };
     const desktopPos = clampCampaignTextPos(
       parsePos(parsed.textPosX, DEFAULT_CAMPAIGN.textPosX),
       parsePos(parsed.textPosY, DEFAULT_CAMPAIGN.textPosY),
@@ -77,6 +102,8 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
       parsePos(parsed.textPosMobileX, desktopPos.x),
       parsePos(parsed.textPosMobileY, desktopPos.y),
     );
+    const fromSlug = asString(parsed.ctaProductSlug, "").trim().replace(/^\/+|\/+$/g, "");
+    const ctaProductSlug = fromSlug || slugFromLegacyHref(parsed.ctaHref);
     return {
       desktopImageUrl: asString(parsed.desktopImageUrl, DEFAULT_CAMPAIGN.desktopImageUrl).trim(),
       mobileImageUrl: asString(parsed.mobileImageUrl, DEFAULT_CAMPAIGN.mobileImageUrl).trim(),
@@ -100,6 +127,13 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
       dividerColor: isHexColor(parsed.dividerColor)
         ? parsed.dividerColor.trim()
         : DEFAULT_CAMPAIGN.dividerColor,
+      ctaText:
+        asString(parsed.ctaText, DEFAULT_CAMPAIGN.ctaText).trim() || DEFAULT_CAMPAIGN.ctaText,
+      ctaProductSlug,
+      ctaBg: isHexColor(parsed.ctaBg) ? parsed.ctaBg.trim() : DEFAULT_CAMPAIGN.ctaBg,
+      ctaTextColor: isHexColor(parsed.ctaTextColor)
+        ? parsed.ctaTextColor.trim()
+        : DEFAULT_CAMPAIGN.ctaTextColor,
       alt: asString(parsed.alt, DEFAULT_CAMPAIGN.alt).trim() || DEFAULT_CAMPAIGN.alt,
       textPosX: desktopPos.x,
       textPosY: desktopPos.y,
@@ -124,6 +158,10 @@ export function serializeCampaignConfig(config: CampaignConfig): string {
     subheadlineColor: config.subheadlineColor,
     subheadlineAccentColor: config.subheadlineAccentColor,
     dividerColor: config.dividerColor,
+    ctaText: config.ctaText,
+    ctaProductSlug: config.ctaProductSlug.trim().replace(/^\/+|\/+$/g, ""),
+    ctaBg: config.ctaBg,
+    ctaTextColor: config.ctaTextColor,
     alt: config.alt,
     textPosX: desktopPos.x,
     textPosY: desktopPos.y,

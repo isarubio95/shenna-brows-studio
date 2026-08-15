@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -7,7 +7,6 @@ import {
   type HeroConfig,
 } from "@/lib/hero-content";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 const HERO_CTA_BASE =
@@ -35,6 +34,11 @@ interface HeroSectionProps {
   preview?: boolean;
   /** En preview, fuerza tipografía e imagen de ese dispositivo. */
   previewDevice?: HeroPreviewDevice;
+  /**
+   * Cuando es false (p. ej. CMS aún cargando), oculta texto/CTA para no pintar
+   * la posición por defecto y luego saltar a la personalizada del admin.
+   */
+  ready?: boolean;
   className?: string;
   onTextPositionChange?: (pos: { x: number; y: number }) => void;
   onScrollNext?: () => void;
@@ -44,6 +48,7 @@ const HeroSection = ({
   config,
   preview = false,
   previewDevice = "desktop",
+  ready = true,
   className,
   onTextPositionChange,
   onScrollNext,
@@ -57,16 +62,15 @@ const HeroSection = ({
     originY: number;
   } | null>(null);
   const [dragging, setDragging] = useState(false);
-  const isMobileViewport = useIsMobile();
 
   const mobileSrc = config.mobileImageUrl.trim() || config.desktopImageUrl;
   const desktopSrc = config.desktopImageUrl.trim() || mobileSrc;
   const line2Parts = splitHeadlineByAccent(config.line2, config.line2Accent);
   const canDrag = Boolean(preview && onTextPositionChange);
   const previewMobile = preview && previewDevice === "mobile";
-  const useMobilePos = preview ? previewMobile : isMobileViewport;
-  const textPosX = useMobilePos ? config.textPosMobileX : config.textPosX;
-  const textPosY = useMobilePos ? config.textPosMobileY : config.textPosY;
+  // En preview usamos JS; en la web, CSS + media query (sin useIsMobile → sin salto al hidratar).
+  const textPosX = previewMobile ? config.textPosMobileX : config.textPosX;
+  const textPosY = previewMobile ? config.textPosMobileY : config.textPosY;
 
   const handlePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -245,14 +249,27 @@ const HeroSection = ({
             ? previewMobile
               ? "max-w-[min(100%-1.5rem,36rem)]"
               : "max-w-[58%]"
-            : "max-w-[min(100%-1.5rem,36rem)] lg:max-w-[58%]",
+            : [
+                "max-w-[min(100%-1.5rem,36rem)] lg:max-w-[58%]",
+                // Posición vía CSS vars + breakpoint: evita el parpadeo de useIsMobile.
+                "left-[var(--hero-x)] top-[var(--hero-y)]",
+                "max-md:left-[var(--hero-x-m)] max-md:top-[var(--hero-y-m)]",
+              ],
+          !ready && "invisible pointer-events-none",
           canDrag && "cursor-grab touch-none select-none rounded-md ring-1 ring-white/70",
           dragging && "cursor-grabbing",
         )}
-        style={{
-          left: `${textPosX}%`,
-          top: `${textPosY}%`,
-        }}
+        style={
+          {
+            "--hero-x": `${config.textPosX}%`,
+            "--hero-y": `${config.textPosY}%`,
+            "--hero-x-m": `${config.textPosMobileX}%`,
+            "--hero-y-m": `${config.textPosMobileY}%`,
+            ...(preview
+              ? { left: `${textPosX}%`, top: `${textPosY}%` }
+              : {}),
+          } as CSSProperties
+        }
         onPointerDown={canDrag ? handlePointerDown : undefined}
         onPointerMove={canDrag ? handlePointerMove : undefined}
         onPointerUp={canDrag ? endDrag : undefined}
@@ -260,7 +277,7 @@ const HeroSection = ({
         role={canDrag ? "group" : undefined}
         aria-label={canDrag ? "Arrastra para colocar el contenido del hero" : undefined}
       >
-        {textInner}
+        {ready ? textInner : null}
       </div>
 
       {preview ? (

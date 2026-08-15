@@ -32,7 +32,7 @@ import { parseHeroConfig } from "@/lib/hero-content";
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { data: siteContent } = useSiteContent([
+  const { data: siteContent, loading: siteContentLoading } = useSiteContent([
     "index_hero",
     "index_marquee",
     "index_collection_headline",
@@ -82,7 +82,11 @@ const Index = () => {
 
   return (
     <main>
-      <HeroSection config={hero} onScrollNext={scrollToNextSection} />
+      <HeroSection
+        config={hero}
+        ready={!siteContentLoading}
+        onScrollNext={scrollToNextSection}
+      />
 
       {/* Marquesina */}
       <div

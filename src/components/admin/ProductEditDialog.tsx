@@ -699,9 +699,9 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
               onDragLeave={handleDragLeave}
               onClick={() => fileInputRef.current?.click()}
               className={`
-                relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden bg-muted
+                relative mx-auto aspect-square w-full max-w-sm cursor-pointer rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden bg-muted
                 ${isDragging ? "border-gold bg-gold/5 scale-[1.01]" : "border-gold/20 hover:border-gold/40"}
-                ${displayImage ? "aspect-square" : "aspect-square flex items-center justify-center"}
+                ${displayImage ? "" : "flex items-center justify-center"}
               `}
             >
               {uploading && (
@@ -713,7 +713,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 <img
                   src={displayImage}
                   alt="Preview"
-                  className="w-full h-full object-cover"
+                  className="absolute inset-0 h-full w-full object-cover"
                 />
               ) : (
                 <div className="flex flex-col items-center gap-2 text-carbon/40">
@@ -827,7 +827,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                       <img
                         src={url}
                         alt={`Imagen ${index + 1}`}
-                        className="w-full h-full object-cover pointer-events-none"
+                        className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                         draggable={false}
                       />
                       {index === 0 && (

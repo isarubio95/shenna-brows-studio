@@ -6,9 +6,12 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
 import {
   clampCampaignTextPos,
+  campaignCtaPath,
+  DEFAULT_CAMPAIGN,
   type CampaignConfig,
 } from "@/lib/campaign-content";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
@@ -119,6 +122,25 @@ const CampaignBanner = ({
 
   if (!preview && !config.desktopImageUrl.trim()) return null;
 
+  const pink = config.ctaBg || DEFAULT_CAMPAIGN.ctaBg;
+  const ctaLabel = config.ctaText.trim() || DEFAULT_CAMPAIGN.ctaText;
+
+  const ctaButton = (
+    <button
+      type="button"
+      className={cn(
+        "mt-6 inline-flex items-center justify-center rounded-full border border-white/70 px-6 py-3 font-sans text-xs font-bold uppercase tracking-[0.18em] shadow-md transition hover:brightness-105 sm:px-7 sm:text-sm",
+        preview && (previewMobile ? "px-5 py-2.5 text-[0.7rem]" : "px-7 py-3"),
+      )}
+      style={{
+        background: `linear-gradient(90deg, ${pink} 0%, #F0A0AB 50%, ${pink} 100%)`,
+        color: config.ctaTextColor || DEFAULT_CAMPAIGN.ctaTextColor,
+      }}
+    >
+      {ctaLabel}
+    </button>
+  );
+
   const textInner = (
     <>
       <h2
@@ -177,6 +199,12 @@ const CampaignBanner = ({
           config.subheadline
         )}
       </p>
+
+      {preview ? (
+        <div className="pointer-events-none">{ctaButton}</div>
+      ) : (
+        <Link to={campaignCtaPath(config)}>{ctaButton}</Link>
+      )}
     </>
   );
 

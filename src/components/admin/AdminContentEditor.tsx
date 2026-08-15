@@ -26,6 +26,7 @@ import {
   DEFAULT_CAMPAIGN,
   parseCampaignConfig,
   serializeCampaignConfig,
+  campaignCtaPath,
   type CampaignConfig,
 } from "@/lib/campaign-content";
 import {
@@ -54,10 +55,25 @@ import HeroSection, {
   type HeroPreviewDevice,
 } from "@/components/HeroSection";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { WelcomePromoDialogView } from "@/components/WelcomePromoDialog";
 import { cn } from "@/lib/utils";
 
 const CAMPAIGN_BUCKET = "campaign-images";
+const CAMPAIGN_CTA_TIENDA_VALUE = "__tienda__";
+
+type CampaignProductOption = {
+  id: string;
+  name: string;
+  slug: string;
+  category: string | null;
+};
 const SUPABASE_URL = "https://vanhsuisvxvclxdgutaw.supabase.co";
 /** Coincide con el banner de la home (md+). */
 const CAMPAIGN_DESKTOP_ASPECT = 21 / 9;
@@ -148,6 +164,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     fontSize: String(DEFAULT_COLLECTION_HEADLINE.fontSize),
   });
   const [campaignDraft, setCampaignDraft] = useState<CampaignConfig>({ ...DEFAULT_CAMPAIGN });
+  const [campaignProducts, setCampaignProducts] = useState<CampaignProductOption[]>([]);
   const [campaignUploading, setCampaignUploading] = useState<"desktop" | "mobile" | null>(null);
   const [campaignDragOver, setCampaignDragOver] = useState<"desktop" | "mobile" | null>(null);
   const [campaignCropOpen, setCampaignCropOpen] = useState(false);
@@ -245,6 +262,12 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       dividerColor: isHex(campaignDraft.dividerColor)
         ? campaignDraft.dividerColor.trim()
         : DEFAULT_CAMPAIGN.dividerColor,
+      ctaText: campaignDraft.ctaText.trim() || DEFAULT_CAMPAIGN.ctaText,
+      ctaProductSlug: campaignDraft.ctaProductSlug.trim().replace(/^\/+|\/+$/g, ""),
+      ctaBg: isHex(campaignDraft.ctaBg) ? campaignDraft.ctaBg.trim() : DEFAULT_CAMPAIGN.ctaBg,
+      ctaTextColor: isHex(campaignDraft.ctaTextColor)
+        ? campaignDraft.ctaTextColor.trim()
+        : DEFAULT_CAMPAIGN.ctaTextColor,
       alt: campaignDraft.alt.trim() || DEFAULT_CAMPAIGN.alt,
       textPosX: campaignDraft.textPosX,
       textPosY: campaignDraft.textPosY,
@@ -521,10 +544,21 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
 
   useEffect(() => {
     const load = async () => {
-      const { data, error } = await (supabase as any)
-        .from("site_content")
-        .select("*")
-        .order("key");
+      const [{ data, error }, productsRes] = await Promise.all([
+        (supabase as any).from("site_content").select("*").order("key"),
+        (supabase as any)
+          .from("products")
+          .select("id, name, slug, category")
+          .order("name"),
+      ]);
+
+      if (productsRes?.data) {
+        setCampaignProducts(
+          (productsRes.data as CampaignProductOption[]).filter(
+            (p) => typeof p.slug === "string" && p.slug.trim().length > 0,
+          ),
+        );
+      }
 
       if (error) {
         setLoading(false);
@@ -2535,6 +2569,144 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           }
                           className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
                           aria-label="Restaurar color del separador"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Texto del CTA
+                    </Label>
+                    <Input
+                      value={campaignDraft.ctaText}
+                      onChange={(e) =>
+                        setCampaignDraft((prev) => ({ ...prev, ctaText: e.target.value }))
+                      }
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                      placeholder={DEFAULT_CAMPAIGN.ctaText}
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Producto del CTA
+                    </Label>
+                    <Select
+                      value={
+                        campaignDraft.ctaProductSlug.trim() || CAMPAIGN_CTA_TIENDA_VALUE
+                      }
+                      onValueChange={(value) =>
+                        setCampaignDraft((prev) => ({
+                          ...prev,
+                          ctaProductSlug:
+                            value === CAMPAIGN_CTA_TIENDA_VALUE ? "" : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="mt-1 border-gold/20 bg-white focus:ring-gold/30">
+                        <SelectValue placeholder="Elige un producto del catálogo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={CAMPAIGN_CTA_TIENDA_VALUE}>
+                          Tienda (catálogo completo)
+                        </SelectItem>
+                        {campaignDraft.ctaProductSlug.trim() &&
+                        !campaignProducts.some(
+                          (p) => p.slug === campaignDraft.ctaProductSlug.trim(),
+                        ) ? (
+                          <SelectItem value={campaignDraft.ctaProductSlug.trim()}>
+                            {campaignDraft.ctaProductSlug.trim()} (ya no está en el catálogo)
+                          </SelectItem>
+                        ) : null}
+                        {campaignProducts.map((p) => (
+                          <SelectItem key={p.id} value={p.slug}>
+                            {p.name}
+                            {p.category ? ` · ${p.category}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-xs text-carbon/30">
+                      Enlace:{" "}
+                      <span className="font-mono text-carbon/50">
+                        {campaignCtaPath(campaignDraft)}
+                      </span>
+                      {campaignProducts.length === 0
+                        ? " · Añade productos en el catálogo para enlazarlos aquí."
+                        : null}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Color del CTA
+                      </Label>
+                      <div className="mt-1 flex items-center gap-2">
+                        <HexColorField
+                          value={campaignDraft.ctaBg}
+                          onChange={(hex) =>
+                            setCampaignDraft((prev) => ({ ...prev, ctaBg: hex }))
+                          }
+                          fallback={DEFAULT_CAMPAIGN.ctaBg}
+                          aria-label="Color del botón CTA de campaña"
+                          className="flex-1 min-w-0"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            toPickerColor(campaignDraft.ctaBg) ===
+                            toPickerColor(DEFAULT_CAMPAIGN.ctaBg)
+                          }
+                          onClick={() =>
+                            setCampaignDraft((prev) => ({
+                              ...prev,
+                              ctaBg: DEFAULT_CAMPAIGN.ctaBg,
+                            }))
+                          }
+                          className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
+                          aria-label="Restaurar color del CTA"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Color del texto del CTA
+                      </Label>
+                      <div className="mt-1 flex items-center gap-2">
+                        <HexColorField
+                          value={campaignDraft.ctaTextColor}
+                          onChange={(hex) =>
+                            setCampaignDraft((prev) => ({ ...prev, ctaTextColor: hex }))
+                          }
+                          fallback={DEFAULT_CAMPAIGN.ctaTextColor}
+                          aria-label="Color del texto del CTA de campaña"
+                          className="flex-1 min-w-0"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            toPickerColor(campaignDraft.ctaTextColor) ===
+                            toPickerColor(DEFAULT_CAMPAIGN.ctaTextColor)
+                          }
+                          onClick={() =>
+                            setCampaignDraft((prev) => ({
+                              ...prev,
+                              ctaTextColor: DEFAULT_CAMPAIGN.ctaTextColor,
+                            }))
+                          }
+                          className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
+                          aria-label="Restaurar color del texto del CTA"
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
