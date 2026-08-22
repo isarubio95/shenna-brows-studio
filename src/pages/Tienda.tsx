@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ShieldCheck, ShoppingCart, Plus, Truck, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShoppingCart, Plus, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import Autoplay from "embla-carousel-autoplay";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -21,6 +21,9 @@ import {
 } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEffectivePrice } from "@/lib/product-pricing";
+import { useSiteContent } from "@/hooks/use-site-content";
+import { parseTiendaHeroConfig } from "@/lib/tienda-hero-content";
+import TiendaHero from "@/components/TiendaHero";
 
 type Product = Database["public"]["Tables"]["products"]["Row"];
 
@@ -228,6 +231,11 @@ const Tienda = () => {
   const { addItem, isAddToCartDisabled } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const { data: siteContent } = useSiteContent(["tienda_hero"]);
+  const tiendaHero = useMemo(
+    () => parseTiendaHeroConfig(siteContent.tienda_hero?.content),
+    [siteContent.tienda_hero?.content],
+  );
 
   useEffect(() => {
     document.title = SEO_TITLE;
@@ -322,42 +330,7 @@ const Tienda = () => {
     <main className="min-h-screen bg-cream pt-28 pb-20">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      <section className="container mx-auto px-6">
-        <AnimatedSection>
-          <div className="rounded-3xl border border-gold/20 bg-[radial-gradient(circle_at_top_right,rgba(197,160,89,0.18),transparent_40%),linear-gradient(to_bottom,#fffaf0,#ffffff)] p-8 md:p-12 shadow-[0_14px_45px_rgba(0,0,0,0.06)]">
-            <p className="text-gold text-xs uppercase tracking-[0.28em] font-medium mb-4">Tienda oficial</p>
-            <h1 className="font-playfair text-4xl md:text-5xl lg:text-5xl text-carbon leading-tight">
-              Herramientas y productos premium para unas cejas impecables
-            </h1>
-            <p className="text-carbon/70 max-w-2xl mt-5 text-base md:text-lg leading-relaxed">
-              Descubre la colección profesional de Shenna Brows. Productos diseñados para ofrecer precisión, control y resultados
-              perfectos en cada aplicación.
-            </p>
-
-            <ul className="mt-8 flex flex-wrap gap-x-8 gap-y-2.5 text-sm text-carbon/70 list-none p-0 m-0">
-              <li className="inline-flex items-center gap-2.5">
-                <ShieldCheck size={17} className="text-gold shrink-0" aria-hidden />
-                Calidad profesional
-              </li>
-              <li className="inline-flex items-center gap-2.5">
-                <Truck size={17} className="text-gold shrink-0" aria-hidden />
-                Envío rápido 24/72h
-              </li>
-              <li className="inline-flex items-center gap-2.5">
-                <Sparkles size={17} className="text-gold shrink-0" aria-hidden />
-                Resultados de precisión
-              </li>
-            </ul>
-
-            <Button
-              asChild
-              className="mt-8 rounded-full bg-gold hover:bg-gold/90 text-white px-8 py-6 text-sm tracking-[0.15em] uppercase shadow-[0_10px_30px_rgba(197,160,89,0.35)]"
-            >
-              <a href="#productos">Comprar ahora</a>
-            </Button>
-          </div>
-        </AnimatedSection>
-      </section>
+      <TiendaHero config={tiendaHero} />
 
       <section id="productos" className="container mx-auto px-6 mt-16">
         <AnimatedSection>

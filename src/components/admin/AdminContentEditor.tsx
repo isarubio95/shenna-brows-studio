@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Monitor, Play, RotateCcw, Save, Smartphone, Sparkle, Trash2, Upload } from "lucide-react";
+import { Loader2, Monitor, Play, Plus, RotateCcw, Save, Smartphone, Sparkle, Trash2, Upload } from "lucide-react";
 import {
   DEFAULT_MARQUEE_CONFIG,
   DEFAULT_MARQUEE_ITEMS,
@@ -36,11 +36,33 @@ import {
   type HeroConfig,
 } from "@/lib/hero-content";
 import {
+  DEFAULT_TIENDA_HERO,
+  parseTiendaHeroConfig,
+  serializeTiendaHeroConfig,
+  TIENDA_HERO_ICON_IDS,
+  TIENDA_HERO_ICON_LABELS,
+  type TiendaHeroConfig,
+  type TiendaHeroIconId,
+} from "@/lib/tienda-hero-content";
+import {
   DEFAULT_WELCOME_POPUP,
   parseWelcomePopupConfig,
   serializeWelcomePopupConfig,
   type WelcomePopupConfig,
 } from "@/lib/welcome-popup-content";
+import {
+  DEFAULT_SALE_BADGE,
+  DEFAULT_SITE_BADGES,
+  parseSiteBadgesConfig,
+  serializeSiteBadgesConfig,
+  type SiteBadgesConfig,
+} from "@/lib/badges-content";
+import {
+  DEFAULT_WHATSAPP_BUTTON,
+  parseWhatsAppButtonConfig,
+  serializeWhatsAppButtonConfig,
+  type WhatsAppButtonConfig,
+} from "@/lib/whatsapp-content";
 import { optimizeImageForUpload, type OptimizeImageVariant } from "@/lib/optimize-image-upload";
 import { HexColorField, toPickerColor } from "@/components/admin/HexColorField";
 import ProductImageCropDialog from "@/components/admin/ProductImageCropDialog";
@@ -63,6 +85,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WelcomePromoDialogView } from "@/components/WelcomePromoDialog";
+import TiendaHero, { type TiendaHeroPreviewDevice } from "@/components/TiendaHero";
+import { SaleBadgeChip } from "@/components/ProductSaleBadge";
+import { WhatsAppButtonView } from "@/components/WhatsAppFloatingButton";
 import { cn } from "@/lib/utils";
 
 const CAMPAIGN_BUCKET = "campaign-images";
@@ -75,10 +100,15 @@ type CampaignProductOption = {
   category: string | null;
 };
 const SUPABASE_URL = "https://vanhsuisvxvclxdgutaw.supabase.co";
+/** Proporción real del banner de tienda (1600×961, incluye degradé inferior). */
+const TIENDA_HERO_DESKTOP_ASPECT = 1600 / 961;
+const TIENDA_HERO_MOBILE_ASPECT = 9 / 16;
 /** Coincide con el banner de la home (md+). */
 const CAMPAIGN_DESKTOP_ASPECT = 21 / 9;
 /** Coincide con el banner de la home en móvil. */
 const CAMPAIGN_MOBILE_ASPECT = 4 / 5;
+/** Hero de tienda: incluye el degradé blanco inferior (1600×961). */
+const TIENDA_HERO_ASPECT = 1600 / 961;
 /** Hero a pantalla completa (escritorio). */
 const HERO_DESKTOP_ASPECT = 16 / 9;
 /** Hero a pantalla completa (móvil). */
@@ -102,6 +132,9 @@ const CONTENT_LABELS: Record<string, string> = {
   index_marquee: "Marquesina — Debajo del hero",
   index_collection_headline: "Titular — Entre marquesina y colección",
   index_campaign: "Campaña — Después de la colección",
+  tienda_hero: "Hero — Página de tienda",
+  site_badges: "Badge de oferta — Productos",
+  whatsapp_button: "Botón de WhatsApp — Flotante",
   about_section_1: "Sobre mí — Sección 1",
   about_section_2: "Sobre mí — Sección 2",
   about_section_3: "Sobre mí — Sección 3",
@@ -117,6 +150,9 @@ const KEY_ORDER = [
   "index_marquee",
   "index_collection_headline",
   "index_campaign",
+  "tienda_hero",
+  "site_badges",
+  "whatsapp_button",
   "about_section_1",
   "about_section_2",
   "about_section_3",
@@ -133,6 +169,44 @@ const snapshotFromBlocks = (rows: ContentBlock[]): SavedSnapshot => {
 
 const isHex = (value: string) =>
   /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(value.trim());
+
+const AdminColorField = ({
+  label,
+  value,
+  fallback,
+  onChange,
+  ariaLabel,
+}: {
+  label: string;
+  value: string;
+  fallback: string;
+  onChange: (hex: string) => void;
+  ariaLabel: string;
+}) => (
+  <div>
+    <Label className="text-carbon/60 text-xs uppercase tracking-wider">{label}</Label>
+    <div className="mt-1 flex items-center gap-2">
+      <HexColorField
+        value={value}
+        onChange={onChange}
+        fallback={fallback}
+        aria-label={ariaLabel}
+        className="flex-1 min-w-0"
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={toPickerColor(value) === toPickerColor(fallback)}
+        onClick={() => onChange(fallback)}
+        className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
+        aria-label={`Restaurar ${label.toLowerCase()}`}
+      >
+        <RotateCcw className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  </div>
+);
 
 const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   const { toast } = useToast();
@@ -192,6 +266,25 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   const [welcomePopupCropSrc, setWelcomePopupCropSrc] = useState<string | null>(null);
   const [welcomePopupPreviewOpen, setWelcomePopupPreviewOpen] = useState(false);
   const welcomePopupInputRef = useRef<HTMLInputElement>(null);
+  const [tiendaHeroDraft, setTiendaHeroDraft] = useState<TiendaHeroConfig>({
+    ...DEFAULT_TIENDA_HERO,
+    features: DEFAULT_TIENDA_HERO.features.map((f) => ({ ...f })),
+  });
+  const [badgesDraft, setBadgesDraft] = useState<SiteBadgesConfig>({
+    sale: { ...DEFAULT_SALE_BADGE },
+  });
+  const [whatsappDraft, setWhatsappDraft] = useState<WhatsAppButtonConfig>({
+    ...DEFAULT_WHATSAPP_BUTTON,
+  });
+  const [tiendaHeroUploading, setTiendaHeroUploading] = useState<"desktop" | "mobile" | null>(null);
+  const [tiendaHeroDragOver, setTiendaHeroDragOver] = useState<"desktop" | "mobile" | null>(null);
+  const [tiendaHeroCropOpen, setTiendaHeroCropOpen] = useState(false);
+  const [tiendaHeroCropSrc, setTiendaHeroCropSrc] = useState<string | null>(null);
+  const [tiendaHeroCropVariant, setTiendaHeroCropVariant] = useState<OptimizeImageVariant>("desktop");
+  const [tiendaHeroPreviewDevice, setTiendaHeroPreviewDevice] =
+    useState<TiendaHeroPreviewDevice>("desktop");
+  const tiendaHeroDesktopInputRef = useRef<HTMLInputElement>(null);
+  const tiendaHeroMobileInputRef = useRef<HTMLInputElement>(null);
 
   const parsePaddingY = (raw: string): number => {
     if (raw.trim() === "") return DEFAULT_MARQUEE_CONFIG.paddingY;
@@ -277,6 +370,90 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     return {
       title: "Campaña publicitaria",
       content: serializeCampaignConfig(config),
+      config,
+    };
+  };
+
+  const buildTiendaHeroPayload = () => {
+    const config: TiendaHeroConfig = parseTiendaHeroConfig(
+      serializeTiendaHeroConfig({
+        ...tiendaHeroDraft,
+        eyebrow: tiendaHeroDraft.eyebrow.trim() || DEFAULT_TIENDA_HERO.eyebrow,
+        headline: tiendaHeroDraft.headline.trim() || DEFAULT_TIENDA_HERO.headline,
+        description: tiendaHeroDraft.description.trim() || DEFAULT_TIENDA_HERO.description,
+        ctaText: tiendaHeroDraft.ctaText.trim() || DEFAULT_TIENDA_HERO.ctaText,
+        ctaHref: tiendaHeroDraft.ctaHref.trim() || DEFAULT_TIENDA_HERO.ctaHref,
+        accentColor: isHex(tiendaHeroDraft.accentColor)
+          ? tiendaHeroDraft.accentColor.trim()
+          : DEFAULT_TIENDA_HERO.accentColor,
+        headlineColor: isHex(tiendaHeroDraft.headlineColor)
+          ? tiendaHeroDraft.headlineColor.trim()
+          : DEFAULT_TIENDA_HERO.headlineColor,
+        descriptionColor: isHex(tiendaHeroDraft.descriptionColor)
+          ? tiendaHeroDraft.descriptionColor.trim()
+          : DEFAULT_TIENDA_HERO.descriptionColor,
+        featureColor: isHex(tiendaHeroDraft.featureColor)
+          ? tiendaHeroDraft.featureColor.trim()
+          : DEFAULT_TIENDA_HERO.featureColor,
+        ctaBg: isHex(tiendaHeroDraft.ctaBg) ? tiendaHeroDraft.ctaBg.trim() : DEFAULT_TIENDA_HERO.ctaBg,
+        ctaTextColor: isHex(tiendaHeroDraft.ctaTextColor)
+          ? tiendaHeroDraft.ctaTextColor.trim()
+          : DEFAULT_TIENDA_HERO.ctaTextColor,
+        desktopImageUrl: tiendaHeroDraft.desktopImageUrl.trim(),
+        mobileImageUrl: tiendaHeroDraft.mobileImageUrl.trim(),
+        alt: tiendaHeroDraft.alt.trim() || DEFAULT_TIENDA_HERO.alt,
+        overlayStrength: tiendaHeroDraft.overlayStrength,
+        contentPosX: tiendaHeroDraft.contentPosX,
+        contentPosY: tiendaHeroDraft.contentPosY,
+        contentPosMobileX: tiendaHeroDraft.contentPosMobileX,
+        contentPosMobileY: tiendaHeroDraft.contentPosMobileY,
+      }),
+    );
+    return {
+      title: "Hero de la tienda",
+      content: serializeTiendaHeroConfig(config),
+      config,
+    };
+  };
+
+  const buildBadgesPayload = () => {
+    const config = parseSiteBadgesConfig(
+      serializeSiteBadgesConfig({
+        sale: {
+          text: badgesDraft.sale.text.trim() || DEFAULT_SALE_BADGE.text,
+          background: isHex(badgesDraft.sale.background)
+            ? badgesDraft.sale.background.trim()
+            : DEFAULT_SALE_BADGE.background,
+          textColor: isHex(badgesDraft.sale.textColor)
+            ? badgesDraft.sale.textColor.trim()
+            : DEFAULT_SALE_BADGE.textColor,
+        },
+      }),
+    );
+    return {
+      title: "Badge de oferta",
+      content: serializeSiteBadgesConfig(config),
+      config,
+    };
+  };
+
+  const buildWhatsAppPayload = () => {
+    const config = parseWhatsAppButtonConfig(
+      serializeWhatsAppButtonConfig({
+        enabled: Boolean(whatsappDraft.enabled),
+        phone: whatsappDraft.phone.trim() || DEFAULT_WHATSAPP_BUTTON.phone,
+        message: whatsappDraft.message,
+        background: isHex(whatsappDraft.background)
+          ? whatsappDraft.background.trim()
+          : DEFAULT_WHATSAPP_BUTTON.background,
+        iconColor: isHex(whatsappDraft.iconColor)
+          ? whatsappDraft.iconColor.trim()
+          : DEFAULT_WHATSAPP_BUTTON.iconColor,
+      }),
+    );
+    return {
+      title: "Botón de WhatsApp",
+      content: serializeWhatsAppButtonConfig(config),
       config,
     };
   };
@@ -412,6 +589,73 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     if (campaignUploading || campaignCropOpen) return;
     const file = Array.from(e.dataTransfer.files || []).find((f) => f.type.startsWith("image/"));
     if (file) beginCampaignCrop(file, variant);
+  };
+
+  const uploadTiendaHeroImage = async (file: File, variant: OptimizeImageVariant) => {
+    setTiendaHeroUploading(variant);
+    try {
+      const optimized = await optimizeImageForUpload(file, variant);
+      const filePath = `tienda-hero-${variant}-${Date.now()}.${optimized.extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from(CAMPAIGN_BUCKET)
+        .upload(filePath, optimized.blob, {
+          upsert: true,
+          contentType: optimized.mimeType,
+        });
+      if (uploadError) throw uploadError;
+
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${CAMPAIGN_BUCKET}/${filePath}`;
+      setTiendaHeroDraft((prev) => ({
+        ...prev,
+        ...(variant === "desktop"
+          ? { desktopImageUrl: publicUrl }
+          : { mobileImageUrl: publicUrl }),
+      }));
+      toast({
+        title: "Imagen subida",
+        description: `Fondo ${variant === "desktop" ? "escritorio/tablet" : "móvil"} optimizado (${optimized.extension.toUpperCase()}).`,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo subir la imagen.";
+      toast({ title: "Error al subir", description: message, variant: "destructive" });
+      throw err instanceof Error ? err : new Error(message);
+    } finally {
+      setTiendaHeroUploading(null);
+    }
+  };
+
+  const beginTiendaHeroCrop = (file: File, variant: OptimizeImageVariant) => {
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Archivo no válido",
+        description: "Selecciona una imagen.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (tiendaHeroCropSrc?.startsWith("blob:")) {
+      URL.revokeObjectURL(tiendaHeroCropSrc);
+    }
+    setTiendaHeroCropVariant(variant);
+    setTiendaHeroCropSrc(URL.createObjectURL(file));
+    setTiendaHeroCropOpen(true);
+  };
+
+  const handleTiendaHeroCropOpenChange = (open: boolean) => {
+    setTiendaHeroCropOpen(open);
+    if (!open && tiendaHeroCropSrc?.startsWith("blob:")) {
+      URL.revokeObjectURL(tiendaHeroCropSrc);
+      setTiendaHeroCropSrc(null);
+    }
+  };
+
+  const handleTiendaHeroDrop = (e: DragEvent, variant: OptimizeImageVariant) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTiendaHeroDragOver(null);
+    if (tiendaHeroUploading || tiendaHeroCropOpen) return;
+    const file = Array.from(e.dataTransfer.files || []).find((f) => f.type.startsWith("image/"));
+    if (file) beginTiendaHeroCrop(file, variant);
   };
 
   const uploadHeroImage = async (file: File, variant: OptimizeImageVariant) => {
@@ -647,6 +891,51 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         if (inserted) rows = [...rows, inserted];
       }
 
+      const hasTiendaHero = rows.some((b) => b.key === "tienda_hero");
+      if (!hasTiendaHero) {
+        const { data: inserted } = await (supabase as any)
+          .from("site_content")
+          .insert({
+            key: "tienda_hero",
+            title: "Hero de la tienda",
+            content: serializeTiendaHeroConfig(DEFAULT_TIENDA_HERO),
+          })
+          .select("*")
+          .single();
+
+        if (inserted) rows = [...rows, inserted];
+      }
+
+      const hasSiteBadges = rows.some((b) => b.key === "site_badges");
+      if (!hasSiteBadges) {
+        const { data: inserted } = await (supabase as any)
+          .from("site_content")
+          .insert({
+            key: "site_badges",
+            title: "Badge de oferta",
+            content: serializeSiteBadgesConfig(DEFAULT_SITE_BADGES),
+          })
+          .select("*")
+          .single();
+
+        if (inserted) rows = [...rows, inserted];
+      }
+
+      const hasWhatsApp = rows.some((b) => b.key === "whatsapp_button");
+      if (!hasWhatsApp) {
+        const { data: inserted } = await (supabase as any)
+          .from("site_content")
+          .insert({
+            key: "whatsapp_button",
+            title: "Botón de WhatsApp",
+            content: serializeWhatsAppButtonConfig(DEFAULT_WHATSAPP_BUTTON),
+          })
+          .select("*")
+          .single();
+
+        if (inserted) rows = [...rows, inserted];
+      }
+
       const heroRow = rows.find((b) => b.key === "index_hero");
       if (heroRow) {
         const cfg = parseHeroConfig(heroRow.content);
@@ -697,6 +986,30 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         campaignRow.content = serializeCampaignConfig(cfg);
       }
 
+      const tiendaHeroRow = rows.find((b) => b.key === "tienda_hero");
+      if (tiendaHeroRow) {
+        const cfg = parseTiendaHeroConfig(tiendaHeroRow.content);
+        setTiendaHeroDraft(cfg);
+        tiendaHeroRow.title = "Hero de la tienda";
+        tiendaHeroRow.content = serializeTiendaHeroConfig(cfg);
+      }
+
+      const badgesRow = rows.find((b) => b.key === "site_badges");
+      if (badgesRow) {
+        const cfg = parseSiteBadgesConfig(badgesRow.content);
+        setBadgesDraft(cfg);
+        badgesRow.title = "Badge de oferta";
+        badgesRow.content = serializeSiteBadgesConfig(cfg);
+      }
+
+      const whatsappRow = rows.find((b) => b.key === "whatsapp_button");
+      if (whatsappRow) {
+        const cfg = parseWhatsAppButtonConfig(whatsappRow.content);
+        setWhatsappDraft(cfg);
+        whatsappRow.title = "Botón de WhatsApp";
+        whatsappRow.content = serializeWhatsAppButtonConfig(cfg);
+      }
+
       setBlocks(rows);
       setSaved(snapshotFromBlocks(rows));
       setLoading(false);
@@ -732,6 +1045,18 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
     if (block.key === "index_campaign") {
       const payload = buildCampaignPayload();
+      return payload.title !== baseline.title || payload.content !== baseline.content;
+    }
+    if (block.key === "tienda_hero") {
+      const payload = buildTiendaHeroPayload();
+      return payload.title !== baseline.title || payload.content !== baseline.content;
+    }
+    if (block.key === "site_badges") {
+      const payload = buildBadgesPayload();
+      return payload.title !== baseline.title || payload.content !== baseline.content;
+    }
+    if (block.key === "whatsapp_button") {
+      const payload = buildWhatsAppPayload();
       return payload.title !== baseline.title || payload.content !== baseline.content;
     }
     return (block.title ?? "") !== baseline.title || (block.content ?? "") !== baseline.content;
@@ -812,6 +1137,39 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       );
     }
 
+    if (block.key === "tienda_hero") {
+      const { title, content, config } = buildTiendaHeroPayload();
+      payload = { title, content };
+      setTiendaHeroDraft(config);
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.key === "tienda_hero" ? { ...b, title: payload.title, content: payload.content } : b
+        )
+      );
+    }
+
+    if (block.key === "site_badges") {
+      const { title, content, config } = buildBadgesPayload();
+      payload = { title, content };
+      setBadgesDraft(config);
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.key === "site_badges" ? { ...b, title: payload.title, content: payload.content } : b
+        )
+      );
+    }
+
+    if (block.key === "whatsapp_button") {
+      const { title, content, config } = buildWhatsAppPayload();
+      payload = { title, content };
+      setWhatsappDraft(config);
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.key === "whatsapp_button" ? { ...b, title: payload.title, content: payload.content } : b
+        )
+      );
+    }
+
     const { error } = await (supabase as any)
       .from("site_content")
       .update({ ...payload, updated_at: new Date().toISOString() })
@@ -860,6 +1218,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   const headlinePreviewSize = parseFontSize(headlineDraft.fontSize);
   const heroPreviewConfig = buildHeroPayload().config;
   const campaignPreviewConfig = buildCampaignPayload().config;
+  const tiendaHeroPreviewConfig = buildTiendaHeroPayload().config;
 
   if (visibleBlocks.length === 0) {
     return (
@@ -878,6 +1237,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         const isMarquee = block.key === "index_marquee";
         const isHeadline = block.key === "index_collection_headline";
         const isCampaign = block.key === "index_campaign";
+        const isTiendaHero = block.key === "tienda_hero";
+        const isBadges = block.key === "site_badges";
+        const isWhatsApp = block.key === "whatsapp_button";
         const dirty = isBlockDirty(block);
 
         return (
@@ -885,7 +1247,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
             key={block.key}
             className={cn(
               "bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6",
-              (isHero || isCampaign || isWelcomePopup) && "ring-1 ring-gold/20",
+              (isHero || isCampaign || isWelcomePopup || isTiendaHero || isBadges || isWhatsApp) && "ring-1 ring-gold/20",
             )}
           >
             <h3 className="font-playfair text-base font-semibold text-carbon mb-4">
@@ -902,9 +1264,27 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                 (oferta welcome).
               </p>
             )}
+            {isTiendaHero && (
+              <p className="text-xs text-carbon/40 -mt-2 mb-4">
+                Cabecera de la página de tienda: fondo (escritorio y móvil), textos, ventajas, CTA
+                y colores.
+              </p>
+            )}
+            {isBadges && (
+              <p className="text-xs text-carbon/40 -mt-2 mb-4">
+                Etiqueta de oferta sobre las fotos de producto (inicio, tienda y ficha). El color
+                por defecto es el rosa del botón CTA de la campaña publicitaria.
+              </p>
+            )}
+            {isWhatsApp && (
+              <p className="text-xs text-carbon/40 -mt-2 mb-4">
+                Botón flotante de contacto en todas las páginas (excepto el panel). Número,
+                mensaje precargado, colores y visibilidad.
+              </p>
+            )}
 
             <div className="space-y-4">
-              {!isMarquee && !isHeadline && !isCampaign && !isHero && !isWelcomePopup && (
+              {!isMarquee && !isHeadline && !isCampaign && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">Título</Label>
                   <Input
@@ -1191,6 +1571,176 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     <p className="text-xs text-carbon/30 mt-3">
                       Vista previa (tamaño web: {headlinePreviewSize}px)
                     </p>
+                  </div>
+                </>
+              )}
+
+              {isBadges && (
+                <>
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Texto
+                    </Label>
+                    <Input
+                      value={badgesDraft.sale.text}
+                      onChange={(e) =>
+                        setBadgesDraft((prev) => ({
+                          ...prev,
+                          sale: { ...prev.sale, text: e.target.value },
+                        }))
+                      }
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                      placeholder={DEFAULT_SALE_BADGE.text}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <AdminColorField
+                      label="Color de fondo"
+                      value={badgesDraft.sale.background}
+                      fallback={DEFAULT_SALE_BADGE.background}
+                      onChange={(hex) =>
+                        setBadgesDraft((prev) => ({
+                          ...prev,
+                          sale: { ...prev.sale, background: hex },
+                        }))
+                      }
+                      ariaLabel="Color de fondo del badge de oferta"
+                    />
+                    <AdminColorField
+                      label="Color del texto"
+                      value={badgesDraft.sale.textColor}
+                      fallback={DEFAULT_SALE_BADGE.textColor}
+                      onChange={(hex) =>
+                        setBadgesDraft((prev) => ({
+                          ...prev,
+                          sale: { ...prev.sale, textColor: hex },
+                        }))
+                      }
+                      ariaLabel="Color del texto del badge de oferta"
+                    />
+                  </div>
+
+                  <div className="rounded-lg border border-carbon/10 p-4" style={{ backgroundColor: "#F8F3EB" }}>
+                    <p className="text-xs uppercase tracking-wider text-carbon/40 mb-3">
+                      Vista previa
+                    </p>
+                    <div className="relative aspect-square max-w-[220px] overflow-hidden rounded-2xl bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] ring-1 ring-black/4">
+                      <div className="absolute inset-0 bg-[linear-gradient(145deg,#f4efe4_0%,#e8dcc8_100%)]" />
+                      <SaleBadgeChip
+                        text={badgesDraft.sale.text.trim() || DEFAULT_SALE_BADGE.text}
+                        background={
+                          isHex(badgesDraft.sale.background)
+                            ? badgesDraft.sale.background
+                            : DEFAULT_SALE_BADGE.background
+                        }
+                        textColor={
+                          isHex(badgesDraft.sale.textColor)
+                            ? badgesDraft.sale.textColor
+                            : DEFAULT_SALE_BADGE.textColor
+                        }
+                        className="absolute left-3 top-3 z-10"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {isWhatsApp && (
+                <>
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-gold/15 bg-cream/40 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-carbon">Mostrar botón</p>
+                      <p className="text-xs text-carbon/45">
+                        Si está desactivado, no aparecerá en la web.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={whatsappDraft.enabled}
+                      onCheckedChange={(v) =>
+                        setWhatsappDraft((prev) => ({ ...prev, enabled: v === true }))
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Número de WhatsApp
+                    </Label>
+                    <Input
+                      value={whatsappDraft.phone}
+                      onChange={(e) =>
+                        setWhatsappDraft((prev) => ({ ...prev, phone: e.target.value }))
+                      }
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                      inputMode="tel"
+                      placeholder={DEFAULT_WHATSAPP_BUTTON.phone}
+                    />
+                    <p className="text-xs text-carbon/30 mt-1">
+                      Con prefijo de país, sin espacios ni +. Ejemplo: {DEFAULT_WHATSAPP_BUTTON.phone}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Mensaje precargado
+                    </Label>
+                    <Textarea
+                      value={whatsappDraft.message}
+                      onChange={(e) =>
+                        setWhatsappDraft((prev) => ({ ...prev, message: e.target.value }))
+                      }
+                      rows={3}
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                      placeholder="Hola, me gustaría consultar…"
+                    />
+                    <p className="text-xs text-carbon/30 mt-1">
+                      Opcional. Si lo rellenas, se abrirá el chat con este texto.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <AdminColorField
+                      label="Color de fondo"
+                      value={whatsappDraft.background}
+                      fallback={DEFAULT_WHATSAPP_BUTTON.background}
+                      onChange={(hex) =>
+                        setWhatsappDraft((prev) => ({ ...prev, background: hex }))
+                      }
+                      ariaLabel="Color de fondo del botón de WhatsApp"
+                    />
+                    <AdminColorField
+                      label="Color del icono"
+                      value={whatsappDraft.iconColor}
+                      fallback={DEFAULT_WHATSAPP_BUTTON.iconColor}
+                      onChange={(hex) =>
+                        setWhatsappDraft((prev) => ({ ...prev, iconColor: hex }))
+                      }
+                      ariaLabel="Color del icono de WhatsApp"
+                    />
+                  </div>
+
+                  <div className="rounded-lg border border-carbon/10 p-4" style={{ backgroundColor: "#F8F3EB" }}>
+                    <p className="text-xs uppercase tracking-wider text-carbon/40 mb-3">
+                      Vista previa
+                    </p>
+                    <WhatsAppButtonView
+                      preview
+                      config={{
+                        ...whatsappDraft,
+                        background: isHex(whatsappDraft.background)
+                          ? whatsappDraft.background
+                          : DEFAULT_WHATSAPP_BUTTON.background,
+                        iconColor: isHex(whatsappDraft.iconColor)
+                          ? whatsappDraft.iconColor
+                          : DEFAULT_WHATSAPP_BUTTON.iconColor,
+                      }}
+                    />
+                    {!whatsappDraft.enabled && (
+                      <p className="text-xs text-carbon/40 mt-2">
+                        Oculto en la web hasta que lo actives.
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -2837,7 +3387,623 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                 </>
               )}
 
-              {!isHeadline && !isCampaign && !isHero && !isWelcomePopup && (
+              {isTiendaHero && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Imagen de fondo · escritorio / tablet
+                      </Label>
+                      <input
+                        ref={tiendaHeroDesktopInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) beginTiendaHeroCrop(file, "desktop");
+                        }}
+                      />
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (tiendaHeroUploading) return;
+                          tiendaHeroDesktopInputRef.current?.click();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            if (!tiendaHeroUploading) tiendaHeroDesktopInputRef.current?.click();
+                          }
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTiendaHeroDragOver("desktop");
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTiendaHeroDragOver("desktop");
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTiendaHeroDragOver((prev) => (prev === "desktop" ? null : prev));
+                        }}
+                        onDrop={(e) => handleTiendaHeroDrop(e, "desktop")}
+                        className={cn(
+                          "relative mt-2 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed transition-all duration-200",
+                          tiendaHeroDragOver === "desktop"
+                            ? "border-gold bg-gold/5 scale-[1.01]"
+                            : "border-gold/20 hover:border-gold/40",
+                          tiendaHeroDraft.desktopImageUrl ? "aspect-video bg-muted" : "min-h-36 bg-muted/40",
+                        )}
+                      >
+                        {tiendaHeroUploading === "desktop" && (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-carbon/40">
+                            <Loader2 className="h-7 w-7 animate-spin text-white" />
+                          </div>
+                        )}
+                        {tiendaHeroDraft.desktopImageUrl ? (
+                          <img
+                            src={tiendaHeroDraft.desktopImageUrl}
+                            alt="Vista previa escritorio"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
+                            <Upload className="h-8 w-8" />
+                            <span className="text-sm text-center">Arrastra una imagen o haz clic</span>
+                          </div>
+                        )}
+                        {tiendaHeroDraft.desktopImageUrl && tiendaHeroUploading !== "desktop" && (
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-carbon/0 opacity-0 transition-opacity hover:bg-carbon/30 hover:opacity-100">
+                            <span className="rounded-lg bg-carbon/60 px-3 py-1.5 text-xs text-white">
+                              Cambiar imagen
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {tiendaHeroDraft.desktopImageUrl && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setTiendaHeroDraft((prev) => ({ ...prev, desktopImageUrl: "" }))
+                            }
+                            className="border-gold/20 text-carbon/60"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                            Quitar
+                          </Button>
+                        )}
+                        <p className="text-xs text-carbon/30">
+                          Opcional; sin imagen se usa el fondo degradado.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Imagen de fondo · móvil
+                      </Label>
+                      <input
+                        ref={tiendaHeroMobileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) beginTiendaHeroCrop(file, "mobile");
+                        }}
+                      />
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (tiendaHeroUploading) return;
+                          tiendaHeroMobileInputRef.current?.click();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            if (!tiendaHeroUploading) tiendaHeroMobileInputRef.current?.click();
+                          }
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTiendaHeroDragOver("mobile");
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTiendaHeroDragOver("mobile");
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTiendaHeroDragOver((prev) => (prev === "mobile" ? null : prev));
+                        }}
+                        onDrop={(e) => handleTiendaHeroDrop(e, "mobile")}
+                        className={cn(
+                          "relative mt-2 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed transition-all duration-200",
+                          tiendaHeroDragOver === "mobile"
+                            ? "border-gold bg-gold/5 scale-[1.01]"
+                            : "border-gold/20 hover:border-gold/40",
+                          tiendaHeroDraft.mobileImageUrl ? "aspect-3/4 max-h-56 bg-muted" : "min-h-36 bg-muted/40",
+                        )}
+                      >
+                        {tiendaHeroUploading === "mobile" && (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-carbon/40">
+                            <Loader2 className="h-7 w-7 animate-spin text-white" />
+                          </div>
+                        )}
+                        {tiendaHeroDraft.mobileImageUrl ? (
+                          <img
+                            src={tiendaHeroDraft.mobileImageUrl}
+                            alt="Vista previa móvil"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
+                            <Upload className="h-8 w-8" />
+                            <span className="text-sm text-center">Arrastra una imagen o haz clic</span>
+                          </div>
+                        )}
+                        {tiendaHeroDraft.mobileImageUrl && tiendaHeroUploading !== "mobile" && (
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-carbon/0 opacity-0 transition-opacity hover:bg-carbon/30 hover:opacity-100">
+                            <span className="rounded-lg bg-carbon/60 px-3 py-1.5 text-xs text-white">
+                              Cambiar imagen
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {tiendaHeroDraft.mobileImageUrl && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setTiendaHeroDraft((prev) => ({ ...prev, mobileImageUrl: "" }))
+                            }
+                            className="border-gold/20 text-carbon/60"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                            Quitar
+                          </Button>
+                        )}
+                        <p className="text-xs text-carbon/30">
+                          Opcional; si falta se usa la de escritorio.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-carbon/30">
+                    Tras elegir la imagen podrás recortar la zona visible. Se convierte a WebP
+                    (máx. 1920px escritorio / 1080px móvil), igual que en la campaña publicitaria.
+                  </p>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Texto alternativo (accesibilidad)
+                    </Label>
+                    <Input
+                      value={tiendaHeroDraft.alt}
+                      onChange={(e) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, alt: e.target.value }))
+                      }
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                      placeholder={DEFAULT_TIENDA_HERO.alt}
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Etiqueta superior
+                    </Label>
+                    <Input
+                      value={tiendaHeroDraft.eyebrow}
+                      onChange={(e) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, eyebrow: e.target.value }))
+                      }
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                      placeholder={DEFAULT_TIENDA_HERO.eyebrow}
+                    />
+                    <p className="text-xs text-carbon/30 mt-1">Se muestra en mayúsculas.</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Titular
+                    </Label>
+                    <Textarea
+                      value={tiendaHeroDraft.headline}
+                      onChange={(e) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, headline: e.target.value }))
+                      }
+                      rows={2}
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Descripción
+                    </Label>
+                    <Textarea
+                      value={tiendaHeroDraft.description}
+                      onChange={(e) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, description: e.target.value }))
+                      }
+                      rows={3}
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Ventajas (icono + texto)
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={tiendaHeroDraft.features.length >= 4}
+                        onClick={() =>
+                          setTiendaHeroDraft((prev) => ({
+                            ...prev,
+                            features: [
+                              ...prev.features,
+                              { icon: "sparkles", label: "" },
+                            ],
+                          }))
+                        }
+                        className="h-8 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1.5" />
+                        Añadir
+                      </Button>
+                    </div>
+                    {tiendaHeroDraft.features.map((feature, index) => (
+                      <div
+                        key={`tienda-feature-${index}`}
+                        className="grid grid-cols-1 sm:grid-cols-[10rem_1fr_auto] gap-2 items-end"
+                      >
+                        <div>
+                          {index === 0 ? (
+                            <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                              Icono
+                            </Label>
+                          ) : null}
+                          <Select
+                            value={feature.icon}
+                            onValueChange={(value) =>
+                              setTiendaHeroDraft((prev) => ({
+                                ...prev,
+                                features: prev.features.map((f, i) =>
+                                  i === index ? { ...f, icon: value as TiendaHeroIconId } : f,
+                                ),
+                              }))
+                            }
+                          >
+                            <SelectTrigger
+                              className={cn(
+                                "border-gold/20 bg-white focus:ring-gold/30",
+                                index === 0 ? "mt-1" : "",
+                              )}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TIENDA_HERO_ICON_IDS.map((id) => (
+                                <SelectItem key={id} value={id}>
+                                  {TIENDA_HERO_ICON_LABELS[id]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          {index === 0 ? (
+                            <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                              Texto
+                            </Label>
+                          ) : null}
+                          <Input
+                            value={feature.label}
+                            onChange={(e) =>
+                              setTiendaHeroDraft((prev) => ({
+                                ...prev,
+                                features: prev.features.map((f, i) =>
+                                  i === index ? { ...f, label: e.target.value } : f,
+                                ),
+                              }))
+                            }
+                            className={cn(
+                              "border-gold/20 focus-visible:ring-gold/30",
+                              index === 0 ? "mt-1" : "",
+                            )}
+                            placeholder="Calidad profesional"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setTiendaHeroDraft((prev) => ({
+                              ...prev,
+                              features: prev.features.filter((_, i) => i !== index),
+                            }))
+                          }
+                          className="h-10 border-gold/20 text-carbon/60 hover:text-carbon"
+                          aria-label={`Quitar ventaja ${index + 1}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    <p className="text-xs text-carbon/30">Hasta 4 ventajas. Vacías no se muestran.</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Texto del CTA
+                    </Label>
+                    <Input
+                      value={tiendaHeroDraft.ctaText}
+                      onChange={(e) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, ctaText: e.target.value }))
+                      }
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                      placeholder={DEFAULT_TIENDA_HERO.ctaText}
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Enlace del CTA
+                    </Label>
+                    <Input
+                      value={tiendaHeroDraft.ctaHref}
+                      onChange={(e) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, ctaHref: e.target.value }))
+                      }
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30 font-mono text-sm"
+                      placeholder="#productos"
+                    />
+                    <p className="text-xs text-carbon/30 mt-1">
+                      Ancla de la tienda (<span className="font-mono">#productos</span>,{" "}
+                      <span className="font-mono">#packs-destacados</span>), ruta interna o URL.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <AdminColorField
+                      label="Color de acento"
+                      value={tiendaHeroDraft.accentColor}
+                      fallback={DEFAULT_TIENDA_HERO.accentColor}
+                      onChange={(hex) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, accentColor: hex }))
+                      }
+                      ariaLabel="Color de acento (etiqueta e iconos)"
+                    />
+                    <AdminColorField
+                      label="Color del titular"
+                      value={tiendaHeroDraft.headlineColor}
+                      fallback={DEFAULT_TIENDA_HERO.headlineColor}
+                      onChange={(hex) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, headlineColor: hex }))
+                      }
+                      ariaLabel="Color del titular de la tienda"
+                    />
+                    <AdminColorField
+                      label="Color de la descripción"
+                      value={tiendaHeroDraft.descriptionColor}
+                      fallback={DEFAULT_TIENDA_HERO.descriptionColor}
+                      onChange={(hex) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, descriptionColor: hex }))
+                      }
+                      ariaLabel="Color de la descripción"
+                    />
+                    <AdminColorField
+                      label="Color de las ventajas"
+                      value={tiendaHeroDraft.featureColor}
+                      fallback={DEFAULT_TIENDA_HERO.featureColor}
+                      onChange={(hex) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, featureColor: hex }))
+                      }
+                      ariaLabel="Color del texto de las ventajas"
+                    />
+                    <AdminColorField
+                      label="Color del CTA"
+                      value={tiendaHeroDraft.ctaBg}
+                      fallback={DEFAULT_TIENDA_HERO.ctaBg}
+                      onChange={(hex) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, ctaBg: hex }))
+                      }
+                      ariaLabel="Color de fondo del CTA"
+                    />
+                    <AdminColorField
+                      label="Color del texto del CTA"
+                      value={tiendaHeroDraft.ctaTextColor}
+                      fallback={DEFAULT_TIENDA_HERO.ctaTextColor}
+                      onChange={(hex) =>
+                        setTiendaHeroDraft((prev) => ({ ...prev, ctaTextColor: hex }))
+                      }
+                      ariaLabel="Color del texto del CTA"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Intensidad del overlay (%)
+                    </Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={String(tiendaHeroDraft.overlayStrength)}
+                        onChange={(e) => {
+                          const next = e.target.value.replace(/[^\d]/g, "");
+                          setTiendaHeroDraft((prev) => ({
+                            ...prev,
+                            overlayStrength: next === "" ? 0 : Math.min(100, Number(next)),
+                          }));
+                        }}
+                        onBlur={() => {
+                          setTiendaHeroDraft((prev) => ({
+                            ...prev,
+                            overlayStrength: Math.min(
+                              100,
+                              Math.max(0, Math.round(prev.overlayStrength)),
+                            ),
+                          }));
+                        }}
+                        className="border-gold/20 focus-visible:ring-gold/30 max-w-[6rem]"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={tiendaHeroDraft.overlayStrength === DEFAULT_TIENDA_HERO.overlayStrength}
+                        onClick={() =>
+                          setTiendaHeroDraft((prev) => ({
+                            ...prev,
+                            overlayStrength: DEFAULT_TIENDA_HERO.overlayStrength,
+                          }))
+                        }
+                        className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
+                        aria-label="Restaurar intensidad del overlay"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-carbon/30 mt-1">
+                      Solo con imagen de fondo. 0 = sin overlay; 100 = máxima cobertura clara.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Vista previa (arrastra el contenido)
+                      </Label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex rounded-md border border-gold/20 overflow-hidden">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setTiendaHeroPreviewDevice("desktop")}
+                          className={cn(
+                            "h-8 gap-1.5 rounded-none px-3 text-xs",
+                            tiendaHeroPreviewDevice === "desktop"
+                              ? "bg-gold/15 text-carbon"
+                              : "text-carbon/50",
+                          )}
+                        >
+                          <Monitor className="h-3.5 w-3.5" aria-hidden />
+                          Escritorio
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setTiendaHeroPreviewDevice("mobile")}
+                          className={cn(
+                            "h-8 gap-1.5 rounded-none px-3 text-xs",
+                            tiendaHeroPreviewDevice === "mobile"
+                              ? "bg-gold/15 text-carbon"
+                              : "text-carbon/50",
+                          )}
+                        >
+                          <Smartphone className="h-3.5 w-3.5" aria-hidden />
+                          Móvil
+                        </Button>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            tiendaHeroPreviewDevice === "mobile"
+                              ? tiendaHeroDraft.contentPosMobileX ===
+                                  DEFAULT_TIENDA_HERO.contentPosMobileX &&
+                                tiendaHeroDraft.contentPosMobileY ===
+                                  DEFAULT_TIENDA_HERO.contentPosMobileY
+                              : tiendaHeroDraft.contentPosX === DEFAULT_TIENDA_HERO.contentPosX &&
+                                tiendaHeroDraft.contentPosY === DEFAULT_TIENDA_HERO.contentPosY
+                          }
+                          onClick={() =>
+                            setTiendaHeroDraft((prev) =>
+                              tiendaHeroPreviewDevice === "mobile"
+                                ? {
+                                    ...prev,
+                                    contentPosMobileX: DEFAULT_TIENDA_HERO.contentPosMobileX,
+                                    contentPosMobileY: DEFAULT_TIENDA_HERO.contentPosMobileY,
+                                  }
+                                : {
+                                    ...prev,
+                                    contentPosX: DEFAULT_TIENDA_HERO.contentPosX,
+                                    contentPosY: DEFAULT_TIENDA_HERO.contentPosY,
+                                  },
+                            )
+                          }
+                          className="border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-8"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                          Restablecer posición
+                        </Button>
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "rounded-xl border border-carbon/10 overflow-hidden bg-cream p-4 mx-auto transition-all",
+                        tiendaHeroPreviewDevice === "mobile" ? "max-w-[390px]" : "w-full",
+                      )}
+                    >
+                      <TiendaHero
+                        config={tiendaHeroPreviewConfig}
+                        preview
+                        previewDevice={tiendaHeroPreviewDevice}
+                        onContentPositionChange={(pos) =>
+                          setTiendaHeroDraft((prev) =>
+                            tiendaHeroPreviewDevice === "mobile"
+                              ? {
+                                  ...prev,
+                                  contentPosMobileX: pos.x,
+                                  contentPosMobileY: pos.y,
+                                }
+                              : {
+                                  ...prev,
+                                  contentPosX: pos.x,
+                                  contentPosY: pos.y,
+                                },
+                          )
+                        }
+                      />
+                    </div>
+                    <p className="text-xs text-carbon/35 mt-2">
+                      En móvil (&lt;768px) se usa la imagen móvil si existe; en escritorio, la de
+                      escritorio. La posición del contenido se guarda aparte para escritorio y móvil.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {!isHeadline && !isCampaign && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">
                     {isMarquee ? "Textos (uno por línea)" : "Contenido"}
@@ -2926,6 +4092,66 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     </Button>
                   </>
                 )}
+                {isTiendaHero && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTiendaHeroDraft({
+                        ...DEFAULT_TIENDA_HERO,
+                        features: DEFAULT_TIENDA_HERO.features.map((f) => ({ ...f })),
+                      });
+                      toast({
+                        title: "Diseño restablecido",
+                        description:
+                          "Textos, ventajas y colores vuelven a la versión por defecto. Guarda para aplicar.",
+                      });
+                    }}
+                    className="border-gold/30 text-carbon/70 hover:bg-gold/10 hover:text-carbon"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Restablecer diseño
+                  </Button>
+                )}
+                {isBadges && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setBadgesDraft({ sale: { ...DEFAULT_SALE_BADGE } });
+                      toast({
+                        title: "Diseño restablecido",
+                        description:
+                          "Texto y colores vuelven a la versión por defecto. Guarda para aplicar.",
+                      });
+                    }}
+                    className="border-gold/30 text-carbon/70 hover:bg-gold/10 hover:text-carbon"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Restablecer diseño
+                  </Button>
+                )}
+                {isWhatsApp && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setWhatsappDraft({ ...DEFAULT_WHATSAPP_BUTTON });
+                      toast({
+                        title: "Diseño restablecido",
+                        description:
+                          "Número, mensaje y colores vuelven a la versión por defecto. Guarda para aplicar.",
+                      });
+                    }}
+                    className="border-gold/30 text-carbon/70 hover:bg-gold/10 hover:text-carbon"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Restablecer diseño
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -2933,6 +4159,23 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       })}
     </div>
 
+    <ProductImageCropDialog
+      open={tiendaHeroCropOpen}
+      imageSrc={tiendaHeroCropSrc}
+      onOpenChange={handleTiendaHeroCropOpenChange}
+      aspect={
+        tiendaHeroCropVariant === "desktop" ? TIENDA_HERO_DESKTOP_ASPECT : TIENDA_HERO_MOBILE_ASPECT
+      }
+      maxOutputSize={tiendaHeroCropVariant === "desktop" ? 1920 : 1080}
+      title={
+        tiendaHeroCropVariant === "desktop"
+          ? "Recortar fondo · Escritorio / tablet"
+          : "Recortar fondo · Móvil"
+      }
+      onCropped={async (file) => {
+        await uploadTiendaHeroImage(file, tiendaHeroCropVariant);
+      }}
+    />
     <ProductImageCropDialog
       open={campaignCropOpen}
       imageSrc={campaignCropSrc}

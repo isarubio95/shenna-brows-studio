@@ -15,6 +15,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CartDrawer from "@/components/CartDrawer";
 import WelcomePromoDialog from "@/components/WelcomePromoDialog";
+import WhatsAppFloatingButton from "@/components/WhatsAppFloatingButton";
 import ScrollToTop from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import ProductPage from "./pages/ProductPage";
@@ -197,6 +198,7 @@ const AppShell = () => {
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!isAdminRoute && <Footer />}
+      {!isAdminRoute && <WhatsAppFloatingButton />}
     </>
   );
 };

@@ -76,6 +76,9 @@ type ContenidoTab =
   | "marquee"
   | "headline"
   | "campaign"
+  | "tienda"
+  | "badges"
+  | "whatsapp"
   | "about"
   | "tema";
 
@@ -85,6 +88,9 @@ const CONTENIDO_TABS: { id: ContenidoTab; label: string; keys?: string[] }[] = [
   { id: "marquee", label: "Marquesina", keys: ["index_marquee"] },
   { id: "headline", label: "Titular", keys: ["index_collection_headline"] },
   { id: "campaign", label: "Campaña", keys: ["index_campaign"] },
+  { id: "tienda", label: "Tienda", keys: ["tienda_hero"] },
+  { id: "badges", label: "Badges", keys: ["site_badges"] },
+  { id: "whatsapp", label: "WhatsApp", keys: ["whatsapp_button"] },
   {
     id: "about",
     label: "Sobre mí",
@@ -1737,11 +1743,13 @@ const Admin = () => {
             )}
           </div>
         </AnimatedSection>
-
-        <AnimatedSection delay={0.07}>
-          <AdminReturnsManager onReturnsChanged={() => void syncAndFetchOrders(ordersPage)} />
-        </AnimatedSection>
           </>
+        )}
+
+        {activeSection === "devoluciones" && (
+          <AnimatedSection delay={0.05}>
+            <AdminReturnsManager onReturnsChanged={() => void syncAndFetchOrders(ordersPage)} />
+          </AnimatedSection>
         )}
 
         {activeSection === "catalogo" && (

@@ -9,6 +9,7 @@ import {
   Menu,
   MessageSquareQuote,
   Package,
+  RotateCcw,
   ShoppingBag,
   Ticket,
   type LucideIcon,
@@ -22,6 +23,7 @@ import {
 
 export type AdminSection =
   | "pedidos"
+  | "devoluciones"
   | "catalogo"
   | "correos"
   | "newsletter"
@@ -31,6 +33,7 @@ export type AdminSection =
 
 const SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
   { id: "pedidos", label: "Pedidos", icon: ShoppingBag },
+  { id: "devoluciones", label: "Devoluciones", icon: RotateCcw },
   { id: "catalogo", label: "Catálogo", icon: Package },
   { id: "correos", label: "Correos", icon: Mail },
   { id: "newsletter", label: "Newsletter", icon: Megaphone },
@@ -40,7 +43,8 @@ const SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
 ];
 
 const SECTION_DESCRIPTIONS: Record<AdminSection, string> = {
-  pedidos: "Gestiona pedidos y devoluciones.",
+  pedidos: "Gestiona pedidos.",
+  devoluciones: "Gestiona solicitudes de devolución y reembolsos.",
   catalogo: "Controla stock y productos del catálogo.",
   correos: "Envía correos individuales a clientes.",
   newsletter: "Campañas a suscriptores con consentimiento activo.",
