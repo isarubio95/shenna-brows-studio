@@ -3,7 +3,7 @@ export const WHATSAPP_DEFAULT_PINK = "#E9808E";
 
 export interface WhatsAppButtonConfig {
   enabled: boolean;
-  /** Número internacional solo dígitos, p. ej. 34633949945. */
+  /** Número internacional solo dígitos, p. ej. 34633979945. */
   phone: string;
   /** Mensaje precargado al abrir el chat (opcional). */
   message: string;
@@ -13,7 +13,7 @@ export interface WhatsAppButtonConfig {
 
 export const DEFAULT_WHATSAPP_BUTTON: WhatsAppButtonConfig = {
   enabled: true,
-  phone: "34633949945",
+  phone: "34633979945",
   message: "",
   background: WHATSAPP_DEFAULT_PINK,
   iconColor: "#FFFFFF",
