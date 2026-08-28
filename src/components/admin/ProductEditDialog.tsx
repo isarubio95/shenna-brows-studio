@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -78,6 +78,16 @@ const normalizeDescriptionHtml = (html: string) => {
     .replace(/<div>/gi, "<p>")
     .replace(/<\/div>/gi, "</p>")
     .replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, "");
+};
+
+const descriptionHtmlFromProduct = (mode: "create" | "edit", product: Product | null) =>
+  mode === "create" || !product ? "" : String(product.description ?? "");
+
+const applyDescriptionHtml = (node: HTMLDivElement | null, html: string) => {
+  if (!node) return;
+  if (node.innerHTML !== html) {
+    node.innerHTML = html;
+  }
 };
 
 const EMPTY_CREATE_FORM = {
@@ -173,7 +183,6 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           colorVariantRows: [],
         }),
       );
-      if (descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = "";
       return;
     }
     if (!currentProduct) return;
@@ -268,13 +277,19 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     }
   }, [form.category, form.name, mode, currentProduct, toast]);
 
-  useEffect(() => {
-    if (!descriptionEditorRef.current) return;
-    const next = form.description || "";
-    if (descriptionEditorRef.current.innerHTML !== next) {
-      descriptionEditorRef.current.innerHTML = next;
-    }
-  }, [form.description, mode, currentProduct?.id, open]);
+  const descriptionSeedHtml = descriptionHtmlFromProduct(mode, currentProduct);
+  const descriptionSeedRef = useRef(descriptionSeedHtml);
+  descriptionSeedRef.current = descriptionSeedHtml;
+
+  const setDescriptionEditorNode = useCallback((node: HTMLDivElement | null) => {
+    descriptionEditorRef.current = node;
+    applyDescriptionHtml(node, descriptionSeedRef.current);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    applyDescriptionHtml(descriptionEditorRef.current, descriptionSeedRef.current);
+  }, [open, mode, currentProduct?.id, currentProduct?.description]);
 
   const isComposicion = (form as any).materials_label === 'composicion';
 
@@ -509,7 +524,10 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
 
   const handleSave = async () => {
     const materialsString = materialItems.filter((m) => m.trim()).join("\n");
-    const normalizedDescription = normalizeDescriptionHtml(String(form.description || ""));
+    const descriptionFromEditor = descriptionEditorRef.current
+      ? descriptionEditorRef.current.innerHTML
+      : String(form.description || "");
+    const normalizedDescription = normalizeDescriptionHtml(descriptionFromEditor);
 
     const colorVariantsPayload: ColorVariant[] = [];
     for (const r of colorVariantRows) {
@@ -1019,8 +1037,9 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                   </Button>
                 </div>
                 <div
+                  key={`${mode}-${currentProduct?.id ?? "new"}`}
                   id="description"
-                  ref={descriptionEditorRef}
+                  ref={setDescriptionEditorNode}
                   contentEditable
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
