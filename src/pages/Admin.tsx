@@ -634,7 +634,7 @@ const buildCorreosPreregisterBody = (order: any) => {
     addressComplement: (import.meta.env.VITE_CORREOS_SENDER_ADDRESS_COMPLEMENT as string | undefined)?.trim() || "",
     addressType: (import.meta.env.VITE_CORREOS_SENDER_ADDRESS_TYPE as string | undefined)?.trim() || "CL",
     block: (import.meta.env.VITE_CORREOS_SENDER_BLOCK as string | undefined)?.trim() || "",
-    company: (import.meta.env.VITE_CORREOS_SENDER_COMPANY as string | undefined)?.trim() || "Shenna Brows Studio",
+    company: (import.meta.env.VITE_CORREOS_SENDER_COMPANY as string | undefined)?.trim() || "",
     contactPerson: (import.meta.env.VITE_CORREOS_SENDER_CONTACT_PERSON as string | undefined)?.trim() || senderName,
     contactPhone: (import.meta.env.VITE_CORREOS_SENDER_PHONE as string | undefined)?.trim() || "",
     country: (import.meta.env.VITE_CORREOS_SENDER_COUNTRY as string | undefined)?.trim() || "ESP",
