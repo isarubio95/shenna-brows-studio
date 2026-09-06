@@ -264,7 +264,7 @@ const ProductPage = () => {
           <AnimatedSection delay={0.15}>
             <div className="flex flex-col justify-center">
               <p className="text-gold text-xs uppercase tracking-[0.3em] font-medium mb-3">{product.category}</p>
-              <h1 className="font-playfair text-4xl md:text-5xl font-bold text-carbon mb-3">{product.name}</h1>
+              <h1 className="product-page-title font-playfair text-4xl md:text-5xl font-bold mb-3">{product.name}</h1>
               <p className="text-carbon/50 text-lg italic mb-6">{product.tagline}</p>
               <ProductPriceDisplay product={product} size="lg" className="mb-4" muted={outOfStock} />
 
@@ -435,7 +435,7 @@ const ProductPage = () => {
                           <p className="text-gold/80 text-[9px] sm:text-[10px] uppercase tracking-[0.2em] font-medium mb-1 line-clamp-1">
                             {p.category}
                           </p>
-                          <h3 className="font-playfair text-sm sm:text-base text-carbon/90 font-medium leading-snug line-clamp-2">
+                          <h3 className="product-card-title font-playfair text-sm sm:text-base font-medium leading-snug line-clamp-2">
                             {p.name}
                           </h3>
                         </div>

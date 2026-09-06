@@ -202,3 +202,13 @@
 .site-theme footer :is(h2, h3, h4, h5, h6, p, blockquote) {
   color: unset;
 }
+
+/* Fichas del catálogo: título en negro aunque el H3 del tema sea rosa. */
+.site-theme .product-card-title {
+  color: #1A1A1A;
+}
+
+/* Ficha de producto: el nombre usa el rosa del H3 del tema. */
+.site-theme .product-page-title {
+  color: var(--theme-color-h3, #E9808E);
+}

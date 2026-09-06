@@ -202,7 +202,7 @@ const Index = () => {
                                 <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">
                                   {product.category}
                                 </p>
-                                <h3 className="font-playfair text-xl font-semibold text-carbon mb-1">
+                                <h3 className="product-card-title font-playfair text-xl font-semibold mb-1">
                                   {product.name}
                                 </h3>
                                 <p className="text-sm text-carbon/50">{product.tagline}</p>
