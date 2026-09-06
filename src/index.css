@@ -203,9 +203,13 @@
   color: unset;
 }
 
-/* Fichas del catálogo: título en negro aunque el H3 del tema sea rosa. */
+/* Fichas del catálogo: carbón del tema (H2), no el rosa del H3 ni negro puro. */
 .site-theme .product-card-title {
-  color: #1A1A1A;
+  color: var(--theme-color-h2, #1A1A1A);
+}
+
+.site-theme .product-card-title[class*="text-carbon/90"] {
+  color: color-mix(in srgb, var(--theme-color-h2, #1A1A1A) 90%, transparent);
 }
 
 /* Ficha de producto: el nombre usa el rosa del H3 del tema. */

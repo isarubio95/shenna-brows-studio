@@ -435,7 +435,7 @@ const ProductPage = () => {
                           <p className="text-gold/80 text-[9px] sm:text-[10px] uppercase tracking-[0.2em] font-medium mb-1 line-clamp-1">
                             {p.category}
                           </p>
-                          <h3 className="product-card-title font-playfair text-sm sm:text-base font-medium leading-snug line-clamp-2">
+                          <h3 className="product-card-title font-playfair text-sm sm:text-base text-carbon/90 font-medium leading-snug line-clamp-2">
                             {p.name}
                           </h3>
                         </div>

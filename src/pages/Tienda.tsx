@@ -173,7 +173,7 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
         <div className="p-6 flex-1 flex flex-col justify-between">
           <div>
             <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">{product.category}</p>
-            <h3 className="product-card-title font-playfair text-xl font-semibold mb-1">{product.name}</h3>
+            <h3 className="product-card-title font-playfair text-xl font-semibold text-carbon mb-1">{product.name}</h3>
             <p className="text-sm text-carbon/60">{product.tagline}</p>
           </div>
 
