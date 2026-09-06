@@ -203,6 +203,11 @@
   color: unset;
 }
 
+.site-theme .announcement-bar,
+.site-theme .announcement-bar :is(p, span, div) {
+  color: inherit;
+}
+
 /* Fichas del catálogo: carbón del tema (H2), no el rosa del H3 ni negro puro. */
 .site-theme .product-card-title {
   color: var(--theme-color-h2, #1A1A1A);
@@ -210,6 +215,11 @@
 
 .site-theme .product-card-title[class*="text-carbon/90"] {
   color: color-mix(in srgb, var(--theme-color-h2, #1A1A1A) 90%, transparent);
+}
+
+/* Rótulos de ficha (Descripción, Materiales, Envío): carbón, no el rosa del H3. */
+.site-theme .product-section-title {
+  color: var(--theme-color-h2, #1A1A1A);
 }
 
 /* Ficha de producto: el mismo rosa que el cartel de oferta. */

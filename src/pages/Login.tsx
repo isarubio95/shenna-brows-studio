@@ -159,7 +159,7 @@ const Login = () => {
   };
 
   return (
-    <main className="min-h-screen bg-cream flex items-center justify-center pt-20 pb-12 px-6">
+    <main className="min-h-screen bg-cream flex items-center justify-center pt-28 pb-12 px-6">
       <AnimatedSection className="w-full max-w-md">
         <div className="bg-white rounded-2xl p-8 md:p-10 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
           <Link to="/" className="block text-center mb-8">

@@ -31,6 +31,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import ReturnsPolicy from "./pages/ReturnsPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import CookiesPolicy from "./pages/CookiesPolicy";
+import Faq from "./pages/Faq";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -201,6 +202,7 @@ const AppShell = () => {
         <Route path="/politica-devoluciones" element={<ReturnsPolicy />} />
         <Route path="/aviso-legal" element={<TermsOfService />} />
         <Route path="/politica-cookies" element={<CookiesPolicy />} />
+        <Route path="/preguntas-frecuentes" element={<Faq />} />
         <Route path="/:slug" element={<ProductPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

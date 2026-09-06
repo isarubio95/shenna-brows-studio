@@ -13,7 +13,7 @@ const PaymentSuccess = () => {
   }, [clearCart]);
 
   return (
-    <main className="min-h-screen bg-cream pt-32 flex items-center justify-center">
+    <main className="min-h-screen bg-cream pt-40 flex items-center justify-center">
       <AnimatedSection>
         <div className="text-center max-w-md mx-auto px-6">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">

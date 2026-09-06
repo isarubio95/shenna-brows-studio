@@ -24,7 +24,7 @@ const sections = [
 ];
 
 const ReturnsPolicy = () => (
-  <main className="min-h-screen bg-cream pt-32 pb-24">
+  <main className="min-h-screen bg-cream pt-40 pb-24">
     <div className="container mx-auto px-6 max-w-3xl">
       <AnimatedSection>
         <p className="text-gold text-sm uppercase tracking-[0.3em] font-medium text-center mb-4">

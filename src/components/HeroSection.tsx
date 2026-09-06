@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import AnimatedSection from "@/components/AnimatedSection";
+import BannerBackgroundMedia from "@/components/BannerBackgroundMedia";
 import {
   clampHeroTextPos,
   type HeroConfig,
 } from "@/lib/hero-content";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
+import { ANNOUNCEMENT_BAR_HEIGHT_PX } from "@/lib/announcement-content";
 import { cn } from "@/lib/utils";
 
 const HERO_CTA_BASE =
@@ -211,31 +213,25 @@ const HeroSection = ({
       )}
       aria-label={config.alt}
     >
-      {preview ? (
-        <img
-          src={previewMobile ? mobileSrc : desktopSrc}
-          alt={config.alt}
-          className={cn(
-            "absolute inset-0 z-0 h-full w-full object-cover pointer-events-none",
-            previewMobile ? "object-[center_calc(50%+4rem)]" : "object-[55%_35%]",
-          )}
-          draggable={false}
-        />
-      ) : (
-        <picture className="absolute inset-0 z-0 pointer-events-none">
-          <source media="(max-width: 767px)" srcSet={mobileSrc} />
-          <img
-            src={desktopSrc}
-            alt={config.alt}
-            width={2640}
-            height={1470}
-            decoding="async"
-            fetchPriority="high"
-            className="absolute inset-0 h-full w-full object-cover max-lg:object-[center_calc(50%+4rem)] lg:object-[55%_35%]"
-            draggable={false}
-          />
-        </picture>
-      )}
+      <BannerBackgroundMedia
+        desktopSrc={desktopSrc}
+        mobileSrc={mobileSrc}
+        alt={config.alt}
+        preview={preview}
+        previewMobile={previewMobile}
+        eager
+        fetchPriority="high"
+        preloadVideo="auto"
+        width={2640}
+        height={1470}
+        mediaClassName={
+          preview
+            ? previewMobile
+              ? "object-[center_calc(50%+4rem)]"
+              : "object-[55%_35%]"
+            : "max-lg:object-[center_calc(50%+4rem)] lg:object-[55%_35%]"
+        }
+      />
 
       <div
         className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35)_0%,rgba(0,0,0,0.18)_10%,transparent_25%,transparent_70%,rgba(0,0,0,0.18)_100%)] z-1 pointer-events-none"
@@ -369,11 +365,13 @@ export function HeroPreviewFrame({
           }}
         >
           {children}
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 z-10 border-b border-carbon/10 bg-cream"
-            style={{ height: viewport.navbarHeight }}
-            aria-hidden
-          />
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10" aria-hidden>
+            <div className="bg-black" style={{ height: ANNOUNCEMENT_BAR_HEIGHT_PX }} />
+            <div
+              className="border-b border-carbon/10 bg-cream"
+              style={{ height: viewport.navbarHeight }}
+            />
+          </div>
         </div>
       </div>
     </div>

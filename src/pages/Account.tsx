@@ -260,7 +260,7 @@ const Account = () => {
 
   if (authLoading) {
     return (
-      <main className="min-h-screen bg-background pt-32 flex items-center justify-center">
+      <main className="min-h-screen bg-background pt-40 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </main>
     );
@@ -288,7 +288,7 @@ const Account = () => {
   };
 
   return (
-    <main className="min-h-screen bg-background pt-28 pb-16">
+    <main className="min-h-screen bg-background pt-36 pb-16">
       <div className="container mx-auto px-6 max-w-5xl">
         <AnimatedSection>
           <h1 className="font-playfair text-3xl md:text-4xl font-bold text-foreground mb-2">

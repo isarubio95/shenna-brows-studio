@@ -160,7 +160,7 @@ const ProductPage = () => {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-cream pt-24">
+      <main className="min-h-screen flex items-center justify-center bg-cream pt-32">
         <Loader2 className="h-8 w-8 animate-spin text-gold" />
       </main>
     );
@@ -168,7 +168,7 @@ const ProductPage = () => {
 
   if (!product) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-cream pt-24">
+      <main className="min-h-screen flex items-center justify-center bg-cream pt-32">
         <div className="text-center">
           <h1 className="font-playfair text-3xl text-carbon mb-4">Producto no encontrado</h1>
           <Link to="/" className="text-gold hover:underline">Volver al inicio</Link>
@@ -203,7 +203,7 @@ const ProductPage = () => {
   const outOfStock = Number(product.stock ?? 0) <= 0;
 
   return (
-    <main className="min-h-screen bg-cream pt-32 pb-16">
+    <main className="min-h-screen bg-cream pt-40 pb-16">
       <div className="container mx-auto px-6">
 
 
@@ -351,7 +351,7 @@ const ProductPage = () => {
 
               <div className="border-t border-gold/10 space-y-0">
                 <section className="border-b border-gold/10 py-5">
-                  <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">Descripción</h3>
+                  <h3 className="product-section-title text-sm font-medium tracking-wide mb-3">Descripción</h3>
                   {descriptionItems.length > 0 ? (
                     <ul className="space-y-2">
                       {descriptionItems.map((item, i) => (
@@ -371,7 +371,7 @@ const ProductPage = () => {
                   ) : null}
                 </section>
                 <section className="border-b border-gold/10 py-5">
-                  <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">
+                  <h3 className="product-section-title text-sm font-medium tracking-wide mb-3">
                     {product.is_pack
                       ? '¿Qué incluye este pack?'
                       : product.materials_label === 'composicion'
@@ -392,7 +392,7 @@ const ProductPage = () => {
                   )}
                 </section>
                 <section className="border-b border-gold/10 py-5">
-                  <h3 className="text-carbon text-sm font-medium tracking-wide mb-3">Envío</h3>
+                  <h3 className="product-section-title text-sm font-medium tracking-wide mb-3">Envío</h3>
                   <p className="text-carbon/60 text-sm leading-relaxed">{product.shipping_info}</p>
                 </section>
               </div>

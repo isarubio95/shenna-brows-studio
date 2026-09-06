@@ -14,7 +14,7 @@ interface ColorField {
 
 const SECTION_COLORS: ColorField[] = [
   { key: "sectionProductsBg", label: "Productos (Inicio)" },
-  { key: "sectionVideoBg", label: "Vídeo presentación (Inicio)" },
+  { key: "sectionVideoBg", label: "Vídeo (Inicio)" },
   { key: "sectionBrandStoryBg", label: "Historia de marca (Inicio)" },
   { key: "sectionCeoBg", label: "CEO / Fundadora (Inicio)" },
   { key: "sectionTestimonialsBg", label: "Testimonios (Inicio)" },

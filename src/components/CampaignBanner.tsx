@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
+import BannerBackgroundMedia from "@/components/BannerBackgroundMedia";
 import {
   clampCampaignTextPos,
   campaignCtaPath,
@@ -71,7 +72,7 @@ const CampaignBanner = ({
   const mobileSrc = config.mobileImageUrl.trim() || config.desktopImageUrl;
   const desktopSrc = config.desktopImageUrl.trim() || mobileSrc;
   const previewSrc = previewMobile ? mobileSrc : desktopSrc;
-  const hasImage = Boolean(previewSrc.trim());
+  const hasMedia = Boolean(previewSrc.trim());
   const subParts = splitHeadlineByAccent(config.subheadline, config.subheadlineAccent);
   const canDrag = Boolean(preview && onTextPositionChange);
 
@@ -220,29 +221,15 @@ const CampaignBanner = ({
       )}
       aria-label={config.alt}
     >
-      {hasImage ? (
-        preview ? (
-          <img
-            src={previewSrc}
-            alt={config.alt}
-            className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-            loading="eager"
-            decoding="async"
-            draggable={false}
-          />
-        ) : (
-          <picture className="absolute inset-0 pointer-events-none">
-            <source media="(max-width: 767px)" srcSet={mobileSrc} />
-            <img
-              src={config.desktopImageUrl}
-              alt={config.alt}
-              className="absolute inset-0 h-full w-full object-cover"
-              loading="lazy"
-              decoding="async"
-              draggable={false}
-            />
-          </picture>
-        )
+      {hasMedia ? (
+        <BannerBackgroundMedia
+          desktopSrc={desktopSrc}
+          mobileSrc={mobileSrc}
+          alt={config.alt}
+          preview={preview}
+          previewMobile={previewMobile}
+          eager={preview}
+        />
       ) : (
         <div className="absolute inset-0 bg-[#E8DFD0]" aria-hidden />
       )}
@@ -272,11 +259,11 @@ const CampaignBanner = ({
         {preview ? textInner : <AnimatedSection>{textInner}</AnimatedSection>}
       </div>
 
-      {preview && !hasImage && (
+      {preview && !hasMedia && (
         <p className="absolute bottom-4 left-6 z-1 text-sm text-carbon/40">
           {previewMobile
-            ? "Sube la imagen móvil (o la de escritorio) para ver la vista previa."
-            : "Sube la imagen de escritorio para ver la vista previa real."}
+            ? "Sube la imagen o el vídeo móvil (o el de escritorio) para ver la vista previa."
+            : "Sube la imagen o el vídeo de escritorio para ver la vista previa real."}
         </p>
       )}
     </section>

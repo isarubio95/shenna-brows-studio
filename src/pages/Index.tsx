@@ -28,6 +28,8 @@ import {
 } from "@/lib/collection-headline-content";
 import { parseCampaignConfig } from "@/lib/campaign-content";
 import { parseHeroConfig } from "@/lib/hero-content";
+import { parseIndexVideoConfig } from "@/lib/video-content";
+import IndexVideoSection from "@/components/IndexVideoSection";
 
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -35,6 +37,7 @@ const Index = () => {
   const { data: siteContent, loading: siteContentLoading } = useSiteContent([
     "index_hero",
     "index_marquee",
+    "index_video",
     "index_collection_headline",
     "index_campaign",
   ]);
@@ -47,6 +50,11 @@ const Index = () => {
   const marquee = useMemo(
     () => parseMarqueeConfig(siteContent.index_marquee?.content),
     [siteContent.index_marquee?.content],
+  );
+
+  const indexVideo = useMemo(
+    () => parseIndexVideoConfig(siteContent.index_video?.content),
+    [siteContent.index_video?.content],
   );
 
   const collectionHeadline = useMemo(
@@ -77,7 +85,7 @@ const Index = () => {
   }, []);
 
   const scrollToNextSection = () => {
-    document.getElementById("coleccion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("video")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -120,6 +128,8 @@ const Index = () => {
         </div>
       </div>
 
+      <IndexVideoSection config={indexVideo} />
+
       {/* Products Grid */}
       <section
         id="coleccion"
@@ -151,7 +161,7 @@ const Index = () => {
               Nuestra colección
             </h2>
             <p className="text-center mb-12 md:mb-16 max-w-lg mx-auto" style={{ color: "var(--theme-color-paragraph, #1A1A1A)", opacity: 0.6 }}>
-              Cinco herramientas esenciales para la artista que busca perfección.
+              Todo lo que necesitas para cuidar, definir y realzar tus cejas, con la precisión de la experiencia profesional.
             </p>
           </AnimatedSection>
           <AnimatedSection delay={0.1}>

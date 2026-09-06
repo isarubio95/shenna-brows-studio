@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useFaqPageVisible } from "@/hooks/use-faq-page-visible";
+import { FAQ_PAGE_PATH } from "@/lib/faq-content";
 import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL =
@@ -15,6 +17,7 @@ const NEWSLETTER_ENDPOINT = `${SUPABASE_URL}/functions/v1/newsletter-subscribe`;
 
 const Footer = () => {
   const { toast } = useToast();
+  const faqPageVisible = useFaqPageVisible();
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,6 +98,7 @@ const Footer = () => {
               { label: "Inicio", to: "/" },
               { label: "Tienda", to: "/tienda" },
               { label: "Sobre mí", to: "/sobre-mi" },
+              ...(faqPageVisible ? [{ label: "Preguntas frecuentes", to: FAQ_PAGE_PATH }] : []),
             ].map((l) => (
               <li key={l.to}>
                 <Link to={l.to} className="hover:text-gold transition-colors">

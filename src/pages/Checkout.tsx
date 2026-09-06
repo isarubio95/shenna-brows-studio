@@ -270,7 +270,7 @@ const Checkout = () => {
 
   if (items.length === 0) {
     return (
-      <main className="min-h-screen bg-cream pt-32 flex items-center justify-center">
+      <main className="min-h-screen bg-cream pt-40 flex items-center justify-center">
         <div className="text-center">
           <h1 className="font-playfair text-3xl text-carbon mb-4">Tu carrito está vacío</h1>
           <Link to="/" className="text-gold hover:underline">Explorar productos</Link>
@@ -280,7 +280,7 @@ const Checkout = () => {
   }
 
   return (
-    <main className="min-h-screen bg-cream pt-28 pb-16">
+    <main className="min-h-screen bg-cream pt-36 pb-16">
       <div className="container mx-auto px-6 max-w-4xl">
         <AnimatedSection>
           <Link to="/" className="inline-flex items-center gap-2 text-carbon/50 hover:text-gold transition-colors text-sm mb-8">

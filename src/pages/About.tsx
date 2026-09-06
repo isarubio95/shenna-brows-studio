@@ -58,7 +58,7 @@ const About = () => {
   }, []);
 
   return (
-    <main className="min-h-screen pt-28 pb-14" style={{ backgroundColor: "var(--theme-section-about-bg, #F9F7F2)" }}>
+    <main className="min-h-screen pt-36 pb-14" style={{ backgroundColor: "var(--theme-section-about-bg, #F9F7F2)" }}>
       <div className="container mx-auto px-6 max-w-6xl">
         <div className="flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-12">
           <div className="w-full lg:w-[34%] lg:shrink-0 order-1">

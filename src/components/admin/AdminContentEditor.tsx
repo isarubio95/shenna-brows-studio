@@ -63,7 +63,35 @@ import {
   serializeWhatsAppButtonConfig,
   type WhatsAppButtonConfig,
 } from "@/lib/whatsapp-content";
+import {
+  DEFAULT_INDEX_VIDEO,
+  parseIndexVideoConfig,
+  resolveIndexVideoPosterSrc,
+  serializeIndexVideoConfig,
+  type IndexVideoConfig,
+} from "@/lib/video-content";
+import {
+  ANNOUNCEMENT_CONTENT_KEY,
+  DEFAULT_ANNOUNCEMENT_BAR,
+  DEFAULT_ANNOUNCEMENT_ITEMS,
+  announcementItemsToText,
+  announcementTextToItems,
+  parseAnnouncementBarConfig,
+  serializeAnnouncementBarConfig,
+  type AnnouncementBarConfig,
+} from "@/lib/announcement-content";
+import IndexVideoSection from "@/components/IndexVideoSection";
+import { AnnouncementBarView } from "@/components/AnnouncementBar";
 import { optimizeImageForUpload, type OptimizeImageVariant } from "@/lib/optimize-image-upload";
+import {
+  BANNER_MEDIA_ACCEPT,
+  BANNER_VIDEO_MAX_BYTES,
+  isVideoFile,
+  isVideoMediaUrl,
+  pickDroppedMediaFile,
+  videoContentType,
+  videoFileExtension,
+} from "@/lib/media-url";
 import { HexColorField, toPickerColor } from "@/components/admin/HexColorField";
 import ProductImageCropDialog from "@/components/admin/ProductImageCropDialog";
 import CampaignBanner, {
@@ -89,6 +117,7 @@ import TiendaHero, { type TiendaHeroPreviewDevice } from "@/components/TiendaHer
 import { SaleBadgeChip } from "@/components/ProductSaleBadge";
 import { WhatsAppButtonView } from "@/components/WhatsAppFloatingButton";
 import { cn } from "@/lib/utils";
+import { invalidateAnnouncementBarCache } from "@/hooks/use-announcement-bar";
 
 const CAMPAIGN_BUCKET = "campaign-images";
 const CAMPAIGN_CTA_TIENDA_VALUE = "__tienda__";
@@ -127,10 +156,12 @@ type SavedSnapshot = Record<string, { title: string; content: string }>;
 
 const CONTENT_LABELS: Record<string, string> = {
   index_brand_story: "Texto principal — Página de inicio",
+  announcement_bar: "Barra superior — Todas las páginas",
   index_hero: "Hero — Página de inicio",
   index_welcome_popup: "Popup bienvenida — Overlay global",
   index_marquee: "Marquesina — Debajo del hero",
-  index_collection_headline: "Titular — Entre marquesina y colección",
+  index_video: "Vídeo — Debajo de la marquesina",
+  index_collection_headline: "Titular — Encima de la colección",
   index_campaign: "Campaña — Después de la colección",
   tienda_hero: "Hero — Página de tienda",
   site_badges: "Badge de oferta — Productos",
@@ -141,13 +172,15 @@ const CONTENT_LABELS: Record<string, string> = {
   about_section_4: "Sobre mí — Sección 4",
 };
 
-const HIDDEN_KEYS = new Set(["index_brand_story", "theme_config"]);
+const HIDDEN_KEYS = new Set(["index_brand_story", "theme_config", "faq"]);
 
 /** Orden preferido en el panel de Contenido */
 const KEY_ORDER = [
+  ANNOUNCEMENT_CONTENT_KEY,
   "index_hero",
   "index_welcome_popup",
   "index_marquee",
+  "index_video",
   "index_collection_headline",
   "index_campaign",
   "tienda_hero",
@@ -207,6 +240,22 @@ const AdminColorField = ({
     </div>
   </div>
 );
+
+function AdminDropzonePreview({ src, alt }: { src: string; alt: string }) {
+  if (isVideoMediaUrl(src)) {
+    return (
+      <video
+        src={src}
+        className="h-full w-full object-cover"
+        muted
+        playsInline
+        preload="metadata"
+        aria-hidden
+      />
+    );
+  }
+  return <img src={src} alt={alt} className="h-full w-full object-cover" />;
+}
 
 const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   const { toast } = useToast();
@@ -276,6 +325,21 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   const [whatsappDraft, setWhatsappDraft] = useState<WhatsAppButtonConfig>({
     ...DEFAULT_WHATSAPP_BUTTON,
   });
+  const [videoDraft, setVideoDraft] = useState<IndexVideoConfig>({ ...DEFAULT_INDEX_VIDEO });
+  const [announcementDraft, setAnnouncementDraft] = useState<{
+    enabled: boolean;
+    texts: string;
+    background: string;
+    textColor: string;
+  }>({
+    enabled: DEFAULT_ANNOUNCEMENT_BAR.enabled,
+    texts: announcementItemsToText(DEFAULT_ANNOUNCEMENT_ITEMS),
+    background: DEFAULT_ANNOUNCEMENT_BAR.background,
+    textColor: DEFAULT_ANNOUNCEMENT_BAR.textColor,
+  });
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoDragOver, setVideoDragOver] = useState(false);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [tiendaHeroUploading, setTiendaHeroUploading] = useState<"desktop" | "mobile" | null>(null);
   const [tiendaHeroDragOver, setTiendaHeroDragOver] = useState<"desktop" | "mobile" | null>(null);
   const [tiendaHeroCropOpen, setTiendaHeroCropOpen] = useState(false);
@@ -437,6 +501,26 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     };
   };
 
+  const buildAnnouncementPayload = () => {
+    const config: AnnouncementBarConfig = parseAnnouncementBarConfig(
+      serializeAnnouncementBarConfig({
+        enabled: Boolean(announcementDraft.enabled),
+        items: announcementTextToItems(announcementDraft.texts),
+        background: isHex(announcementDraft.background)
+          ? announcementDraft.background.trim()
+          : DEFAULT_ANNOUNCEMENT_BAR.background,
+        textColor: isHex(announcementDraft.textColor)
+          ? announcementDraft.textColor.trim()
+          : DEFAULT_ANNOUNCEMENT_BAR.textColor,
+      }),
+    );
+    return {
+      title: "Barra superior",
+      content: serializeAnnouncementBarConfig(config),
+      config,
+    };
+  };
+
   const buildWhatsAppPayload = () => {
     const config = parseWhatsAppButtonConfig(
       serializeWhatsAppButtonConfig({
@@ -454,6 +538,22 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     return {
       title: "Botón de WhatsApp",
       content: serializeWhatsAppButtonConfig(config),
+      config,
+    };
+  };
+
+  const buildVideoPayload = () => {
+    const config = parseIndexVideoConfig(
+      serializeIndexVideoConfig({
+        title: videoDraft.title.trim() || DEFAULT_INDEX_VIDEO.title,
+        accent: videoDraft.accent.trim(),
+        videoUrl: videoDraft.videoUrl.trim() || DEFAULT_INDEX_VIDEO.videoUrl,
+        posterUrl: videoDraft.posterUrl.trim(),
+      }),
+    );
+    return {
+      title: "Vídeo del inicio",
+      content: serializeIndexVideoConfig(config),
       config,
     };
   };
@@ -557,11 +657,60 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
   };
 
+  const uploadStorageVideo = async (file: File, pathPrefix: string) => {
+    if (!isVideoFile(file)) {
+      throw new Error("Sube un vídeo MP4, WebM o MOV.");
+    }
+    if (file.size > BANNER_VIDEO_MAX_BYTES) {
+      throw new Error("El tamaño máximo es 40 MB.");
+    }
+    const ext = videoFileExtension(file);
+    const filePath = `${pathPrefix}-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from(CAMPAIGN_BUCKET)
+      .upload(filePath, file, {
+        upsert: true,
+        contentType: videoContentType(file, ext),
+      });
+    if (uploadError) throw uploadError;
+    return `${SUPABASE_URL}/storage/v1/object/public/${CAMPAIGN_BUCKET}/${filePath}`;
+  };
+
+  const uploadCampaignVideo = async (file: File, variant: OptimizeImageVariant) => {
+    setCampaignUploading(variant);
+    try {
+      const publicUrl = await uploadStorageVideo(file, `campaign-${variant}`);
+      setCampaignDraft((prev) => ({
+        ...prev,
+        ...(variant === "desktop"
+          ? { desktopImageUrl: publicUrl }
+          : { mobileImageUrl: publicUrl }),
+      }));
+      toast({
+        title: "Vídeo subido",
+        description: `Versión ${variant === "desktop" ? "escritorio/tablet" : "móvil"} lista. Guarda para publicarla.`,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo subir el vídeo.";
+      toast({ title: "Error al subir", description: message, variant: "destructive" });
+    } finally {
+      setCampaignUploading(null);
+    }
+  };
+
+  const handleCampaignFile = (file: File, variant: OptimizeImageVariant) => {
+    if (isVideoFile(file)) {
+      void uploadCampaignVideo(file, variant);
+      return;
+    }
+    beginCampaignCrop(file, variant);
+  };
+
   const beginCampaignCrop = (file: File, variant: OptimizeImageVariant) => {
     if (!file.type.startsWith("image/")) {
       toast({
         title: "Archivo no válido",
-        description: "Selecciona una imagen.",
+        description: "Selecciona una imagen o un vídeo.",
         variant: "destructive",
       });
       return;
@@ -587,8 +736,8 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     e.stopPropagation();
     setCampaignDragOver(null);
     if (campaignUploading || campaignCropOpen) return;
-    const file = Array.from(e.dataTransfer.files || []).find((f) => f.type.startsWith("image/"));
-    if (file) beginCampaignCrop(file, variant);
+    const file = pickDroppedMediaFile(e.dataTransfer.files);
+    if (file) handleCampaignFile(file, variant);
   };
 
   const uploadTiendaHeroImage = async (file: File, variant: OptimizeImageVariant) => {
@@ -691,11 +840,41 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
   };
 
+  const uploadHeroVideo = async (file: File, variant: OptimizeImageVariant) => {
+    setHeroUploading(variant);
+    try {
+      const publicUrl = await uploadStorageVideo(file, `hero-${variant}`);
+      setHeroDraft((prev) => ({
+        ...prev,
+        ...(variant === "desktop"
+          ? { desktopImageUrl: publicUrl }
+          : { mobileImageUrl: publicUrl }),
+      }));
+      toast({
+        title: "Vídeo subido",
+        description: `Versión ${variant === "desktop" ? "escritorio/tablet" : "móvil"} lista. Guarda para publicarla.`,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo subir el vídeo.";
+      toast({ title: "Error al subir", description: message, variant: "destructive" });
+    } finally {
+      setHeroUploading(null);
+    }
+  };
+
+  const handleHeroFile = (file: File, variant: OptimizeImageVariant) => {
+    if (isVideoFile(file)) {
+      void uploadHeroVideo(file, variant);
+      return;
+    }
+    beginHeroCrop(file, variant);
+  };
+
   const beginHeroCrop = (file: File, variant: OptimizeImageVariant) => {
     if (!file.type.startsWith("image/")) {
       toast({
         title: "Archivo no válido",
-        description: "Selecciona una imagen.",
+        description: "Selecciona una imagen o un vídeo.",
         variant: "destructive",
       });
       return;
@@ -721,8 +900,8 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     e.stopPropagation();
     setHeroDragOver(null);
     if (heroUploading || heroCropOpen) return;
-    const file = Array.from(e.dataTransfer.files || []).find((f) => f.type.startsWith("image/"));
-    if (file) beginHeroCrop(file, variant);
+    const file = pickDroppedMediaFile(e.dataTransfer.files);
+    if (file) handleHeroFile(file, variant);
   };
 
   const uploadWelcomePopupImage = async (file: File) => {
@@ -784,6 +963,36 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     if (welcomePopupUploading || welcomePopupCropOpen) return;
     const file = Array.from(e.dataTransfer.files || []).find((f) => f.type.startsWith("image/"));
     if (file) beginWelcomePopupCrop(file);
+  };
+
+  const uploadIndexVideo = async (file: File) => {
+    setVideoUploading(true);
+    try {
+      const publicUrl = await uploadStorageVideo(file, "index-video");
+      setVideoDraft((prev) => ({
+        ...prev,
+        videoUrl: publicUrl,
+        posterUrl: "",
+      }));
+      toast({
+        title: "Vídeo subido",
+        description: "Guarda para publicarlo en la web.",
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo subir el vídeo.";
+      toast({ title: "Error al subir", description: message, variant: "destructive" });
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const handleVideoDrop = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setVideoDragOver(false);
+    if (videoUploading) return;
+    const file = Array.from(e.dataTransfer.files || []).find(isVideoFile);
+    if (file) void uploadIndexVideo(file);
   };
 
   useEffect(() => {
@@ -936,6 +1145,36 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         if (inserted) rows = [...rows, inserted];
       }
 
+      const hasVideo = rows.some((b) => b.key === "index_video");
+      if (!hasVideo) {
+        const { data: inserted } = await (supabase as any)
+          .from("site_content")
+          .insert({
+            key: "index_video",
+            title: "Vídeo del inicio",
+            content: serializeIndexVideoConfig(DEFAULT_INDEX_VIDEO),
+          })
+          .select("*")
+          .single();
+
+        if (inserted) rows = [...rows, inserted];
+      }
+
+      const hasAnnouncement = rows.some((b) => b.key === ANNOUNCEMENT_CONTENT_KEY);
+      if (!hasAnnouncement) {
+        const { data: inserted } = await (supabase as any)
+          .from("site_content")
+          .insert({
+            key: ANNOUNCEMENT_CONTENT_KEY,
+            title: "Barra superior",
+            content: serializeAnnouncementBarConfig(DEFAULT_ANNOUNCEMENT_BAR),
+          })
+          .select("*")
+          .single();
+
+        if (inserted) rows = [...rows, inserted];
+      }
+
       const heroRow = rows.find((b) => b.key === "index_hero");
       if (heroRow) {
         const cfg = parseHeroConfig(heroRow.content);
@@ -1010,6 +1249,27 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         whatsappRow.content = serializeWhatsAppButtonConfig(cfg);
       }
 
+      const videoRow = rows.find((b) => b.key === "index_video");
+      if (videoRow) {
+        const cfg = parseIndexVideoConfig(videoRow.content);
+        setVideoDraft(cfg);
+        videoRow.title = "Vídeo del inicio";
+        videoRow.content = serializeIndexVideoConfig(cfg);
+      }
+
+      const announcementRow = rows.find((b) => b.key === ANNOUNCEMENT_CONTENT_KEY);
+      if (announcementRow) {
+        const cfg = parseAnnouncementBarConfig(announcementRow.content);
+        setAnnouncementDraft({
+          enabled: cfg.enabled,
+          texts: announcementItemsToText(cfg.items),
+          background: cfg.background,
+          textColor: cfg.textColor,
+        });
+        announcementRow.title = "Barra superior";
+        announcementRow.content = serializeAnnouncementBarConfig(cfg);
+      }
+
       setBlocks(rows);
       setSaved(snapshotFromBlocks(rows));
       setLoading(false);
@@ -1057,6 +1317,14 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
     if (block.key === "whatsapp_button") {
       const payload = buildWhatsAppPayload();
+      return payload.title !== baseline.title || payload.content !== baseline.content;
+    }
+    if (block.key === "index_video") {
+      const payload = buildVideoPayload();
+      return payload.title !== baseline.title || payload.content !== baseline.content;
+    }
+    if (block.key === ANNOUNCEMENT_CONTENT_KEY) {
+      const payload = buildAnnouncementPayload();
       return payload.title !== baseline.title || payload.content !== baseline.content;
     }
     return (block.title ?? "") !== baseline.title || (block.content ?? "") !== baseline.content;
@@ -1170,6 +1438,35 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       );
     }
 
+    if (block.key === "index_video") {
+      const { title, content, config } = buildVideoPayload();
+      payload = { title, content };
+      setVideoDraft(config);
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.key === "index_video" ? { ...b, title: payload.title, content: payload.content } : b
+        )
+      );
+    }
+
+    if (block.key === ANNOUNCEMENT_CONTENT_KEY) {
+      const { title, content, config } = buildAnnouncementPayload();
+      payload = { title, content };
+      setAnnouncementDraft({
+        enabled: config.enabled,
+        texts: announcementItemsToText(config.items),
+        background: config.background,
+        textColor: config.textColor,
+      });
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.key === ANNOUNCEMENT_CONTENT_KEY
+            ? { ...b, title: payload.title, content: payload.content }
+            : b
+        )
+      );
+    }
+
     const { error } = await (supabase as any)
       .from("site_content")
       .update({ ...payload, updated_at: new Date().toISOString() })
@@ -1182,6 +1479,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         ...prev,
         [block.key]: { title: payload.title ?? "", content: payload.content ?? "" },
       }));
+      if (block.key === ANNOUNCEMENT_CONTENT_KEY) {
+        invalidateAnnouncementBarCache();
+      }
       toast({ title: "Guardado", description: `"${CONTENT_LABELS[block.key] || block.key}" actualizado.` });
     }
     setSaving(null);
@@ -1240,6 +1540,8 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         const isTiendaHero = block.key === "tienda_hero";
         const isBadges = block.key === "site_badges";
         const isWhatsApp = block.key === "whatsapp_button";
+        const isVideo = block.key === "index_video";
+        const isAnnouncement = block.key === ANNOUNCEMENT_CONTENT_KEY;
         const dirty = isBlockDirty(block);
 
         return (
@@ -1247,7 +1549,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
             key={block.key}
             className={cn(
               "bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6",
-              (isHero || isCampaign || isWelcomePopup || isTiendaHero || isBadges || isWhatsApp) && "ring-1 ring-gold/20",
+              (isHero || isCampaign || isWelcomePopup || isTiendaHero || isBadges || isWhatsApp || isVideo || isAnnouncement) && "ring-1 ring-gold/20",
             )}
           >
             <h3 className="font-playfair text-base font-semibold text-carbon mb-4">
@@ -1282,9 +1584,19 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                 mensaje precargado, colores y visibilidad.
               </p>
             )}
+            {isVideo && (
+              <p className="text-xs text-carbon/40 -mt-2 mb-4">
+                Sección debajo de la marquesina del inicio. Título y vídeo son editables.
+              </p>
+            )}
+            {isAnnouncement && (
+              <p className="text-xs text-carbon/40 -mt-2 mb-4">
+                Marquesina fija encima del menú en todas las páginas. Textos, colores y visibilidad.
+              </p>
+            )}
 
             <div className="space-y-4">
-              {!isMarquee && !isHeadline && !isCampaign && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && (
+              {!isMarquee && !isHeadline && !isCampaign && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">Título</Label>
                   <Input
@@ -1646,6 +1958,216 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                 </>
               )}
 
+              {isVideo && (
+                <>
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Título
+                    </Label>
+                    <Textarea
+                      value={videoDraft.title}
+                      onChange={(e) =>
+                        setVideoDraft((prev) => ({ ...prev, title: e.target.value }))
+                      }
+                      rows={3}
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Texto en dorado cursiva
+                    </Label>
+                    <Input
+                      value={videoDraft.accent}
+                      onChange={(e) =>
+                        setVideoDraft((prev) => ({ ...prev, accent: e.target.value }))
+                      }
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                      placeholder={DEFAULT_INDEX_VIDEO.accent}
+                    />
+                    <p className="text-xs text-carbon/30 mt-1">
+                      Debe coincidir con un fragmento del título.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Vídeo
+                    </Label>
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void uploadIndexVideo(file);
+                      }}
+                    />
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (!videoUploading) videoInputRef.current?.click();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          if (!videoUploading) videoInputRef.current?.click();
+                        }
+                      }}
+                      onDragEnter={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setVideoDragOver(true);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setVideoDragOver(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setVideoDragOver(false);
+                      }}
+                      onDrop={handleVideoDrop}
+                      className={cn(
+                        "relative mt-2 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed transition-all duration-200",
+                        videoDragOver
+                          ? "border-gold bg-gold/5 scale-[1.01]"
+                          : "border-gold/20 hover:border-gold/40",
+                        videoDraft.videoUrl ? "bg-carbon" : "min-h-36 bg-muted/40",
+                      )}
+                    >
+                      {videoUploading && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-carbon/40">
+                          <Loader2 className="h-7 w-7 animate-spin text-white" />
+                        </div>
+                      )}
+                      {videoDraft.videoUrl ? (
+                        <video
+                          src={videoDraft.videoUrl}
+                          poster={resolveIndexVideoPosterSrc(videoDraft)}
+                          className="mx-auto max-h-72 w-full object-contain"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
+                          <Upload className="h-8 w-8" />
+                          <span className="text-sm text-center">Arrastra un vídeo o haz clic</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {videoDraft.videoUrl !== DEFAULT_INDEX_VIDEO.videoUrl && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setVideoDraft((prev) => ({
+                              ...prev,
+                              videoUrl: DEFAULT_INDEX_VIDEO.videoUrl,
+                              posterUrl: DEFAULT_INDEX_VIDEO.posterUrl,
+                            }))
+                          }
+                          className="border-gold/20 text-carbon/60"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                          Volver al vídeo original
+                        </Button>
+                      )}
+                      <p className="text-xs text-carbon/30">
+                        MP4, WebM o MOV. Máximo 40 MB.
+                      </p>
+                    </div>
+                  </div>
+
+                  <IndexVideoSection config={buildVideoPayload().config} preview />
+                </>
+              )}
+
+              {isAnnouncement && (
+                <>
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-gold/15 bg-cream/40 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-carbon">Mostrar barra</p>
+                      <p className="text-xs text-carbon/45">
+                        Si está desactivada, no aparecerá en la web.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={announcementDraft.enabled}
+                      onCheckedChange={(v) =>
+                        setAnnouncementDraft((prev) => ({ ...prev, enabled: v === true }))
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Textos (uno por línea)
+                    </Label>
+                    <Textarea
+                      value={announcementDraft.texts}
+                      onChange={(e) =>
+                        setAnnouncementDraft((prev) => ({ ...prev, texts: e.target.value }))
+                      }
+                      rows={4}
+                      className="mt-1 border-gold/20 focus-visible:ring-gold/30 font-sans"
+                    />
+                    <p className="text-xs text-carbon/30 mt-1">
+                      Cada línea es un mensaje de la marquesina. Se muestran en mayúsculas.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <AdminColorField
+                      label="Color de fondo"
+                      value={announcementDraft.background}
+                      fallback={DEFAULT_ANNOUNCEMENT_BAR.background}
+                      onChange={(hex) =>
+                        setAnnouncementDraft((prev) => ({ ...prev, background: hex }))
+                      }
+                      ariaLabel="Color de fondo de la barra superior"
+                    />
+                    <AdminColorField
+                      label="Color del texto"
+                      value={announcementDraft.textColor}
+                      fallback={DEFAULT_ANNOUNCEMENT_BAR.textColor}
+                      onChange={(hex) =>
+                        setAnnouncementDraft((prev) => ({ ...prev, textColor: hex }))
+                      }
+                      ariaLabel="Color del texto de la barra superior"
+                    />
+                  </div>
+
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-carbon/40 mb-2">
+                      Vista previa
+                    </p>
+                    <AnnouncementBarView
+                      preview
+                      config={{
+                        enabled: announcementDraft.enabled,
+                        items: announcementTextToItems(announcementDraft.texts),
+                        background: isHex(announcementDraft.background)
+                          ? announcementDraft.background
+                          : DEFAULT_ANNOUNCEMENT_BAR.background,
+                        textColor: isHex(announcementDraft.textColor)
+                          ? announcementDraft.textColor
+                          : DEFAULT_ANNOUNCEMENT_BAR.textColor,
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+
               {isWhatsApp && (
                 <>
                   <div className="flex items-center justify-between gap-3 rounded-lg border border-gold/15 bg-cream/40 px-4 py-3">
@@ -1750,17 +2272,17 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
-                        Imagen escritorio / tablet
+                        Imagen o vídeo · escritorio / tablet
                       </Label>
                       <input
                         ref={heroDesktopInputRef}
                         type="file"
-                        accept="image/*"
+                        accept={BANNER_MEDIA_ACCEPT}
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           e.target.value = "";
-                          if (file) beginHeroCrop(file, "desktop");
+                          if (file) handleHeroFile(file, "desktop");
                         }}
                       />
                       <div
@@ -1806,21 +2328,20 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           </div>
                         )}
                         {heroDraft.desktopImageUrl ? (
-                          <img
+                          <AdminDropzonePreview
                             src={heroDraft.desktopImageUrl}
                             alt="Vista previa escritorio"
-                            className="h-full w-full object-cover"
                           />
                         ) : (
                           <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
                             <Upload className="h-8 w-8" />
-                            <span className="text-sm text-center">Arrastra una imagen o haz clic</span>
+                            <span className="text-sm text-center">Arrastra una imagen o un vídeo, o haz clic</span>
                           </div>
                         )}
                         {heroDraft.desktopImageUrl && heroUploading !== "desktop" && (
                           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-carbon/0 opacity-0 transition-opacity hover:bg-carbon/30 hover:opacity-100">
                             <span className="rounded-lg bg-carbon/60 px-3 py-1.5 text-xs text-white">
-                              Cambiar imagen
+                              Cambiar archivo
                             </span>
                           </div>
                         )}
@@ -1852,17 +2373,17 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
 
                     <div>
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
-                        Imagen móvil
+                        Imagen o vídeo · móvil
                       </Label>
                       <input
                         ref={heroMobileInputRef}
                         type="file"
-                        accept="image/*"
+                        accept={BANNER_MEDIA_ACCEPT}
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           e.target.value = "";
-                          if (file) beginHeroCrop(file, "mobile");
+                          if (file) handleHeroFile(file, "mobile");
                         }}
                       />
                       <div
@@ -1910,21 +2431,20 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           </div>
                         )}
                         {heroDraft.mobileImageUrl ? (
-                          <img
+                          <AdminDropzonePreview
                             src={heroDraft.mobileImageUrl}
                             alt="Vista previa móvil"
-                            className="h-full w-full object-cover"
                           />
                         ) : (
                           <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
                             <Upload className="h-8 w-8" />
-                            <span className="text-sm text-center">Arrastra una imagen o haz clic</span>
+                            <span className="text-sm text-center">Arrastra una imagen o un vídeo, o haz clic</span>
                           </div>
                         )}
                         {heroDraft.mobileImageUrl && heroUploading !== "mobile" && (
                           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-carbon/0 opacity-0 transition-opacity hover:bg-carbon/30 hover:opacity-100">
                             <span className="rounded-lg bg-carbon/60 px-3 py-1.5 text-xs text-white">
-                              Cambiar imagen
+                              Cambiar archivo
                             </span>
                           </div>
                         )}
@@ -1955,8 +2475,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                   </div>
 
                   <p className="text-xs text-carbon/30">
-                    Tras elegir la imagen podrás recortar la zona visible. Se convierte a WebP
-                    (máx. 1920px escritorio / 1080px móvil).
+                    Las fotos se recortan y convierten a WebP (máx. 1920px escritorio / 1080px
+                    móvil). Los vídeos (MP4, WebM o MOV, máx. 40 MB) se suben tal cual y se
+                    reproducen en bucle, sin sonido.
                   </p>
 
                   <div>
@@ -2731,17 +3252,17 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
-                        Imagen escritorio / tablet
+                        Imagen o vídeo · escritorio / tablet
                       </Label>
                       <input
                         ref={desktopInputRef}
                         type="file"
-                        accept="image/*"
+                        accept={BANNER_MEDIA_ACCEPT}
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           e.target.value = "";
-                          if (file) beginCampaignCrop(file, "desktop");
+                          if (file) handleCampaignFile(file, "desktop");
                         }}
                       />
                       <div
@@ -2787,21 +3308,20 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           </div>
                         )}
                         {campaignDraft.desktopImageUrl ? (
-                          <img
+                          <AdminDropzonePreview
                             src={campaignDraft.desktopImageUrl}
                             alt="Vista previa escritorio"
-                            className="h-full w-full object-cover"
                           />
                         ) : (
                           <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
                             <Upload className="h-8 w-8" />
-                            <span className="text-sm text-center">Arrastra una imagen o haz clic</span>
+                            <span className="text-sm text-center">Arrastra una imagen o un vídeo, o haz clic</span>
                           </div>
                         )}
                         {campaignDraft.desktopImageUrl && campaignUploading !== "desktop" && (
                           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-carbon/0 opacity-0 transition-opacity hover:bg-carbon/30 hover:opacity-100">
                             <span className="rounded-lg bg-carbon/60 px-3 py-1.5 text-xs text-white">
-                              Cambiar imagen
+                              Cambiar archivo
                             </span>
                           </div>
                         )}
@@ -2829,17 +3349,17 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
 
                     <div>
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
-                        Imagen móvil
+                        Imagen o vídeo · móvil
                       </Label>
                       <input
                         ref={mobileInputRef}
                         type="file"
-                        accept="image/*"
+                        accept={BANNER_MEDIA_ACCEPT}
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           e.target.value = "";
-                          if (file) beginCampaignCrop(file, "mobile");
+                          if (file) handleCampaignFile(file, "mobile");
                         }}
                       />
                       <div
@@ -2885,21 +3405,20 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           </div>
                         )}
                         {campaignDraft.mobileImageUrl ? (
-                          <img
+                          <AdminDropzonePreview
                             src={campaignDraft.mobileImageUrl}
                             alt="Vista previa móvil"
-                            className="h-full w-full object-cover"
                           />
                         ) : (
                           <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
                             <Upload className="h-8 w-8" />
-                            <span className="text-sm text-center">Arrastra una imagen o haz clic</span>
+                            <span className="text-sm text-center">Arrastra una imagen o un vídeo, o haz clic</span>
                           </div>
                         )}
                         {campaignDraft.mobileImageUrl && campaignUploading !== "mobile" && (
                           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-carbon/0 opacity-0 transition-opacity hover:bg-carbon/30 hover:opacity-100">
                             <span className="rounded-lg bg-carbon/60 px-3 py-1.5 text-xs text-white">
-                              Cambiar imagen
+                              Cambiar archivo
                             </span>
                           </div>
                         )}
@@ -2927,8 +3446,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                   </div>
 
                   <p className="text-xs text-carbon/30">
-                    Tras elegir la imagen podrás recortar la zona visible. Se convierte a WebP
-                    (máx. 1920px escritorio / 1080px móvil).
+                    Las fotos se recortan y convierten a WebP (máx. 1920px escritorio / 1080px
+                    móvil). Los vídeos (MP4, WebM o MOV, máx. 40 MB) se suben tal cual y se
+                    reproducen en bucle, sin sonido.
                   </p>
 
                   <div>
@@ -4003,7 +4523,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                 </>
               )}
 
-              {!isHeadline && !isCampaign && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && (
+              {!isHeadline && !isCampaign && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">
                     {isMarquee ? "Textos (uno por línea)" : "Contenido"}
@@ -4133,6 +4653,30 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     Restablecer diseño
                   </Button>
                 )}
+                {isAnnouncement && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setAnnouncementDraft({
+                        enabled: DEFAULT_ANNOUNCEMENT_BAR.enabled,
+                        texts: announcementItemsToText(DEFAULT_ANNOUNCEMENT_ITEMS),
+                        background: DEFAULT_ANNOUNCEMENT_BAR.background,
+                        textColor: DEFAULT_ANNOUNCEMENT_BAR.textColor,
+                      });
+                      toast({
+                        title: "Diseño restablecido",
+                        description:
+                          "Textos y colores vuelven a la versión por defecto. Guarda para aplicar.",
+                      });
+                    }}
+                    className="border-gold/30 text-carbon/70 hover:bg-gold/10 hover:text-carbon"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Restablecer diseño
+                  </Button>
+                )}
                 {isWhatsApp && (
                   <Button
                     type="button"
@@ -4150,6 +4694,25 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                   >
                     <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
                     Restablecer diseño
+                  </Button>
+                )}
+                {isVideo && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setVideoDraft({ ...DEFAULT_INDEX_VIDEO });
+                      toast({
+                        title: "Sección restablecida",
+                        description:
+                          "Título y vídeo vuelven a la versión por defecto. Guarda para aplicar.",
+                      });
+                    }}
+                    className="border-gold/30 text-carbon/70 hover:bg-gold/10 hover:text-carbon"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Restablecer sección
                   </Button>
                 )}
               </div>

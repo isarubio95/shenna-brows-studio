@@ -3,12 +3,15 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo-shenna.png";
 import {
   ShoppingBag, User, Menu, Shield,
-  Sparkles, HeartHandshake,
+  Sparkles, HeartHandshake, CircleHelp,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
+import AnnouncementBar from "@/components/AnnouncementBar";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { useFaqPageVisible } from "@/hooks/use-faq-page-visible";
+import { FAQ_PAGE_PATH } from "@/lib/faq-content";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +31,7 @@ const navLinks: { label: string; to: string; icon: LucideIcon }[] = [
   { label: "Inicio", to: "/", icon: Sparkles },
   { label: "Colección", to: "/tienda", icon: ShoppingBag },
   { label: "Conócenos", to: "/sobre-mi", icon: HeartHandshake },
+  { label: "Preguntas", to: FAQ_PAGE_PATH, icon: CircleHelp },
 ];
 
 const Navbar = () => {
@@ -36,8 +40,10 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { openCart, totalItems } = useCart();
   const { user, isAdmin, profile, signOut } = useAuth();
+  const faqPageVisible = useFaqPageVisible();
   const location = useLocation();
   const navigate = useNavigate();
+  const visibleNavLinks = navLinks.filter((link) => link.to !== FAQ_PAGE_PATH || faqPageVisible);
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
   const displayName = firstName
@@ -61,7 +67,6 @@ const Navbar = () => {
     if (to === "/tienda") return isTiendaActive;
     return location.pathname === to;
   };
-  const isHome = location.pathname === "/";
 
   useEffect(() => {
     const onScroll = () => {
@@ -82,120 +87,118 @@ const Navbar = () => {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out bg-cream border-b border-carbon/10 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${
         hidden ? "-translate-y-full" : "translate-y-0"
       }`}
     >
-      <nav className="relative container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
-        <Link to="/" onClick={scrollToTop}>
-          <img
-            src={logo}
-            alt="Shenna Brows"
-            className="h-11 lg:h-[3.35rem] w-auto relative z-10 drop-shadow-[0_2px_10px_rgba(201,162,39,0.22)] brightness-105 transition-all duration-300 hover:brightness-110 hover:scale-[1.02]"
-          />
-        </Link>
+      <AnnouncementBar />
+      <nav className="relative border-b border-carbon/10 bg-cream">
+        <div className="container mx-auto flex items-center justify-between px-6 py-4 lg:py-5">
+          <Link to="/" onClick={scrollToTop}>
+            <img
+              src={logo}
+              alt="Shenna Brows"
+              className="h-11 lg:h-[3.35rem] w-auto relative z-10 drop-shadow-[0_2px_10px_rgba(201,162,39,0.22)] brightness-105 transition-all duration-300 hover:brightness-110 hover:scale-[1.02]"
+            />
+          </Link>
 
-        <ul className="hidden lg:flex items-center gap-8 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-max">
-          {navLinks.map((link) => (
-            <li key={link.to}>
+          <ul className="hidden lg:flex items-center gap-5 xl:gap-8 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-max">
+            {visibleNavLinks.map((link) => (
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  onClick={link.to === "/" ? scrollToTop : undefined}
+                  className={`text-sm font-medium tracking-wide p-1 transition-colors duration-300 ${
+                    isLinkActive(link.to) ? "text-gold" : linkColor
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <div className="flex items-center gap-3 lg:gap-4 relative z-10">
+            <a
+              href="https://www.instagram.com/shennabrows/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`hidden lg:flex p-1 transition-colors duration-300 ${iconColor}`}
+              aria-label="Instagram"
+            >
+              <InstagramIcon width={21} height={21} className="drop-shadow-sm" />
+            </a>
+
+            {isAdmin && (
               <Link
-                to={link.to}
-                onClick={link.to === "/" ? scrollToTop : undefined}
-                className={`text-sm font-medium tracking-wide p-1 transition-colors duration-300 ${
-                  isLinkActive(link.to) ? "text-gold" : linkColor
-                }`}
+                to="/admin"
+                className={`p-1 transition-colors duration-300 ${iconColor}`}
+                aria-label="Admin"
               >
-                {link.label}
+                <Shield size={21} className="drop-shadow-sm" />
               </Link>
-            </li>
-          ))}
-        </ul>
-
-        {/* Right icons — visible on ALL screen sizes */}
-        <div className="flex items-center gap-3 lg:gap-4 relative z-10">
-          <a
-            href="https://www.instagram.com/shennabrows/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`hidden lg:flex p-1 transition-colors duration-300 ${iconColor}`}
-            aria-label="Instagram"
-          >
-            <InstagramIcon width={21} height={21} className="drop-shadow-sm" />
-          </a>
-
-          {isAdmin && (
-            <Link
-              to="/admin"
-              className={`p-1 transition-colors duration-300 ${iconColor}`}
-              aria-label="Admin"
-            >
-              <Shield size={21} className="drop-shadow-sm" />
-            </Link>
-          )}
-
-          {/* User icon — visible on mobile + desktop */}
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className={`group flex flex-col items-center p-1 gap-0.5 transition-colors focus:outline-none ${iconColor} hover:text-gold`} aria-label="Mi cuenta">
-                  <User size={21} fill="currentColor" className="drop-shadow-sm transition-colors group-hover:text-gold" />
-                  {displayName && (
-                    <span className={`text-[10px] tracking-widest font-medium leading-none max-w-[60px] truncate transition-colors ${iconColor} group-hover:text-gold`}>
-                      {displayName}
-                    </span>
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-card border-border z-50">
-                <DropdownMenuLabel className="font-playfair text-sm">
-                  Hola, {displayName || "Cliente"}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate("/account")} className="cursor-pointer">
-                  Mi Área Privada
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive">
-                  Cerrar Sesión
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Link
-              to="/login"
-              className={`transition-colors duration-300 ${iconColor}`}
-              aria-label="Mi cuenta"
-            >
-              <User size={21} className="drop-shadow-sm" />
-            </Link>
-          )}
-
-          {/* Cart — always visible */}
-          <button
-            onClick={openCart}
-            className={`relative transition-colors p-1 duration-300 ${iconColor}`}
-            aria-label="Carrito"
-          >
-            <ShoppingBag size={21} className="drop-shadow-sm" />
-            {totalItems > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[10px] font-semibold text-white">
-                {totalItems}
-              </span>
             )}
-          </button>
 
-          {/* Hamburger — mobile only */}
-          <button
-            onClick={() => setMobileOpen(true)}
-            className={`lg:hidden p-1 transition-colors duration-300 ${iconColor}`}
-            aria-label="Menú"
-          >
-            <Menu size={25} />
-          </button>
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className={`group flex flex-col items-center p-1 gap-0.5 transition-colors focus:outline-none ${iconColor} hover:text-gold`} aria-label="Mi cuenta">
+                    <User size={21} fill="currentColor" className="drop-shadow-sm transition-colors group-hover:text-gold" />
+                    {displayName && (
+                      <span className={`text-[10px] tracking-widest font-medium leading-none max-w-[60px] truncate transition-colors ${iconColor} group-hover:text-gold`}>
+                        {displayName}
+                      </span>
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 bg-card border-border z-50">
+                  <DropdownMenuLabel className="font-playfair text-sm">
+                    Hola, {displayName || "Cliente"}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/account")} className="cursor-pointer">
+                    Mi Área Privada
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive">
+                    Cerrar Sesión
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link
+                to="/login"
+                className={`transition-colors duration-300 ${iconColor}`}
+                aria-label="Mi cuenta"
+              >
+                <User size={21} className="drop-shadow-sm" />
+              </Link>
+            )}
+
+            <button
+              onClick={openCart}
+              className={`relative transition-colors p-1 duration-300 ${iconColor}`}
+              aria-label="Carrito"
+            >
+              <ShoppingBag size={21} className="drop-shadow-sm" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[10px] font-semibold text-white">
+                  {totalItems}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setMobileOpen(true)}
+              className={`lg:hidden p-1 transition-colors duration-300 ${iconColor}`}
+              aria-label="Menú"
+            >
+              <Menu size={25} />
+            </button>
+          </div>
         </div>
       </nav>
 
-      {/* Mobile menu — Sheet from right */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="right" className="bg-cream border-l border-gold/10 w-72 flex flex-col">
           <SheetHeader className="text-left pl-1">
@@ -203,7 +206,7 @@ const Navbar = () => {
           </SheetHeader>
 
           <ul className="flex flex-col mt-6">
-            {navLinks.map((link) => {
+            {visibleNavLinks.map((link) => {
               const Icon = link.icon;
               return (
                 <li key={link.to} className="border-b border-gold/10 last:border-b-0">
@@ -224,10 +227,9 @@ const Navbar = () => {
                   </Link>
                 </li>
               );
-            })}      
+            })}
           </ul>
 
-          {/* Auth section at bottom */}
           <div className="mt-auto pb-6 pt-4 border-t border-gold/10">
             <div className="flex items-center gap-4 px-1 mb-5">
               <a

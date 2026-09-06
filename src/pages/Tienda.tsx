@@ -327,7 +327,7 @@ const Tienda = () => {
   };
 
   return (
-    <main className="min-h-screen bg-cream pt-28 pb-20">
+    <main className="min-h-screen bg-cream pt-36 pb-20">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <TiendaHero config={tiendaHero} />
@@ -336,7 +336,7 @@ const Tienda = () => {
         <AnimatedSection>
           <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center text-carbon">Productos</h2>
           <p className="text-center text-carbon/60 max-w-2xl mx-auto mt-4 mb-10">
-            Elige la herramienta ideal para elevar tu tecnica y potenciar el resultado de cada diseno.
+            Elige las herramientas y productos que cuidan tus cejas para lucirlas naturales, elegantes y definidas en el menor tiempo posible.
           </p>
         </AnimatedSection>
 
@@ -400,7 +400,7 @@ const Tienda = () => {
                     <p className="text-gold text-xs uppercase tracking-[0.28em] font-medium mb-3">Destacados</p>
                     <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon">Packs</h2>
                     <p className="text-carbon/60 max-w-xl mx-auto mt-3 text-sm md:text-base">
-                      Combinaciones pensadas para quien quiere equiparse de una vez y ahorrar frente a la compra por separado.
+                      Combinaciones pensadas para ti y para las necesidades de tus cejas, para que encuentres todo lo que necesitas en un solo pack.
                     </p>
                   </>
                 )}

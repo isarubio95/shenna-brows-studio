@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  CircleHelp,
   FileText,
   Mail,
   Megaphone,
@@ -29,6 +30,7 @@ export type AdminSection =
   | "newsletter"
   | "codigos_dto"
   | "contenido"
+  | "faq"
   | "testimonios";
 
 const SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
@@ -39,6 +41,7 @@ const SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
   { id: "newsletter", label: "Newsletter", icon: Megaphone },
   { id: "codigos_dto", label: "Códigos dto.", icon: Ticket },
   { id: "contenido", label: "Contenido", icon: FileText },
+  { id: "faq", label: "FAQ", icon: CircleHelp },
   { id: "testimonios", label: "Testimonios", icon: MessageSquareQuote },
 ];
 
@@ -50,6 +53,7 @@ const SECTION_DESCRIPTIONS: Record<AdminSection, string> = {
   newsletter: "Campañas a suscriptores con consentimiento activo.",
   codigos_dto: "Crea y gestiona códigos promocionales y sus usos.",
   contenido: "Textos de la web y tema visual.",
+  faq: "Preguntas frecuentes de la web.",
   testimonios: "Modera y destaca testimonios de clientes.",
 };
 

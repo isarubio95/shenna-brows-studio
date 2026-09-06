@@ -1,7 +1,9 @@
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
 
 export interface HeroConfig {
+  /** Foto o vídeo de fondo (escritorio). */
   desktopImageUrl: string;
+  /** Foto o vídeo de fondo (móvil). */
   mobileImageUrl: string;
   /** Primera línea del H1. */
   line1: string;

@@ -1,5 +1,7 @@
 export interface CampaignConfig {
+  /** Foto o vídeo de fondo (escritorio). */
   desktopImageUrl: string;
+  /** Foto o vídeo de fondo (móvil). */
   mobileImageUrl: string;
   headline: string;
   headlineColor: string;

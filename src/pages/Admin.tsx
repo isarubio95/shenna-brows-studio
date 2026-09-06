@@ -22,6 +22,7 @@ import AdminReturnsManager from "@/components/admin/AdminReturnsManager";
 import AdminSectionNav, {
   type AdminSection,
 } from "@/components/admin/AdminSectionNav";
+import AdminFaqEditor from "@/components/admin/AdminFaqEditor";
 import {
   canDownloadOrderInvoice,
   getOrderInvoiceButtonLabel,
@@ -71,9 +72,11 @@ const PENDING_ORDER_STATUSES = new Set(["pending", "pending_payment"]);
 const ORDERS_PAGE_SIZE = 10;
 
 type ContenidoTab =
+  | "anuncio"
   | "hero"
   | "welcome"
   | "marquee"
+  | "video"
   | "headline"
   | "campaign"
   | "tienda"
@@ -83,9 +86,11 @@ type ContenidoTab =
   | "tema";
 
 const CONTENIDO_TABS: { id: ContenidoTab; label: string; keys?: string[] }[] = [
+  { id: "anuncio", label: "Barra superior", keys: ["announcement_bar"] },
   { id: "hero", label: "Hero", keys: ["index_hero"] },
   { id: "welcome", label: "Bienvenida", keys: ["index_welcome_popup"] },
   { id: "marquee", label: "Marquesina", keys: ["index_marquee"] },
+  { id: "video", label: "Vídeo", keys: ["index_video"] },
   { id: "headline", label: "Titular", keys: ["index_collection_headline"] },
   { id: "campaign", label: "Campaña", keys: ["index_campaign"] },
   { id: "tienda", label: "Tienda", keys: ["tienda_hero"] },
@@ -1995,6 +2000,12 @@ const Admin = () => {
         {activeSection === "codigos_dto" && (
           <AnimatedSection delay={0.05}>
             <AdminDiscountCodes />
+          </AnimatedSection>
+        )}
+
+        {activeSection === "faq" && (
+          <AnimatedSection delay={0.05}>
+            <AdminFaqEditor />
           </AnimatedSection>
         )}
 
