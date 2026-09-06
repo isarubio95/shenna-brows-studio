@@ -10,6 +10,8 @@ import { ShoppingBag, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImageGallery, getProductImageUrl } from "@/lib/product-images";
 import { getEffectivePrice } from "@/lib/product-pricing";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
+import { useSiteBadges } from "@/hooks/use-site-badges";
+import { DEFAULT_SALE_BADGE } from "@/lib/badges-content";
 import { motion } from "framer-motion";
 
 type DescriptionItem = { content: string; format: "text" | "html" };
@@ -54,6 +56,7 @@ const RELATED_CAROUSEL_GAP_PX = 12;
 const ProductPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { addItem, isAddToCartDisabled } = useCart();
+  const { sale } = useSiteBadges();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -264,7 +267,12 @@ const ProductPage = () => {
           <AnimatedSection delay={0.15}>
             <div className="flex flex-col justify-center">
               <p className="text-gold text-xs uppercase tracking-[0.3em] font-medium mb-3">{product.category}</p>
-              <h1 className="product-page-title font-playfair text-4xl md:text-5xl font-bold mb-3">{product.name}</h1>
+              <h1
+                className="product-page-title font-playfair text-4xl md:text-5xl font-bold mb-3"
+                style={{ color: sale.background || DEFAULT_SALE_BADGE.background }}
+              >
+                {product.name}
+              </h1>
               <p className="text-carbon/50 text-lg italic mb-6">{product.tagline}</p>
               <ProductPriceDisplay product={product} size="lg" className="mb-4" muted={outOfStock} />
 

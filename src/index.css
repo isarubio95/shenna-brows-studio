@@ -212,7 +212,7 @@
   color: color-mix(in srgb, var(--theme-color-h2, #1A1A1A) 90%, transparent);
 }
 
-/* Ficha de producto: el nombre usa el rosa del H3 del tema. */
+/* Ficha de producto: el mismo rosa que el cartel de oferta. */
 .site-theme .product-page-title {
-  color: var(--theme-color-h3, #E9808E);
+  color: var(--sale-badge-bg, #E9808E);
 }
