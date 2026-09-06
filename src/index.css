@@ -41,6 +41,24 @@
     --sidebar-accent-foreground: 0 0% 10%;
     --sidebar-border: 40 20% 88%;
     --sidebar-ring: 40 48% 55%;
+
+    --theme-section-products-bg: #F9F7F2;
+    --theme-section-video-bg: #F9F7F2;
+    --theme-section-brand-story-bg: #FFFFFF;
+    --theme-section-ceo-bg: #F9F7F2;
+    --theme-section-testimonials-bg: #F9F7F2;
+    --theme-section-about-bg: #F9F7F2;
+    --theme-footer-bg: #451a03;
+    --theme-footer-text: #F9F7F2;
+    --theme-color-h2: #1A1A1A;
+    --theme-color-h3: #1A1A1A;
+    --theme-color-h4: #1A1A1A;
+    --theme-color-h5: #1A1A1A;
+    --theme-color-h6: #1A1A1A;
+    --theme-color-paragraph: #1A1A1A;
+    --theme-color-accent: #C5A059;
+    --theme-primary-hsl: 40 48% 55%;
+    --brand-gold: #C5A059;
   }
 
   .dark {
@@ -104,4 +122,83 @@
     opacity: 1;
     color: hsl(var(--muted-foreground) / 0.6);
   }
+}
+
+/*
+  Tipografía del tema (admin → theme_config).
+  Fuera de @layer para ganar a utilidades como text-carbon / text-muted-foreground.
+  El footer tiene sus propios colores y se excluye.
+*/
+.site-theme {
+  --brand-gold: var(--theme-color-accent, #C5A059);
+  --primary: var(--theme-primary-hsl, 40 48% 55%);
+  --ring: var(--theme-primary-hsl, 40 48% 55%);
+}
+
+.site-theme :is(h2):not(footer *) {
+  color: var(--theme-color-h2, #1A1A1A);
+}
+
+.site-theme :is(h3):not(footer *) {
+  color: var(--theme-color-h3, #1A1A1A);
+}
+
+.site-theme :is(h4):not(footer *) {
+  color: var(--theme-color-h4, #1A1A1A);
+}
+
+.site-theme :is(h5):not(footer *) {
+  color: var(--theme-color-h5, #1A1A1A);
+}
+
+.site-theme :is(h6):not(footer *) {
+  color: var(--theme-color-h6, #1A1A1A);
+}
+
+.site-theme :is(p, blockquote):not(footer *):not([class*="text-gold"]):not([class*="text-white"]):not([class*="text-primary-foreground"]) {
+  color: var(--theme-color-paragraph, #1A1A1A);
+}
+
+.site-theme p[class*="text-carbon/40"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 40%, transparent);
+}
+
+.site-theme p[class*="text-carbon/45"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 45%, transparent);
+}
+
+.site-theme p[class*="text-carbon/50"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 50%, transparent);
+}
+
+.site-theme p[class*="text-carbon/55"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 55%, transparent);
+}
+
+.site-theme p[class*="text-carbon/60"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 60%, transparent);
+}
+
+.site-theme p[class*="text-carbon/70"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 70%, transparent);
+}
+
+.site-theme p[class*="text-carbon/75"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 75%, transparent);
+}
+
+.site-theme p[class*="text-carbon/80"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 80%, transparent);
+}
+
+.site-theme p[class*="text-carbon/85"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 85%, transparent);
+}
+
+.site-theme p[class*="text-carbon/90"] {
+  color: color-mix(in srgb, var(--theme-color-paragraph, #1A1A1A) 90%, transparent);
+}
+
+.site-theme footer :is(h2, h3, h4, h5, h6, p, blockquote) {
+  color: unset;
 }

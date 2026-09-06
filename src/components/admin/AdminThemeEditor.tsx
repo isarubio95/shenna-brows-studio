@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, RotateCcw } from "lucide-react";
-import { ThemeConfig, DEFAULT_THEME } from "@/hooks/use-theme-config";
+import { ThemeConfig, DEFAULT_THEME, applyTheme } from "@/hooks/use-theme-config";
 import { HexColorField } from "@/components/admin/HexColorField";
 
 interface ColorField {
@@ -96,28 +96,7 @@ const AdminThemeEditor = () => {
     if (error) {
       toast({ title: "Error", description: "No se pudo guardar el tema.", variant: "destructive" });
     } else {
-      // Apply live
-      const root = document.documentElement;
-      const CSS_VAR_MAP: Record<string, string> = {
-        sectionProductsBg: "--theme-section-products-bg",
-        sectionVideoBg: "--theme-section-video-bg",
-        sectionBrandStoryBg: "--theme-section-brand-story-bg",
-        sectionCeoBg: "--theme-section-ceo-bg",
-        sectionTestimonialsBg: "--theme-section-testimonials-bg",
-        sectionAboutBg: "--theme-section-about-bg",
-        footerBg: "--theme-footer-bg",
-        footerText: "--theme-footer-text",
-        colorH2: "--theme-color-h2",
-        colorH3: "--theme-color-h3",
-        colorH4: "--theme-color-h4",
-        colorH5: "--theme-color-h5",
-        colorH6: "--theme-color-h6",
-        colorParagraph: "--theme-color-paragraph",
-        colorAccent: "--theme-color-accent",
-      };
-      for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
-        root.style.setProperty(cssVar, theme[key as keyof ThemeConfig]);
-      }
+      applyTheme(theme);
       setSavedTheme(theme);
       toast({ title: "Tema guardado", description: "Los cambios se han aplicado." });
     }

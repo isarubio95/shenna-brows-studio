@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { useThemeConfig } from "@/hooks/use-theme-config";
@@ -173,6 +173,13 @@ const MaintenancePage = () => {
 const AppShell = () => {
   const { pathname } = useLocation();
   const isAdminRoute = pathname.startsWith("/admin");
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("site-theme", !isAdminRoute);
+    return () => {
+      document.documentElement.classList.remove("site-theme");
+    };
+  }, [isAdminRoute]);
 
   return (
     <>

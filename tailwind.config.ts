@@ -59,7 +59,7 @@ export default {
         },
         // Brand tokens
         cream: "#F9F7F2",
-        gold: "#C5A059",
+        gold: "var(--brand-gold, #C5A059)",
         carbon: "#1A1A1A",
       },
       fontFamily: {
