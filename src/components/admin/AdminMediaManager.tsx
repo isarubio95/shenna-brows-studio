@@ -419,17 +419,18 @@ const AdminMediaManager = () => {
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
             Actualizar
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="border-red-200 text-red-600 hover:bg-red-50"
-            disabled={selectedRows.length === 0 || loading}
-            onClick={() => setSelectedDeleteOpen(true)}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Eliminar seleccionados
-            {selectedRows.length > 0 ? ` (${selectedRows.length})` : ""}
-          </Button>
+          {selectedRows.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50"
+              disabled={loading}
+              onClick={() => setSelectedDeleteOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar seleccionados ({selectedRows.length})
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"

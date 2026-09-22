@@ -125,7 +125,7 @@ describe("AdminMediaManager", () => {
     expect(
       screen.getByRole("checkbox", { name: "No se puede seleccionar pinzas-1.webp, está en uso" }),
     ).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Eliminar seleccionados" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Eliminar seleccionados/ })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar hero-old.webp" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar banner-old.webp" }));
