@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type TouchEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ProductMedia from "@/components/ProductMedia";
 import { cn } from "@/lib/utils";
@@ -49,85 +49,68 @@ const ProductImageGallery = ({
   onIndexChange,
 }: ProductImageGalleryProps) => {
   const canSwipe = images.length > 1;
-  const trackRef = useRef<HTMLDivElement>(null);
-  const selectedIndexRef = useRef(activeIndex ?? 0);
-  const swipeGestureRef = useRef({ x: 0, swiped: false });
+  const rootRef = useRef<HTMLDivElement>(null);
+  const gestureRef = useRef({ x: 0, y: 0, axis: null as "x" | "y" | null, swiped: false });
   const [selectedIndex, setSelectedIndex] = useState(activeIndex ?? 0);
+  const [dragOffset, setDragOffset] = useState<number | null>(null);
 
-  const setIndex = useCallback(
+  const goTo = useCallback(
     (index: number) => {
-      if (selectedIndexRef.current === index) return;
-      selectedIndexRef.current = index;
-      setSelectedIndex(index);
-      onIndexChange?.(index);
-    },
-    [onIndexChange],
-  );
-
-  const syncFromScroll = useCallback(() => {
-    const root = trackRef.current;
-    if (!root || images.length === 0) return;
-    const step = Math.max(1, root.clientWidth);
-    const maxPage = images.length - 1;
-    const maxScroll = root.scrollWidth - root.clientWidth;
-    if (maxScroll <= 4) {
-      setIndex(0);
-      return;
-    }
-    if (root.scrollLeft >= maxScroll - 4) {
-      setIndex(maxPage);
-      return;
-    }
-    setIndex(Math.max(0, Math.min(Math.round(root.scrollLeft / step), maxPage)));
-  }, [images.length, setIndex]);
-
-  const scrollToPage = useCallback(
-    (index: number, behavior: ScrollBehavior = "smooth") => {
-      const root = trackRef.current;
-      if (!root) return;
       const target = Math.max(0, Math.min(index, images.length - 1));
-      const loopingAround =
-        (selectedIndexRef.current === images.length - 1 && target === 0) ||
-        (selectedIndexRef.current === 0 && target === images.length - 1);
-      root.scrollTo({
-        left: target * root.clientWidth,
-        behavior: loopingAround ? "auto" : behavior,
-      });
+      setSelectedIndex(target);
+      onIndexChange?.(target);
     },
-    [images.length],
+    [images.length, onIndexChange],
   );
 
   useEffect(() => {
-    const root = trackRef.current;
-    if (!root || !canSwipe) return;
-    syncFromScroll();
-    root.addEventListener("scroll", syncFromScroll, { passive: true });
-    const ro = new ResizeObserver(syncFromScroll);
-    ro.observe(root);
-    return () => {
-      root.removeEventListener("scroll", syncFromScroll);
-      ro.disconnect();
-    };
-  }, [canSwipe, syncFromScroll]);
-
-  useEffect(() => {
-    if (!canSwipe || activeIndex == null) return;
-    if (activeIndex === selectedIndexRef.current) return;
-    scrollToPage(activeIndex);
-  }, [activeIndex, canSwipe, scrollToPage]);
+    if (activeIndex == null) return;
+    setSelectedIndex(Math.max(0, Math.min(activeIndex, images.length - 1)));
+  }, [activeIndex, images.length]);
 
   const goPrev = (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    const next = selectedIndexRef.current === 0 ? images.length - 1 : selectedIndexRef.current - 1;
-    scrollToPage(next);
+    goTo(selectedIndex === 0 ? images.length - 1 : selectedIndex - 1);
   };
 
   const goNext = (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    const next = selectedIndexRef.current === images.length - 1 ? 0 : selectedIndexRef.current + 1;
-    scrollToPage(next);
+    goTo(selectedIndex === images.length - 1 ? 0 : selectedIndex + 1);
+  };
+
+  // Transform + touch events en vez de scroll-snap nativo: WebKit en iOS (y los
+  // navegadores embebidos de Instagram) se atasca con scrollTo sobre snap-mandatory.
+  const onTouchStart = (event: TouchEvent) => {
+    const touch = event.touches[0];
+    gestureRef.current = { x: touch.clientX, y: touch.clientY, axis: null, swiped: false };
+  };
+
+  const onTouchMove = (event: TouchEvent) => {
+    const touch = event.touches[0];
+    const gesture = gestureRef.current;
+    const dx = touch.clientX - gesture.x;
+    const dy = touch.clientY - gesture.y;
+    if (!gesture.axis) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      gesture.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    }
+    if (gesture.axis !== "x") return;
+    gesture.swiped = true;
+    const atEdge =
+      (selectedIndex === 0 && dx > 0) || (selectedIndex === images.length - 1 && dx < 0);
+    setDragOffset(atEdge ? dx / 3 : dx);
+  };
+
+  const onTouchEnd = () => {
+    const offset = dragOffset;
+    setDragOffset(null);
+    if (offset == null) return;
+    const width = rootRef.current?.clientWidth ?? 0;
+    const threshold = Math.min(60, width * 0.2);
+    if (offset <= -threshold) goTo(selectedIndex + 1);
+    else if (offset >= threshold) goTo(selectedIndex - 1);
   };
 
   if (images.length === 0) return null;
@@ -154,31 +137,35 @@ const ProductImageGallery = ({
 
   return (
     <div
-      className={cn("absolute inset-0 overflow-hidden", className)}
+      ref={rootRef}
+      className={cn("absolute inset-0 touch-pan-y overflow-hidden", className)}
       data-product-gallery=""
-      onPointerDown={(event) => {
-        swipeGestureRef.current = { x: event.clientX, swiped: false };
-      }}
-      onPointerMove={(event) => {
-        if (Math.abs(event.clientX - swipeGestureRef.current.x) > 12) {
-          swipeGestureRef.current.swiped = true;
-        }
-      }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
       onClickCapture={(event) => {
-        if (!swipeGestureRef.current.swiped) return;
+        if (!gestureRef.current.swiped) return;
         event.preventDefault();
         event.stopPropagation();
-        swipeGestureRef.current.swiped = false;
+        gestureRef.current.swiped = false;
       }}
     >
       <div
-        ref={trackRef}
-        className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        className={cn(
+          "flex h-full w-full",
+          dragOffset == null && "transition-transform duration-300 ease-out",
+        )}
+        style={{ transform: `translateX(calc(${-selectedIndex * 100}% + ${dragOffset ?? 0}px))` }}
         aria-label={alt}
         aria-roledescription="carrusel"
       >
         {images.map((src, index) => (
-          <div key={`${src}-${index}`} className="h-full min-w-full shrink-0 snap-center snap-always">
+          <div
+            key={`${src}-${index}`}
+            className="h-full min-w-full shrink-0"
+            aria-hidden={index === selectedIndex ? undefined : true}
+          >
             <ProductMedia
               src={src}
               alt={index === 0 ? alt : `${alt} ${index + 1}`}
@@ -223,7 +210,7 @@ const ProductImageGallery = ({
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                scrollToPage(index);
+                goTo(index);
               }}
               className={`h-1.5 rounded-full transition-all ${
                 index === selectedIndex ? "w-5 bg-white" : "w-2 bg-white/70"
