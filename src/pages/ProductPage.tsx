@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
-import { ShoppingBag, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShoppingBag, Loader2 } from "lucide-react";
 import { getProductImageGallery, getProductPosterUrl } from "@/lib/product-images";
 import ProductMedia from "@/components/ProductMedia";
+import ProductImageGallery from "@/components/ProductImageGallery";
 import {
   ProductFeatureVideoCarousel,
   ProductFeatureVideoStack,
@@ -223,39 +224,22 @@ const ProductPage = () => {
           <AnimatedSection>
             <div>
               <div className="relative aspect-square rounded-2xl bg-white overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)] ring-1 ring-black/4">
+                <ProductImageGallery
+                  key={product.id}
+                  images={gallery}
+                  alt={product.name}
+                  playable
+                  loading="eager"
+                  fetchPriority="high"
+                  activeIndex={currentImageIndex}
+                  onIndexChange={setCurrentImageIndex}
+                  mediaClassName={outOfStock ? "grayscale-[0.35] opacity-90" : undefined}
+                />
                 <ProductSaleBadge product={product} />
                 {outOfStock && (
                   <span className="absolute right-3 top-3 z-10 rounded-full bg-carbon px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white shadow-md">
                     Sin stock
                   </span>
-                )}
-                <ProductMedia
-                  src={gallery[currentImageIndex]}
-                  alt={product.name}
-                  className={`w-full h-full object-cover ${outOfStock ? "grayscale-[0.35] opacity-90" : ""}`}
-                  playable
-                  loading="eager"
-                  fetchPriority="high"
-                />
-                {gallery.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Foto anterior"
-                      onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? gallery.length - 1 : prev - 1))}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-carbon rounded-full p-2 shadow"
-                    >
-                      <ChevronLeft size={20} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Siguiente foto"
-                      onClick={() => setCurrentImageIndex((prev) => (prev === gallery.length - 1 ? 0 : prev + 1))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-carbon rounded-full p-2 shadow"
-                    >
-                      <ChevronRight size={20} />
-                    </button>
-                  </>
                 )}
               </div>
               {gallery.length > 1 && (

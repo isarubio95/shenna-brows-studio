@@ -4,6 +4,7 @@ import { Film, ImageIcon, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -75,6 +76,11 @@ const BUCKET_LABELS: Record<string, string> = {
   "product-images": "Productos",
   "campaign-images": "Campaña",
 };
+
+const rowKey = (row: { bucket_id: string; name: string }) => `${row.bucket_id}/${row.name}`;
+
+const checkboxClass =
+  "border-gold/40 data-[state=checked]:bg-gold data-[state=checked]:border-gold data-[state=checked]:text-white data-[state=indeterminate]:bg-gold data-[state=indeterminate]:border-gold data-[state=indeterminate]:text-white";
 
 const filterBtnClass = (active: boolean) =>
   cn(
@@ -149,6 +155,8 @@ const AdminMediaManager = () => {
   const [preview, setPreview] = useState<MediaRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MediaRow | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [selectedDeleteOpen, setSelectedDeleteOpen] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
@@ -178,7 +186,14 @@ const AdminMediaManager = () => {
       siteContent: contentRes.data ?? [],
     });
     setUsageLabels(usedStorageLabelsByKey(refs));
-    setObjects(objectsRes.data ?? []);
+    const nextObjects = objectsRes.data ?? [];
+    setObjects(nextObjects);
+    setSelectedKeys((prev) => {
+      if (prev.size === 0) return prev;
+      const valid = new Set(nextObjects.map((object) => rowKey(object)));
+      const next = new Set([...prev].filter((key) => valid.has(key)));
+      return next.size === prev.size ? prev : next;
+    });
     setLoading(false);
   }, [toast]);
 
@@ -253,6 +268,49 @@ const AdminMediaManager = () => {
     };
   }, [rows]);
 
+  const selectableFiltered = useMemo(
+    () => filtered.filter((row) => !row.inUse),
+    [filtered],
+  );
+
+  const selectedRows = useMemo(
+    () => rows.filter((row) => selectedKeys.has(rowKey(row)) && !row.inUse),
+    [rows, selectedKeys],
+  );
+
+  const selectedBytes = useMemo(
+    () => selectedRows.reduce((sum, row) => sum + row.size_bytes, 0),
+    [selectedRows],
+  );
+
+  const allVisibleSelected =
+    selectableFiltered.length > 0 &&
+    selectableFiltered.every((row) => selectedKeys.has(rowKey(row)));
+  const someVisibleSelected = selectableFiltered.some((row) => selectedKeys.has(rowKey(row)));
+
+  const toggleSelected = (row: MediaRow, checked: boolean) => {
+    if (row.inUse) return;
+    const key = rowKey(row);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = (checked: boolean) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const row of selectableFiltered) {
+        const key = rowKey(row);
+        if (checked) next.add(key);
+        else next.delete(key);
+      }
+      return next;
+    });
+  };
+
   const pathsToDeleteFor = useCallback(
     (row: MediaRow): { bucket_id: string; name: string }[] => {
       const items = [{ bucket_id: row.bucket_id, name: row.name }];
@@ -284,6 +342,11 @@ const AdminMediaManager = () => {
       const items = pathsToDeleteFor(deleteTarget);
       await removePathsByBucket(items);
       setDeleteTarget(null);
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(rowKey(deleteTarget));
+        return next;
+      });
       await afterDelete(items.length);
     } catch (error) {
       toast({
@@ -302,7 +365,28 @@ const AdminMediaManager = () => {
     try {
       await removePathsByBucket(totals.unusedRows);
       setBulkDeleteOpen(false);
+      setSelectedKeys(new Set());
       await afterDelete(totals.unusedRows.length);
+    } catch (error) {
+      toast({
+        title: "No se pudieron eliminar los archivos",
+        description: error instanceof Error ? error.message : "Error desconocido",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const confirmSelectedDelete = async () => {
+    if (selectedRows.length === 0) return;
+    setDeleting(true);
+    try {
+      const items = selectedRows.flatMap((row) => pathsToDeleteFor(row));
+      await removePathsByBucket(items);
+      setSelectedDeleteOpen(false);
+      setSelectedKeys(new Set());
+      await afterDelete(selectedRows.length);
     } catch (error) {
       toast({
         title: "No se pudieron eliminar los archivos",
@@ -339,6 +423,17 @@ const AdminMediaManager = () => {
             type="button"
             variant="outline"
             className="border-red-200 text-red-600 hover:bg-red-50"
+            disabled={selectedRows.length === 0 || loading}
+            onClick={() => setSelectedDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Eliminar seleccionados
+            {selectedRows.length > 0 ? ` (${selectedRows.length})` : ""}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-red-200 text-red-600 hover:bg-red-50"
             disabled={totals.unused === 0 || loading}
             onClick={() => setBulkDeleteOpen(true)}
           >
@@ -353,15 +448,15 @@ const AdminMediaManager = () => {
         sin usar · {formatStorageBytes(totals.bytes)}
       </p>
 
-      <div className="flex flex-col gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-4">
         <Input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar por nombre de archivo…"
-          className="max-w-md border-gold/20 bg-white"
+          placeholder="Buscar archivo…"
+          className="w-full sm:w-52 lg:w-64 border-gold/20 bg-white"
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-carbon/40 mr-1">Bucket</span>
+        <div className="flex flex-nowrap items-center gap-1.5 shrink-0">
+          <span className="text-xs text-carbon/40 mr-0.5">Bucket</span>
           {(
             [
               ["all", "Todos"],
@@ -379,8 +474,9 @@ const AdminMediaManager = () => {
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-carbon/40 mr-1">Estado</span>
+        <div className="hidden h-4 w-px bg-gold/20 sm:block" aria-hidden />
+        <div className="flex flex-nowrap items-center gap-1.5 shrink-0">
+          <span className="text-xs text-carbon/40 mr-0.5">Estado</span>
           {(
             [
               ["all", "Todos"],
@@ -397,21 +493,21 @@ const AdminMediaManager = () => {
               {label}
             </button>
           ))}
-          <Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
-            <SelectTrigger className="ml-auto w-[220px] border-gold/20 bg-white">
-              <SelectValue placeholder="Ordenar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="date_desc">Fecha de subida (reciente)</SelectItem>
-              <SelectItem value="date_asc">Fecha de subida (antigua)</SelectItem>
-              <SelectItem value="size_desc">Tamaño (mayor)</SelectItem>
-              <SelectItem value="size_asc">Tamaño (menor)</SelectItem>
-              <SelectItem value="name_asc">Nombre</SelectItem>
-              <SelectItem value="in_use_first">En uso primero</SelectItem>
-              <SelectItem value="unused_first">Sin usar primero</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
+        <Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
+          <SelectTrigger className="w-[200px] sm:ml-auto border-gold/20 bg-white">
+            <SelectValue placeholder="Ordenar" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="date_desc">Fecha de subida (reciente)</SelectItem>
+            <SelectItem value="date_asc">Fecha de subida (antigua)</SelectItem>
+            <SelectItem value="size_desc">Tamaño (mayor)</SelectItem>
+            <SelectItem value="size_asc">Tamaño (menor)</SelectItem>
+            <SelectItem value="name_asc">Nombre</SelectItem>
+            <SelectItem value="in_use_first">En uso primero</SelectItem>
+            <SelectItem value="unused_first">Sin usar primero</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
@@ -428,6 +524,17 @@ const AdminMediaManager = () => {
             <Table>
               <TableHeader>
                 <TableRow className="border-b border-gold/10">
+                  <TableHead className="text-carbon/60 w-10 pr-0">
+                    <Checkbox
+                      className={checkboxClass}
+                      checked={
+                        allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false
+                      }
+                      disabled={selectableFiltered.length === 0}
+                      onCheckedChange={(value) => toggleSelectAllVisible(value === true)}
+                      aria-label="Seleccionar todos los archivos sin usar visibles"
+                    />
+                  </TableHead>
                   <TableHead className="text-carbon/60 w-16">Vista</TableHead>
                   <TableHead className="text-carbon/60">Archivo</TableHead>
                   <TableHead className="text-carbon/60">Bucket</TableHead>
@@ -441,9 +548,25 @@ const AdminMediaManager = () => {
               <TableBody>
                 {filtered.map((row) => (
                   <TableRow
-                    key={`${row.bucket_id}/${row.name}`}
-                    className="border-b border-gold/5"
+                    key={rowKey(row)}
+                    className={cn(
+                      "border-b border-gold/5",
+                      selectedKeys.has(rowKey(row)) && "bg-gold/5",
+                    )}
                   >
+                    <TableCell className="pr-0">
+                      <Checkbox
+                        className={checkboxClass}
+                        checked={selectedKeys.has(rowKey(row))}
+                        disabled={row.inUse}
+                        onCheckedChange={(value) => toggleSelected(row, value === true)}
+                        aria-label={
+                          row.inUse
+                            ? `No se puede seleccionar ${row.name}, está en uso`
+                            : `Seleccionar ${row.name}`
+                        }
+                      />
+                    </TableCell>
                     <TableCell>
                       <MediaThumb
                         url={row.publicUrl}
@@ -549,6 +672,33 @@ const AdminMediaManager = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? "Eliminando…" : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={selectedDeleteOpen} onOpenChange={setSelectedDeleteOpen}>
+        <AlertDialogContent className="bg-cream border-gold/20">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-playfair text-carbon">
+              ¿Eliminar los archivos seleccionados?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-carbon/60">
+              Se borrarán {selectedRows.length} archivo{selectedRows.length === 1 ? "" : "s"} (
+              {formatStorageBytes(selectedBytes)}). Los que están en uso no se pueden seleccionar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-gold/20">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmSelectedDelete();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Eliminando…" : "Eliminar seleccionados"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

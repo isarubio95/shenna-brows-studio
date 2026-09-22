@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ShoppingCart, Plus, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShoppingCart, Plus, Sparkles } from "lucide-react";
 import Autoplay from "embla-carousel-autoplay";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { getProductImageGallery, getProductPosterUrl } from "@/lib/product-images";
-import ProductMedia from "@/components/ProductMedia";
+import ProductImageGallery, {
+  allowEmblaDragOutsideProductGallery,
+} from "@/components/ProductImageGallery";
 import { useCart } from "@/context/CartContext";
 import AnimatedSection from "@/components/AnimatedSection";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
@@ -19,6 +20,7 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEffectivePrice } from "@/lib/product-pricing";
@@ -71,20 +73,7 @@ interface ProductCardProps {
 
 const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisabled, featured }: ProductCardProps) => {
   const gallery = getProductImageGallery(product.image_url, product.slug);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const outOfStock = Number(product.stock ?? 0) <= 0;
-
-  const goPrevImage = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setCurrentImageIndex((prev) => (prev === 0 ? gallery.length - 1 : prev - 1));
-  };
-
-  const goNextImage = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setCurrentImageIndex((prev) => (prev === gallery.length - 1 ? 0 : prev + 1));
-  };
 
   return (
     <AnimatedSection key={product.id} delay={delay} className="h-full">
@@ -108,7 +97,16 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
           }
         }}
       >
-        <Link to={`/${product.slug}`} className="relative block aspect-square bg-muted overflow-hidden">
+        <div className="relative aspect-square bg-muted overflow-hidden">
+          <ProductImageGallery
+            images={gallery}
+            alt={`${product.name} - Shenna Brows`}
+            compact
+            showDots
+            mediaClassName={`transition-transform duration-700 ${
+              outOfStock ? "grayscale-[0.4] opacity-90" : "hover:scale-105"
+            }`}
+          />
           <ProductSaleBadge
             product={product}
             className={featured ? "left-3 top-12" : undefined}
@@ -124,51 +122,7 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
               Sin stock
             </span>
           )}
-          <ProductMedia
-            src={gallery[currentImageIndex]}
-            alt={`${product.name} - Shenna Brows`}
-            className={`w-full h-full object-cover transition-transform duration-700 ${
-              outOfStock ? "grayscale-[0.4] opacity-90" : "hover:scale-105"
-            }`}
-          />
-          {gallery.length > 1 && (
-            <>
-              <button
-                type="button"
-                aria-label="Foto anterior"
-                onClick={goPrevImage}
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-carbon rounded-full p-1.5 shadow"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                type="button"
-                aria-label="Siguiente foto"
-                onClick={goNextImage}
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-carbon rounded-full p-1.5 shadow"
-              >
-                <ChevronRight size={16} />
-              </button>
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                {gallery.map((_, index) => (
-                  <button
-                    key={`${product.id}-dot-${index}`}
-                    type="button"
-                    aria-label={`Ver foto ${index + 1}`}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setCurrentImageIndex(index);
-                    }}
-                    className={`h-1.5 rounded-full transition-all ${
-                      index === currentImageIndex ? "w-5 bg-white" : "w-2 bg-white/70"
-                    }`}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </Link>
+        </div>
 
         <div className="p-6 flex-1 flex flex-col justify-between">
           <div>
@@ -231,6 +185,7 @@ const Tienda = () => {
   const { addItem, isAddToCartDisabled } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [productsCarouselApi, setProductsCarouselApi] = useState<CarouselApi>();
   const { data: siteContent } = useSiteContent(["tienda_hero"]);
   const tiendaHero = useMemo(
     () => parseTiendaHeroConfig(siteContent.tienda_hero?.content),
@@ -342,8 +297,18 @@ const Tienda = () => {
 
         <div className="relative md:px-12 lg:px-16">
           <Carousel
+            setApi={setProductsCarouselApi}
             plugins={loading ? undefined : [productsAutoplay]}
-            opts={{ align: "start", loop: false, containScroll: "trimSnaps" }}
+            opts={{
+              align: "start",
+              loop: false,
+              containScroll: "trimSnaps",
+              watchDrag: allowEmblaDragOutsideProductGallery,
+            }}
+            onPointerDownCapture={() => {
+              const autoplay = productsCarouselApi?.plugins()?.autoplay as { stop?: () => void } | undefined;
+              autoplay?.stop();
+            }}
             className="w-full"
           >
             <CarouselContent className="-ml-4">

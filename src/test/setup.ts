@@ -29,3 +29,21 @@ if (!("ResizeObserver" in window)) {
   });
   globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 }
+
+// Embla también observa visibilidad de slides.
+class IntersectionObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+
+if (!("IntersectionObserver" in window)) {
+  Object.defineProperty(window, "IntersectionObserver", {
+    writable: true,
+    value: IntersectionObserverStub,
+  });
+  globalThis.IntersectionObserver = IntersectionObserverStub as unknown as typeof IntersectionObserver;
+}

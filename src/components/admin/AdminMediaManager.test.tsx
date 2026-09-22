@@ -7,12 +7,13 @@ const BASE = "https://vanhsuisvxvclxdgutaw.supabase.co/storage/v1/object/public"
 
 const rpc = vi.fn();
 const from = vi.fn();
+const remove = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: (...args: unknown[]) => rpc(...args),
     from: (...args: unknown[]) => from(...args),
-    storage: { from: () => ({ remove: vi.fn() }) },
+    storage: { from: () => ({ remove: (...args: unknown[]) => remove(...args) }) },
   },
 }));
 
@@ -40,6 +41,8 @@ describe("AdminMediaManager", () => {
   beforeEach(() => {
     rpc.mockReset();
     from.mockReset();
+    remove.mockReset();
+    remove.mockResolvedValue({ error: null });
     rpc.mockResolvedValue({
       data: [
         {
@@ -56,6 +59,14 @@ describe("AdminMediaManager", () => {
           created_at: "2026-09-20T10:00:00.000Z",
           updated_at: "2026-09-20T10:00:00.000Z",
           size_bytes: 9000,
+          mime_type: "image/webp",
+        },
+        {
+          bucket_id: "campaign-images",
+          name: "banner-old.webp",
+          created_at: "2026-09-19T10:00:00.000Z",
+          updated_at: "2026-09-19T10:00:00.000Z",
+          size_bytes: 4000,
           mime_type: "image/webp",
         },
       ],
@@ -101,6 +112,35 @@ describe("AdminMediaManager", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Sin usar" }));
     expect(screen.getByText("hero-old.webp")).toBeInTheDocument();
+    expect(screen.getByText("banner-old.webp")).toBeInTheDocument();
     expect(screen.queryByText("pinzas-1.webp")).not.toBeInTheDocument();
+  });
+
+  it("permite seleccionar varios archivos sin usar y eliminarlos juntos", async () => {
+    renderMedia();
+    await waitFor(() => {
+      expect(screen.getByText("banner-old.webp")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("checkbox", { name: "No se puede seleccionar pinzas-1.webp, está en uso" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Eliminar seleccionados" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar hero-old.webp" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar banner-old.webp" }));
+
+    const toolbarDelete = screen.getByRole("button", { name: "Eliminar seleccionados (2)" });
+    expect(toolbarDelete).toBeEnabled();
+    fireEvent.click(toolbarDelete);
+
+    expect(screen.getByText("¿Eliminar los archivos seleccionados?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar seleccionados" }));
+
+    await waitFor(() => {
+      expect(remove).toHaveBeenCalled();
+    });
+    const deletedNames = remove.mock.calls.flatMap((call) => call[0] as string[]);
+    expect(deletedNames).toEqual(expect.arrayContaining(["hero-old.webp", "banner-old.webp"]));
   });
 });
