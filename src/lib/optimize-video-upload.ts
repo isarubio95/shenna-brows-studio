@@ -16,9 +16,6 @@ const MAX_TRANSCODE_EDGE = 3840;
 /** El re-encode va a velocidad de reproducción: por encima de esto la espera es inasumible. */
 export const MAX_TRANSCODE_SECONDS = 180;
 
-/** Tamaño máximo del archivo de origen que aceptamos subir. */
-export const VIDEO_SOURCE_MAX_BYTES = 200 * 1024 * 1024;
-
 export interface OptimizedVideo {
   blob: Blob;
   extension: "mp4" | "webm" | "mov";
@@ -498,12 +495,6 @@ export async function optimizeVideoForUpload(
   options: OptimizeVideoOptions = {},
 ): Promise<OptimizedVideo> {
   const file = typeof source === "string" ? null : source;
-  if (file && file.size > VIDEO_SOURCE_MAX_BYTES) {
-    throw new Error(
-      `El archivo pesa ${Math.round(file.size / (1024 * 1024))} MB y el máximo es ${Math.round(VIDEO_SOURCE_MAX_BYTES / (1024 * 1024))} MB.`,
-    );
-  }
-
   const crop = options.crop ?? null;
   const probe = await probeVideo(source);
 
