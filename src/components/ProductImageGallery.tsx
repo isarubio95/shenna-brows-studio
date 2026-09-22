@@ -163,7 +163,7 @@ const ProductImageGallery = ({
         {images.map((src, index) => (
           <div
             key={`${src}-${index}`}
-            className="h-full min-w-full shrink-0"
+            className="h-full w-full min-w-0 shrink-0 grow-0 basis-full overflow-hidden"
             aria-hidden={index === selectedIndex ? undefined : true}
           >
             <ProductMedia
