@@ -18,6 +18,7 @@ import {
 } from "@/lib/campaign-content";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
 import { cn } from "@/lib/utils";
 
 export type CampaignPreviewDevice = "desktop" | "mobile";
@@ -36,6 +37,16 @@ export const CAMPAIGN_PREVIEW_VIEWPORT: Record<
 };
 
 const CAMPAIGN_PREVIEW_MAX_HEIGHT = 520;
+
+/** El fondo de cada dispositivo: el suyo, o el del otro si no se subió. */
+function campaignBannerSrc(
+  config: Pick<CampaignConfig, "desktopImageUrl" | "mobileImageUrl">,
+  device: CampaignPreviewDevice,
+): string {
+  const mobile = config.mobileImageUrl.trim() || config.desktopImageUrl.trim();
+  const desktop = config.desktopImageUrl.trim() || mobile;
+  return device === "mobile" ? mobile : desktop;
+}
 
 interface CampaignBannerProps {
   config: CampaignConfig;
@@ -74,6 +85,10 @@ const CampaignBanner = ({
   const desktopSrc = config.desktopImageUrl.trim() || mobileSrc;
   const previewSrc = previewMobile ? mobileSrc : desktopSrc;
   const hasMedia = Boolean(previewSrc.trim());
+  // El vídeo no pasa por el recortador del admin: manda su propia proporción,
+  // así se ve entero en lugar de recortado por arriba y por abajo.
+  const activeSrc = preview ? previewSrc : isMobileViewport ? mobileSrc : desktopSrc;
+  const videoAspect = useVideoAspectRatio(activeSrc);
   const subParts = splitHeadlineByAccent(config.subheadline, config.subheadlineAccent);
   const canDrag = Boolean(preview && onTextPositionChange);
 
@@ -217,9 +232,12 @@ const CampaignBanner = ({
         "relative w-full overflow-hidden",
         preview
           ? "h-full min-h-full"
-          : "aspect-4/5 sm:aspect-video md:aspect-21/9 max-h-180",
+          : videoAspect
+            ? ""
+            : "aspect-4/5 sm:aspect-video md:aspect-21/9 max-h-180",
         className,
       )}
+      style={!preview && videoAspect ? { aspectRatio: String(videoAspect) } : undefined}
       aria-label={config.alt}
     >
       {hasMedia ? (
@@ -276,14 +294,21 @@ const CampaignBanner = ({
 /** Escala la campaña al viewport del dispositivo simulado dentro del admin. */
 export function CampaignPreviewFrame({
   device,
+  config,
   children,
 }: {
   device: CampaignPreviewDevice;
+  /** Con vídeo de fondo el alto del marco es el del archivo, no el del recorte. */
+  config?: Pick<CampaignConfig, "desktopImageUrl" | "mobileImageUrl">;
   children: ReactNode;
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  const viewport = CAMPAIGN_PREVIEW_VIEWPORT[device];
+  const videoAspect = useVideoAspectRatio(config ? campaignBannerSrc(config, device) : undefined);
+  const base = CAMPAIGN_PREVIEW_VIEWPORT[device];
+  const viewport = videoAspect
+    ? { width: base.width, height: Math.round(base.width / videoAspect) }
+    : base;
 
   useEffect(() => {
     const el = outerRef.current;

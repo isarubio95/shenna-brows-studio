@@ -538,10 +538,22 @@ export async function optimizeVideoForUpload(
 
   const needsResize = probe.width > MAX_WIDTH[variant] || probe.height > MAX_HEIGHT[variant];
   const needsShrink = file !== null && file.size > passthroughSizeLimit(probe.duration, variant);
+  /**
+   * Ningún navegador declara soportar el contenedor QuickTime, y el iPhone graba
+   * en HEVC por defecto: un .mov puede subirse bien desde un equipo que sabe
+   * decodificarlo y luego no verse en el del visitante. Al bucket sólo MP4 o WebM.
+   */
+  const unsafeContainer = file !== null && sourceExtension(file) === "mov";
   const mustTranscode =
-    Boolean(options.force) || crop !== null || needsResize || needsShrink || file === null;
+    Boolean(options.force) || crop !== null || needsResize || needsShrink || unsafeContainer || file === null;
 
   if (!mustTranscode) return passthrough();
+
+  if (unsafeContainer && probe.duration > MAX_TRANSCODE_SECONDS) {
+    throw new Error(
+      `Este .mov dura ${Math.round(probe.duration)}s y por encima de ${MAX_TRANSCODE_SECONDS}s no se puede convertir. Pásalo a MP4 y vuelve a subirlo.`,
+    );
+  }
 
   if (!canTranscodeVideo()) {
     // Sin soporte de re-encode preferimos subir el original a bloquear al admin.

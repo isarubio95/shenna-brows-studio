@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import AnimatedSection from "@/components/AnimatedSection";
 import InstagramPostEmbed from "@/components/InstagramPostEmbed";
 import { useSiteContent } from "@/hooks/use-site-content";
+import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
 import { Loader2 } from "lucide-react";
 
 const ABOUT_KEYS = ["about_section_1", "about_section_2", "about_section_3", "about_section_4"];
 
 const VIDEO_POSTER_TIME = 2;
+
+const ABOUT_VIDEO_SRC = "/video-presentacion2-vertical.mp4";
 
 const FALLBACK_SECTIONS = [
   { title: "Donde la precisión se convierte en identidad", text: "Shenna BROWS nace de una obsesión: hacer las cejas bien. Después de años trabajando con manos reales, entendí que la herramienta marca la diferencia. No creemos en el exceso, creemos en la exactitud." },
@@ -18,6 +21,8 @@ const FALLBACK_SECTIONS = [
 const About = () => {
   const { data: siteContent, loading } = useSiteContent(ABOUT_KEYS);
   const [videoPoster, setVideoPoster] = useState<string | null>(null);
+  // El hueco lo marca el propio archivo, para no recortarlo por arriba y por abajo.
+  const videoAspect = useVideoAspectRatio(ABOUT_VIDEO_SRC);
 
   const sections = ABOUT_KEYS.map((key, i) => ({
     title: siteContent[key]?.title || FALLBACK_SECTIONS[i].title,
@@ -48,7 +53,7 @@ const About = () => {
     };
     video.addEventListener("loadeddata", onLoadedData);
     video.addEventListener("seeked", onSeeked);
-    video.src = "/video-presentacion2-vertical.mp4";
+    video.src = ABOUT_VIDEO_SRC;
     video.load();
     return () => {
       video.removeEventListener("loadeddata", onLoadedData);
@@ -64,8 +69,9 @@ const About = () => {
           <div className="w-full lg:w-[34%] lg:shrink-0 order-1">
             <div className="max-w-[320px] sm:max-w-[360px] mx-auto lg:mx-0 rounded-2xl overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-gold/15 lg:sticky lg:top-28">
               <video
-                className="w-full aspect-9/16 object-cover"
-                src="/video-presentacion2-vertical.mp4"
+                className={videoAspect ? "w-full object-cover" : "w-full aspect-9/16 object-cover"}
+                style={videoAspect ? { aspectRatio: String(videoAspect) } : undefined}
+                src={ABOUT_VIDEO_SRC}
                 poster={videoPoster ?? undefined}
                 autoPlay
                 muted

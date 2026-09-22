@@ -3947,7 +3947,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                       </div>
                     </div>
                     <div className="-mx-6 border-y border-carbon/10 overflow-hidden">
-                      <CampaignPreviewFrame device={campaignPreviewDevice}>
+                      <CampaignPreviewFrame
+                        device={campaignPreviewDevice}
+                        config={campaignPreviewConfig}
+                      >
                         <CampaignBanner
                           config={campaignPreviewConfig}
                           preview
@@ -3975,9 +3978,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                       {campaignPreviewDevice === "mobile"
                         ? `móvil (${CAMPAIGN_PREVIEW_VIEWPORT.mobile.width}px, ratio 4:5)`
                         : `escritorio (${CAMPAIGN_PREVIEW_VIEWPORT.desktop.width}px, ratio 21:9 · máx. 720px de alto)`}
-                      : misma tipografía, imagen y proporción que en la web. Las bandas laterales
-                      marcan el ancho real del dispositivo; la posición del texto se guarda aparte
-                      para escritorio y para móvil.
+                      : misma tipografía, imagen y proporción que en la web. Con vídeo de fondo el
+                      banner toma la proporción del propio archivo, para que se vea entero y sin
+                      recortes. Las bandas laterales marcan el ancho real del dispositivo; la
+                      posición del texto se guarda aparte para escritorio y para móvil.
                     </p>
                   </div>
                 </>
@@ -4824,6 +4828,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       aspect={
         tiendaHeroCropVariant === "desktop" ? TIENDA_HERO_DESKTOP_ASPECT : TIENDA_HERO_MOBILE_ASPECT
       }
+      videoFullDefault
       maxOutputSize={tiendaHeroCropVariant === "desktop" ? 1920 : 1080}
       title={
         tiendaHeroCropVariant === "desktop"
@@ -4845,6 +4850,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       progress={cropProgress}
       onOpenChange={handleCampaignCropOpenChange}
       aspect={campaignCropVariant === "desktop" ? CAMPAIGN_DESKTOP_ASPECT : CAMPAIGN_MOBILE_ASPECT}
+      videoFullDefault
       maxOutputSize={campaignCropVariant === "desktop" ? 1920 : 1080}
       title={
         campaignCropVariant === "desktop"
@@ -4887,6 +4893,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       progress={cropProgress}
       onOpenChange={setVideoCropOpen}
       aspect={9 / 16}
+      videoFullDefault
       title="Recortar · Vídeo del inicio"
       onCropped={async ({ crop }) => {
         await uploadIndexVideo(videoDraft.videoUrl, crop);

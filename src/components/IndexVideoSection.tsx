@@ -1,5 +1,6 @@
 import AnimatedSection from "@/components/AnimatedSection";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
+import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
 import {
   resolveIndexVideoPosterSrc,
   resolveIndexVideoUrl,
@@ -15,6 +16,8 @@ interface IndexVideoSectionProps {
 const IndexVideoSection = ({ config, preview = false }: IndexVideoSectionProps) => {
   const videoSrc = resolveIndexVideoUrl(config.videoUrl);
   const posterSrc = resolveIndexVideoPosterSrc(config);
+  // El archivo subido manda: si no es 9/16 se enseña entero, sin recortarlo.
+  const videoAspect = useVideoAspectRatio(videoSrc);
   const title = config.title.trim();
   const titleParts = splitHeadlineByAccent(title, config.accent);
 
@@ -36,7 +39,8 @@ const IndexVideoSection = ({ config, preview = false }: IndexVideoSectionProps) 
     <div className="mx-auto w-full max-w-80 sm:max-w-90 md:max-w-100">
       <div className="rounded-2xl overflow-hidden border border-gold/15 shadow-[0_12px_40px_rgba(0,0,0,0.12)] bg-carbon">
         <video
-          className="w-full aspect-9/16 object-cover"
+          className={videoAspect ? "w-full object-cover" : "w-full aspect-9/16 object-cover"}
+          style={videoAspect ? { aspectRatio: String(videoAspect) } : undefined}
           src={videoSrc}
           poster={posterSrc}
           controls

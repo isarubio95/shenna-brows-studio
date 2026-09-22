@@ -5,6 +5,7 @@ import CampaignBanner from "./CampaignBanner";
 import HeroSection from "./HeroSection";
 import { parseCampaignConfig } from "@/lib/campaign-content";
 import { parseHeroConfig } from "@/lib/hero-content";
+import { rememberVideoAspectRatio } from "@/lib/video-aspect-ratio";
 
 beforeAll(() => {
   class IntersectionObserverMock {
@@ -95,5 +96,46 @@ describe("hero and campaign video backgrounds", () => {
     );
     const button = container.querySelector('button[aria-pressed="false"]');
     expect(button?.className ?? "hidden").toContain("hidden");
+  });
+});
+
+describe("proporción del vídeo de fondo", () => {
+  it("da a la campaña la proporción del archivo en vez de recortarlo", () => {
+    const src = "https://cdn.example.com/campaign-vertical.mp4";
+    // 1080x1920: más estrecho que el hueco 4:5 del móvil, que lo recortaría.
+    rememberVideoAspectRatio(src, 1080, 1920);
+    const config = parseCampaignConfig(JSON.stringify({ desktopImageUrl: src }));
+    const { container } = render(
+      <MemoryRouter>
+        <CampaignBanner config={config} />
+      </MemoryRouter>,
+    );
+    const section = container.querySelector("section");
+    expect(section).toHaveStyle({ aspectRatio: "0.5625" });
+    expect(section?.className).not.toContain("aspect-4/5");
+  });
+
+  it("mantiene el hueco fijo mientras no se conoce la proporción", () => {
+    const config = parseCampaignConfig(
+      JSON.stringify({ desktopImageUrl: "https://cdn.example.com/sin-medir.mp4" }),
+    );
+    const { container } = render(
+      <MemoryRouter>
+        <CampaignBanner config={config} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector("section")?.className).toContain("aspect-4/5");
+  });
+
+  it("no toca el hueco de las fotos", () => {
+    const config = parseCampaignConfig(
+      JSON.stringify({ desktopImageUrl: "https://cdn.example.com/campaign.jpg" }),
+    );
+    const { container } = render(
+      <MemoryRouter>
+        <CampaignBanner config={config} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector("section")?.className).toContain("aspect-4/5");
   });
 });

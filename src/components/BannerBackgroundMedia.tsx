@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { backgroundSoundProps } from "@/components/BackgroundSoundButton";
 import { isVideoMediaUrl } from "@/lib/media-url";
+import { rememberVideoAspectRatio } from "@/lib/video-aspect-ratio";
 import { cn } from "@/lib/utils";
 
 const MEDIA_CLASS = "absolute inset-0 z-0 h-full w-full object-cover pointer-events-none";
@@ -59,6 +60,10 @@ function BackgroundVideo({
       ref={ref}
       src={src}
       className={cn(MEDIA_CLASS, className)}
+      onLoadedMetadata={(e) => {
+        const el = e.currentTarget;
+        rememberVideoAspectRatio(src, el.videoWidth, el.videoHeight);
+      }}
       {...backgroundSoundProps}
       autoPlay
       muted

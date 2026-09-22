@@ -23,6 +23,7 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { isVideoMediaUrl, posterUrlForVideoUrl } from "@/lib/media-url";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
 import { cn } from "@/lib/utils";
 import {
   clampTiendaHeroContentPos,
@@ -102,6 +103,10 @@ const TiendaHero = ({
   const desktopSrc = resolveTiendaHeroImageUrl(config.desktopImageUrl || config.mobileImageUrl, "desktop");
   const previewSrc = useMobileLayout ? mobileSrc : desktopSrc;
   const hasImage = Boolean(preview ? previewSrc : desktopSrc);
+  // Las fotos se recortan en el admin; los vídeos se suben tal cual, así que el
+  // hueco lo marca la proporción del archivo y no se recortan al reproducirlos.
+  const mobileVideoAspect = useVideoAspectRatio(mobileSrc);
+  const desktopVideoAspect = useVideoAspectRatio(desktopSrc);
 
   const contentPosX = useMobileLayout ? config.contentPosMobileX : config.contentPosX;
   const contentPosY = useMobileLayout ? config.contentPosMobileY : config.contentPosY;
@@ -261,8 +266,14 @@ const TiendaHero = ({
     />
   );
 
-  const renderMobileImage = (src: string) => (
-    <div className="relative aspect-[9/16] w-full overflow-hidden bg-[#f8f5f2] md:hidden">
+  const renderMobileImage = (src: string, videoAspect?: number) => (
+    <div
+      className={cn(
+        "relative w-full overflow-hidden bg-[#f8f5f2] md:hidden",
+        videoAspect ? "" : "aspect-[9/16]",
+      )}
+      style={videoAspect ? { aspectRatio: String(videoAspect) } : undefined}
+    >
       {isVideoMediaUrl(src) ? (
         <>
           {renderBackgroundVideo(src, "absolute inset-0 h-full w-full object-cover")}
@@ -281,11 +292,17 @@ const TiendaHero = ({
     </div>
   );
 
-  const renderDesktopImage = (src: string) =>
+  const renderDesktopImage = (src: string, videoAspect?: number) =>
     isVideoMediaUrl(src) ? (
-      // Sin dimensiones intrínsecas conocidas fijamos la proporción del banner
-      // (la misma a la que recorta el admin) para no provocar salto de layout.
-      <div className="relative hidden aspect-[1600/961] w-full overflow-hidden md:block">
+      // Mientras no se leen las dimensiones del archivo fijamos la proporción del
+      // banner (la misma a la que recorta el admin) para no provocar salto de layout.
+      <div
+        className={cn(
+          "relative hidden w-full overflow-hidden md:block",
+          videoAspect ? "" : "aspect-[1600/961]",
+        )}
+        style={videoAspect ? { aspectRatio: String(videoAspect) } : undefined}
+      >
         {renderBackgroundVideo(
           src,
           "absolute inset-0 h-full w-full origin-top scale-[1.02] object-cover",
@@ -305,12 +322,15 @@ const TiendaHero = ({
       </div>
     );
 
+  const previewVideoAspect = useMobileLayout ? mobileVideoAspect : desktopVideoAspect;
   const imageElement = preview ? (
-    useMobileLayout ? renderMobileImage(previewSrc) : renderDesktopImage(previewSrc)
+    useMobileLayout
+      ? renderMobileImage(previewSrc, previewVideoAspect)
+      : renderDesktopImage(previewSrc, previewVideoAspect)
   ) : (
     <>
-      {renderMobileImage(mobileSrc)}
-      {renderDesktopImage(desktopSrc)}
+      {renderMobileImage(mobileSrc, mobileVideoAspect)}
+      {renderDesktopImage(desktopSrc, desktopVideoAspect)}
     </>
   );
 
