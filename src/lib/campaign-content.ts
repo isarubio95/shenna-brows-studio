@@ -17,12 +17,6 @@ export interface CampaignConfig {
   ctaBg: string;
   ctaTextColor: string;
   alt: string;
-  /** Posición del bloque de texto en escritorio (0–100 %). */
-  textPosX: number;
-  textPosY: number;
-  /** Posición del bloque de texto en móvil (0–100 %). */
-  textPosMobileX: number;
-  textPosMobileY: number;
 }
 
 export const DEFAULT_CAMPAIGN: CampaignConfig = {
@@ -40,10 +34,6 @@ export const DEFAULT_CAMPAIGN: CampaignConfig = {
   ctaBg: "#E9808E",
   ctaTextColor: "#FFFFFF",
   alt: "Campaña publicitaria",
-  textPosX: 6,
-  textPosY: 32,
-  textPosMobileX: 6,
-  textPosMobileY: 32,
 };
 
 const isHexColor = (value: unknown): value is string =>
@@ -52,21 +42,6 @@ const isHexColor = (value: unknown): value is string =>
 
 const asString = (value: unknown, fallback: string) =>
   typeof value === "string" ? value : fallback;
-
-const clampPos = (n: number, min: number, max: number) =>
-  Math.round(Math.min(max, Math.max(min, n)) * 10) / 10;
-
-export function clampCampaignTextPos(x: number, y: number): { x: number; y: number } {
-  return {
-    x: clampPos(x, 0, 72),
-    y: clampPos(y, 0, 78),
-  };
-}
-
-const parsePos = (value: unknown, fallback: number) => {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return clampPos(value, 0, 100);
-};
 
 /** Ruta del CTA: ficha de producto o tienda si no hay slug. */
 export function campaignCtaPath(config: Pick<CampaignConfig, "ctaProductSlug">): string {
@@ -95,15 +70,6 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
 
   try {
     const parsed = JSON.parse(trimmed) as Partial<CampaignConfig> & { ctaHref?: string };
-    const desktopPos = clampCampaignTextPos(
-      parsePos(parsed.textPosX, DEFAULT_CAMPAIGN.textPosX),
-      parsePos(parsed.textPosY, DEFAULT_CAMPAIGN.textPosY),
-    );
-    // Si aún no hay posición móvil guardada, hereda la de escritorio.
-    const mobilePos = clampCampaignTextPos(
-      parsePos(parsed.textPosMobileX, desktopPos.x),
-      parsePos(parsed.textPosMobileY, desktopPos.y),
-    );
     const fromSlug = asString(parsed.ctaProductSlug, "").trim().replace(/^\/+|\/+$/g, "");
     const ctaProductSlug = fromSlug || slugFromLegacyHref(parsed.ctaHref);
     return {
@@ -137,10 +103,6 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
         ? parsed.ctaTextColor.trim()
         : DEFAULT_CAMPAIGN.ctaTextColor,
       alt: asString(parsed.alt, DEFAULT_CAMPAIGN.alt).trim() || DEFAULT_CAMPAIGN.alt,
-      textPosX: desktopPos.x,
-      textPosY: desktopPos.y,
-      textPosMobileX: mobilePos.x,
-      textPosMobileY: mobilePos.y,
     };
   } catch {
     return { ...DEFAULT_CAMPAIGN };
@@ -148,8 +110,6 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
 }
 
 export function serializeCampaignConfig(config: CampaignConfig): string {
-  const desktopPos = clampCampaignTextPos(config.textPosX, config.textPosY);
-  const mobilePos = clampCampaignTextPos(config.textPosMobileX, config.textPosMobileY);
   return JSON.stringify({
     desktopImageUrl: config.desktopImageUrl,
     mobileImageUrl: config.mobileImageUrl,
@@ -165,9 +125,5 @@ export function serializeCampaignConfig(config: CampaignConfig): string {
     ctaBg: config.ctaBg,
     ctaTextColor: config.ctaTextColor,
     alt: config.alt,
-    textPosX: desktopPos.x,
-    textPosY: desktopPos.y,
-    textPosMobileX: mobilePos.x,
-    textPosMobileY: mobilePos.y,
   });
 }

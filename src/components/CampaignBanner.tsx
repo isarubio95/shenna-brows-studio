@@ -1,21 +1,9 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
 import BannerBackgroundMedia from "@/components/BannerBackgroundMedia";
 import BackgroundSoundButton from "@/components/BackgroundSoundButton";
-import {
-  clampCampaignTextPos,
-  campaignCtaPath,
-  DEFAULT_CAMPAIGN,
-  type CampaignConfig,
-} from "@/lib/campaign-content";
+import { campaignCtaPath, DEFAULT_CAMPAIGN, type CampaignConfig } from "@/lib/campaign-content";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
@@ -23,30 +11,13 @@ import { cn } from "@/lib/utils";
 
 export type CampaignPreviewDevice = "desktop" | "mobile";
 
-/**
- * Viewports que simula la preview del admin.
- * Escritorio: aspect 21/9 acotado por max-h-180 (720px), como en la web.
- * Móvil: aspect 4/5 a 390px de ancho.
- */
-export const CAMPAIGN_PREVIEW_VIEWPORT: Record<
-  CampaignPreviewDevice,
-  { width: number; height: number }
-> = {
-  desktop: { width: 1920, height: Math.min(720, Math.round((1920 * 9) / 21)) },
-  mobile: { width: 390, height: Math.round((390 * 5) / 4) },
+/** Viewports que simula la preview del admin: ancho real del dispositivo. */
+export const CAMPAIGN_PREVIEW_VIEWPORT: Record<CampaignPreviewDevice, { width: number }> = {
+  desktop: { width: 1920 },
+  mobile: { width: 390 },
 };
 
-const CAMPAIGN_PREVIEW_MAX_HEIGHT = 520;
-
-/** El fondo de cada dispositivo: el suyo, o el del otro si no se subió. */
-function campaignBannerSrc(
-  config: Pick<CampaignConfig, "desktopImageUrl" | "mobileImageUrl">,
-  device: CampaignPreviewDevice,
-): string {
-  const mobile = config.mobileImageUrl.trim() || config.desktopImageUrl.trim();
-  const desktop = config.desktopImageUrl.trim() || mobile;
-  return device === "mobile" ? mobile : desktop;
-}
+const CAMPAIGN_PREVIEW_MAX_HEIGHT = 640;
 
 interface CampaignBannerProps {
   config: CampaignConfig;
@@ -55,8 +26,6 @@ interface CampaignBannerProps {
   /** En preview, fuerza tipografía, ratio e imagen de ese dispositivo. */
   previewDevice?: CampaignPreviewDevice;
   className?: string;
-  /** Solo en preview: actualiza la posición al arrastrar el bloque de textos. */
-  onTextPositionChange?: (pos: { x: number; y: number }) => void;
 }
 
 const CampaignBanner = ({
@@ -64,23 +33,11 @@ const CampaignBanner = ({
   preview = false,
   previewDevice = "desktop",
   className,
-  onTextPositionChange,
 }: CampaignBannerProps) => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const dragRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
-  } | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const mediaRef = useRef<HTMLDivElement>(null);
   const isMobileViewport = useIsMobile();
 
   const previewMobile = preview && previewDevice === "mobile";
-  const useMobilePos = preview ? previewMobile : isMobileViewport;
-  const textPosX = useMobilePos ? config.textPosMobileX : config.textPosX;
-  const textPosY = useMobilePos ? config.textPosMobileY : config.textPosY;
   const mobileSrc = config.mobileImageUrl.trim() || config.desktopImageUrl;
   const desktopSrc = config.desktopImageUrl.trim() || mobileSrc;
   const previewSrc = previewMobile ? mobileSrc : desktopSrc;
@@ -90,52 +47,6 @@ const CampaignBanner = ({
   const activeSrc = preview ? previewSrc : isMobileViewport ? mobileSrc : desktopSrc;
   const videoAspect = useVideoAspectRatio(activeSrc);
   const subParts = splitHeadlineByAccent(config.subheadline, config.subheadlineAccent);
-  const canDrag = Boolean(preview && onTextPositionChange);
-
-  const handlePointerDown = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (!canDrag || !onTextPositionChange) return;
-      e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
-      dragRef.current = {
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        startY: e.clientY,
-        originX: textPosX,
-        originY: textPosY,
-      };
-      setDragging(true);
-    },
-    [canDrag, textPosX, textPosY, onTextPositionChange],
-  );
-
-  const handlePointerMove = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (!canDrag || !onTextPositionChange || !dragRef.current) return;
-      if (dragRef.current.pointerId !== e.pointerId) return;
-      const section = sectionRef.current;
-      if (!section) return;
-      const rect = section.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return;
-      const dxPct = ((e.clientX - dragRef.current.startX) / rect.width) * 100;
-      const dyPct = ((e.clientY - dragRef.current.startY) / rect.height) * 100;
-      onTextPositionChange(
-        clampCampaignTextPos(dragRef.current.originX + dxPct, dragRef.current.originY + dyPct),
-      );
-    },
-    [canDrag, onTextPositionChange],
-  );
-
-  const endDrag = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* already released */
-    }
-    dragRef.current = null;
-    setDragging(false);
-  }, []);
 
   if (!preview && !config.desktopImageUrl.trim()) return null;
 
@@ -176,7 +87,7 @@ const CampaignBanner = ({
 
       <div
         className={cn(
-          "flex items-center gap-3",
+          "mx-auto flex items-center gap-3",
           preview
             ? previewMobile
               ? "my-5 max-w-56"
@@ -226,67 +137,55 @@ const CampaignBanner = ({
   );
 
   return (
-    <section
-      ref={sectionRef}
-      className={cn(
-        "relative w-full overflow-hidden",
-        preview
-          ? "h-full min-h-full"
-          : videoAspect
-            ? ""
-            : "aspect-4/5 sm:aspect-video md:aspect-21/9 max-h-180",
-        className,
-      )}
-      style={!preview && videoAspect ? { aspectRatio: String(videoAspect) } : undefined}
-      aria-label={config.alt}
-    >
-      {hasMedia ? (
-        <BannerBackgroundMedia
-          desktopSrc={desktopSrc}
-          mobileSrc={mobileSrc}
-          alt={config.alt}
-          preview={preview}
-          previewMobile={previewMobile}
-          eager={preview}
-        />
-      ) : (
-        <div className="absolute inset-0 bg-[#E8DFD0]" aria-hidden />
-      )}
+    <section className={cn("relative w-full overflow-hidden", className)} aria-label={config.alt}>
+      <div
+        ref={mediaRef}
+        className={cn(
+          "relative w-full overflow-hidden",
+          preview
+            ? previewMobile
+              ? "aspect-4/5"
+              : "aspect-21/9 max-h-180"
+            : videoAspect
+              ? ""
+              : "aspect-4/5 sm:aspect-video md:aspect-21/9 max-h-180",
+        )}
+        style={videoAspect ? { aspectRatio: String(videoAspect) } : undefined}
+      >
+        {hasMedia ? (
+          <BannerBackgroundMedia
+            desktopSrc={desktopSrc}
+            mobileSrc={mobileSrc}
+            alt={config.alt}
+            preview={preview}
+            previewMobile={previewMobile}
+            eager={preview}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-[#E8DFD0]" aria-hidden />
+        )}
+
+        {hasMedia ? <BackgroundSoundButton containerRef={mediaRef} className="z-2" /> : null}
+
+        {preview && !hasMedia && (
+          <p className="absolute bottom-4 left-6 z-1 text-sm text-carbon/40">
+            {previewMobile
+              ? "Sube la imagen o el vídeo móvil (o el de escritorio) para ver la vista previa."
+              : "Sube la imagen o el vídeo de escritorio para ver la vista previa real."}
+          </p>
+        )}
+      </div>
 
       <div
         className={cn(
-          "absolute z-1 text-left",
-          preview
-            ? previewMobile
-              ? "max-w-[min(100%-1.5rem,28rem)]"
-              : "max-w-xl"
-            : "max-w-[min(100%-1.5rem,28rem)] md:max-w-lg lg:max-w-xl",
-          canDrag && "cursor-grab touch-none select-none rounded-md ring-1 ring-white/70",
-          dragging && "cursor-grabbing",
+          "bg-cream px-6 py-10 text-center",
+          preview ? (previewMobile ? "px-5 py-8" : "px-8 py-10") : "sm:py-12",
         )}
-        style={{
-          left: `${textPosX}%`,
-          top: `${textPosY}%`,
-        }}
-        onPointerDown={canDrag ? handlePointerDown : undefined}
-        onPointerMove={canDrag ? handlePointerMove : undefined}
-        onPointerUp={canDrag ? endDrag : undefined}
-        onPointerCancel={canDrag ? endDrag : undefined}
-        role={canDrag ? "group" : undefined}
-        aria-label={canDrag ? "Arrastra para colocar los textos" : undefined}
       >
-        {preview ? textInner : <AnimatedSection>{textInner}</AnimatedSection>}
+        <div className="mx-auto flex max-w-xl flex-col items-center">
+          {preview ? textInner : <AnimatedSection className="flex flex-col items-center">{textInner}</AnimatedSection>}
+        </div>
       </div>
-
-      {hasMedia ? <BackgroundSoundButton containerRef={sectionRef} className="z-2" /> : null}
-
-      {preview && !hasMedia && (
-        <p className="absolute bottom-4 left-6 z-1 text-sm text-carbon/40">
-          {previewMobile
-            ? "Sube la imagen o el vídeo móvil (o el de escritorio) para ver la vista previa."
-            : "Sube la imagen o el vídeo de escritorio para ver la vista previa real."}
-        </p>
-      )}
     </section>
   );
 };
@@ -294,21 +193,16 @@ const CampaignBanner = ({
 /** Escala la campaña al viewport del dispositivo simulado dentro del admin. */
 export function CampaignPreviewFrame({
   device,
-  config,
   children,
 }: {
   device: CampaignPreviewDevice;
-  /** Con vídeo de fondo el alto del marco es el del archivo, no el del recorte. */
-  config?: Pick<CampaignConfig, "desktopImageUrl" | "mobileImageUrl">;
   children: ReactNode;
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  const videoAspect = useVideoAspectRatio(config ? campaignBannerSrc(config, device) : undefined);
-  const base = CAMPAIGN_PREVIEW_VIEWPORT[device];
-  const viewport = videoAspect
-    ? { width: base.width, height: Math.round(base.width / videoAspect) }
-    : base;
+  const [contentHeight, setContentHeight] = useState(0);
+  const viewportWidth = CAMPAIGN_PREVIEW_VIEWPORT[device].width;
 
   useEffect(() => {
     const el = outerRef.current;
@@ -320,18 +214,26 @@ export function CampaignPreviewFrame({
     return () => ro.disconnect();
   }, []);
 
+  // Mide la altura natural del contenido (media + texto debajo) al ancho real
+  // del dispositivo, sin que la afecte el `transform: scale` usado para mostrarla.
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    const update = () => setContentHeight(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [device]);
+
   // No ampliar por encima del tamaño real: en móvil deja bandas laterales claras.
   const scale =
-    containerWidth > 0
-      ? Math.min(
-          1,
-          containerWidth / viewport.width,
-          CAMPAIGN_PREVIEW_MAX_HEIGHT / viewport.height,
-        )
+    containerWidth > 0 && contentHeight > 0
+      ? Math.min(1, containerWidth / viewportWidth, CAMPAIGN_PREVIEW_MAX_HEIGHT / contentHeight)
       : 0;
 
-  const stageW = Math.round(viewport.width * scale);
-  const stageH = Math.round(viewport.height * scale);
+  const stageW = Math.round(viewportWidth * scale);
+  const stageH = Math.round(contentHeight * scale);
 
   return (
     <div
@@ -344,10 +246,10 @@ export function CampaignPreviewFrame({
         style={{ width: stageW, height: stageH }}
       >
         <div
+          ref={innerRef}
           className="origin-top-left"
           style={{
-            width: viewport.width,
-            height: viewport.height,
+            width: viewportWidth,
             transform: `scale(${scale})`,
           }}
         >

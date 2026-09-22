@@ -110,9 +110,9 @@ describe("proporción del vídeo de fondo", () => {
         <CampaignBanner config={config} />
       </MemoryRouter>,
     );
-    const section = container.querySelector("section");
-    expect(section).toHaveStyle({ aspectRatio: "0.5625" });
-    expect(section?.className).not.toContain("aspect-4/5");
+    const mediaWrapper = container.querySelector("section")?.firstElementChild;
+    expect(mediaWrapper).toHaveStyle({ aspectRatio: "0.5625" });
+    expect(mediaWrapper?.className).not.toContain("aspect-4/5");
   });
 
   it("mantiene el hueco fijo mientras no se conoce la proporción", () => {
@@ -124,7 +124,9 @@ describe("proporción del vídeo de fondo", () => {
         <CampaignBanner config={config} />
       </MemoryRouter>,
     );
-    expect(container.querySelector("section")?.className).toContain("aspect-4/5");
+    expect(container.querySelector("section")?.firstElementChild?.className).toContain(
+      "aspect-4/5",
+    );
   });
 
   it("no toca el hueco de las fotos", () => {
@@ -136,6 +138,8 @@ describe("proporción del vídeo de fondo", () => {
         <CampaignBanner config={config} />
       </MemoryRouter>,
     );
-    expect(container.querySelector("section")?.className).toContain("aspect-4/5");
+    expect(container.querySelector("section")?.firstElementChild?.className).toContain(
+      "aspect-4/5",
+    );
   });
 });

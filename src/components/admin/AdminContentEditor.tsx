@@ -453,10 +453,6 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         ? campaignDraft.ctaTextColor.trim()
         : DEFAULT_CAMPAIGN.ctaTextColor,
       alt: campaignDraft.alt.trim() || DEFAULT_CAMPAIGN.alt,
-      textPosX: campaignDraft.textPosX,
-      textPosY: campaignDraft.textPosY,
-      textPosMobileX: campaignDraft.textPosMobileX,
-      textPosMobileY: campaignDraft.textPosMobileY,
     };
     return {
       title: "Campaña publicitaria",
@@ -655,9 +651,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     variant === "desktop" ? "escritorio/tablet" : "móvil";
 
   /**
-   * Punto único de subida de los assets del inicio y la tienda: aplica la
-   * optimización del dispositivo tanto a imagen como a vídeo y, en vídeo,
-   * deja además el póster junto al archivo.
+   * Punto único de subida de los assets del inicio y la tienda: las fotos se
+   * optimizan por dispositivo; los vídeos se suben sin recomprimir (salvo recorte
+   * o conversión de .mov) y dejan el póster junto al archivo.
    */
   const uploadBannerMedia = async (
     source: File | string,
@@ -1015,8 +1011,8 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         title: "Vídeo subido",
         description: [
           result.transcoded
-            ? "Recomprimido para la web. Guarda para publicarlo."
-            : "Ya estaba optimizado. Guarda para publicarlo.",
+            ? "Se ha recodificado (recorte o conversión). Guarda para publicarlo."
+            : "Subido sin recomprimir. Guarda para publicarlo.",
           videoUploadNotes(result),
         ]
           .filter(Boolean)
@@ -2132,8 +2128,8 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         </Button>
                       )}
                       <p className="text-xs text-carbon/30">
-                        MP4, WebM o MOV. Se recomprime a 1080px si hace falta; si ya está
-                        optimizado se sube tal cual.
+                        MP4, WebM o MOV. Se sube sin recomprimir para conservar la calidad.
+                        Los .mov se convierten para que se vean en todos los navegadores.
                       </p>
                     </div>
                   </div>
@@ -2536,7 +2532,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
 
                   <p className="text-xs text-carbon/30">
                     Las fotos se recortan y convierten a WebP (máx. 1920px escritorio / 1080px
-                    móvil). Los vídeos (MP4, WebM o MOV, máx. 40 MB) se suben tal cual y se
+                    móvil). Los vídeos (MP4, WebM o MOV) se suben sin recomprimir y se
                     reproducen en bucle, sin sonido.
                   </p>
 
@@ -3523,7 +3519,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
 
                   <p className="text-xs text-carbon/30">
                     Las fotos se recortan y convierten a WebP (máx. 1920px escritorio / 1080px
-                    móvil). Los vídeos (MP4, WebM o MOV, máx. 40 MB) se suben tal cual y se
+                    móvil). Los vídeos (MP4, WebM o MOV) se suben sin recomprimir y se
                     reproducen en bucle, sin sonido.
                   </p>
 
@@ -3876,100 +3872,47 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                   <div>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
-                        Vista previa (escala real · arrastra los textos)
+                        Vista previa (escala real)
                       </Label>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex rounded-md border border-gold/20 overflow-hidden">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setCampaignPreviewDevice("desktop")}
-                            className={cn(
-                              "h-8 gap-1.5 rounded-none px-3 text-xs",
-                              campaignPreviewDevice === "desktop"
-                                ? "bg-gold/15 text-carbon"
-                                : "text-carbon/50",
-                            )}
-                          >
-                            <Monitor className="h-3.5 w-3.5" aria-hidden />
-                            Escritorio
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setCampaignPreviewDevice("mobile")}
-                            className={cn(
-                              "h-8 gap-1.5 rounded-none px-3 text-xs",
-                              campaignPreviewDevice === "mobile"
-                                ? "bg-gold/15 text-carbon"
-                                : "text-carbon/50",
-                            )}
-                          >
-                            <Smartphone className="h-3.5 w-3.5" aria-hidden />
-                            Móvil
-                          </Button>
-                        </div>
+                      <div className="flex rounded-md border border-gold/20 overflow-hidden">
                         <Button
                           type="button"
-                          variant="outline"
                           size="sm"
-                          disabled={
-                            campaignPreviewDevice === "mobile"
-                              ? campaignDraft.textPosMobileX ===
-                                  DEFAULT_CAMPAIGN.textPosMobileX &&
-                                campaignDraft.textPosMobileY ===
-                                  DEFAULT_CAMPAIGN.textPosMobileY
-                              : campaignDraft.textPosX === DEFAULT_CAMPAIGN.textPosX &&
-                                campaignDraft.textPosY === DEFAULT_CAMPAIGN.textPosY
-                          }
-                          onClick={() =>
-                            setCampaignDraft((prev) =>
-                              campaignPreviewDevice === "mobile"
-                                ? {
-                                    ...prev,
-                                    textPosMobileX: DEFAULT_CAMPAIGN.textPosMobileX,
-                                    textPosMobileY: DEFAULT_CAMPAIGN.textPosMobileY,
-                                  }
-                                : {
-                                    ...prev,
-                                    textPosX: DEFAULT_CAMPAIGN.textPosX,
-                                    textPosY: DEFAULT_CAMPAIGN.textPosY,
-                                  },
-                            )
-                          }
-                          className="border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-8"
+                          variant="ghost"
+                          onClick={() => setCampaignPreviewDevice("desktop")}
+                          className={cn(
+                            "h-8 gap-1.5 rounded-none px-3 text-xs",
+                            campaignPreviewDevice === "desktop"
+                              ? "bg-gold/15 text-carbon"
+                              : "text-carbon/50",
+                          )}
                         >
-                          <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                          Restablecer posición
+                          <Monitor className="h-3.5 w-3.5" aria-hidden />
+                          Escritorio
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setCampaignPreviewDevice("mobile")}
+                          className={cn(
+                            "h-8 gap-1.5 rounded-none px-3 text-xs",
+                            campaignPreviewDevice === "mobile"
+                              ? "bg-gold/15 text-carbon"
+                              : "text-carbon/50",
+                          )}
+                        >
+                          <Smartphone className="h-3.5 w-3.5" aria-hidden />
+                          Móvil
                         </Button>
                       </div>
                     </div>
                     <div className="-mx-6 border-y border-carbon/10 overflow-hidden">
-                      <CampaignPreviewFrame
-                        device={campaignPreviewDevice}
-                        config={campaignPreviewConfig}
-                      >
+                      <CampaignPreviewFrame device={campaignPreviewDevice}>
                         <CampaignBanner
                           config={campaignPreviewConfig}
                           preview
                           previewDevice={campaignPreviewDevice}
-                          onTextPositionChange={(pos) =>
-                            setCampaignDraft((prev) =>
-                              campaignPreviewDevice === "mobile"
-                                ? {
-                                    ...prev,
-                                    textPosMobileX: pos.x,
-                                    textPosMobileY: pos.y,
-                                  }
-                                : {
-                                    ...prev,
-                                    textPosX: pos.x,
-                                    textPosY: pos.y,
-                                  },
-                            )
-                          }
                         />
                       </CampaignPreviewFrame>
                     </div>
@@ -3980,8 +3923,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         : `escritorio (${CAMPAIGN_PREVIEW_VIEWPORT.desktop.width}px, ratio 21:9 · máx. 720px de alto)`}
                       : misma tipografía, imagen y proporción que en la web. Con vídeo de fondo el
                       banner toma la proporción del propio archivo, para que se vea entero y sin
-                      recortes. Las bandas laterales marcan el ancho real del dispositivo; la
-                      posición del texto se guarda aparte para escritorio y para móvil.
+                      recortes. El texto y el botón van siempre debajo de la imagen o el vídeo.
                     </p>
                   </div>
                 </>

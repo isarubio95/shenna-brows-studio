@@ -58,7 +58,7 @@ const BackgroundSoundButton = ({ containerRef, className }: BackgroundSoundButto
     let watched: HTMLVideoElement[] = [];
     const evaluate = () => {
       const list = videos();
-      setOfferButton(list.length > 0 && list.some((video) => !knownSilent(video)));
+      setOfferButton(list.some((video) => isVisible(video) && !knownSilent(video)));
     };
     // En el preview del admin el vídeo se cambia sin desmontar el botón.
     const listen = () => {
@@ -72,8 +72,11 @@ const BackgroundSoundButton = ({ containerRef, className }: BackgroundSoundButto
     listen();
     const observer = new MutationObserver(listen);
     observer.observe(root, { childList: true, subtree: true });
+    // El vídeo visible cambia al cruzar el breakpoint `md`, aunque el DOM no cambie.
+    window.addEventListener("resize", evaluate);
     return () => {
       observer.disconnect();
+      window.removeEventListener("resize", evaluate);
       watched.forEach((video) => video.removeEventListener("loadedmetadata", evaluate));
     };
   }, [containerRef, videos]);

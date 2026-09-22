@@ -2,40 +2,22 @@ import type { Area } from "react-easy-crop";
 
 export type OptimizeVideoVariant = "desktop" | "mobile";
 
-/** Mismo criterio que las imágenes: el ancho manda, la altura sólo pone techo. */
-const MAX_WIDTH: Record<OptimizeVideoVariant, number> = {
-  desktop: 1920,
-  mobile: 1080,
-};
+/**
+ * Bitrate del re-encode cuando no queda más remedio (recorte o .mov). El MP4/WebM
+ * original se sube tal cual: recomprimir con MediaRecorder era lo que bajaba la calidad.
+ */
+const TARGET_BITRATE = 12_000_000;
 
-const MAX_HEIGHT: Record<OptimizeVideoVariant, number> = {
-  desktop: 1920,
-  mobile: 1920,
-};
+const TARGET_FPS = 60;
 
-/** Bitrate objetivo del re-encode. */
-const TARGET_BITRATE: Record<OptimizeVideoVariant, number> = {
-  desktop: 4_500_000,
-  mobile: 2_200_000,
-};
-
-const TARGET_FPS = 30;
-
-/** Un vídeo por debajo de esto ya es lo bastante ligero para no tocarlo. */
-const ALWAYS_PASSTHROUGH_BYTES = 2 * 1024 * 1024;
+/** Tope del canvas al recortar o convertir .mov; el original no se reescala. */
+const MAX_TRANSCODE_EDGE = 3840;
 
 /** El re-encode va a velocidad de reproducción: por encima de esto la espera es inasumible. */
 export const MAX_TRANSCODE_SECONDS = 180;
 
-/** Tamaño máximo del archivo de origen que aceptamos procesar. */
+/** Tamaño máximo del archivo de origen que aceptamos subir. */
 export const VIDEO_SOURCE_MAX_BYTES = 200 * 1024 * 1024;
-
-/**
- * Tope del archivo que acaba en el bucket. Va por debajo del límite por defecto
- * de Supabase Storage (50 MB) para que el fallo se vea aquí y no como un error
- * opaco de la subida.
- */
-export const VIDEO_UPLOAD_MAX_BYTES = 45 * 1024 * 1024;
 
 export interface OptimizedVideo {
   blob: Blob;
@@ -167,16 +149,15 @@ export async function probeVideo(source: VideoSource): Promise<VideoProbe> {
   }));
 }
 
-/** Dimensiones de salida: respetan la proporción del recorte y los topes del dispositivo. */
+/** Dimensiones de salida: respetan la proporción del recorte y no bajan de 4K. */
 function fitOutputSize(
   sourceWidth: number,
   sourceHeight: number,
-  variant: OptimizeVideoVariant,
 ): { width: number; height: number } {
   const scale = Math.min(
     1,
-    MAX_WIDTH[variant] / sourceWidth,
-    MAX_HEIGHT[variant] / sourceHeight,
+    MAX_TRANSCODE_EDGE / sourceWidth,
+    MAX_TRANSCODE_EDGE / sourceHeight,
   );
   // Los codificadores de vídeo exigen dimensiones pares.
   const toEven = (value: number) => Math.max(2, Math.round(value * scale / 2) * 2);
@@ -343,7 +324,6 @@ function drawFrame(
 
 async function transcodeVideo(
   source: VideoSource,
-  variant: OptimizeVideoVariant,
   crop: Area | null,
   onProgress?: (ratio: number) => void,
 ): Promise<OptimizedVideo> {
@@ -365,7 +345,7 @@ async function transcodeVideo(
       throw new Error("El vídeo no tiene un tamaño válido.");
     }
 
-    const { width, height } = fitOutputSize(sourceWidth, sourceHeight, variant);
+    const { width, height } = fitOutputSize(sourceWidth, sourceHeight);
 
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -392,8 +372,8 @@ async function transcodeVideo(
 
     const recorder = new MediaRecorder(stream, {
       mimeType,
-      videoBitsPerSecond: TARGET_BITRATE[variant],
-      ...(keepAudio ? { audioBitsPerSecond: 128_000 } : {}),
+      videoBitsPerSecond: TARGET_BITRATE,
+      ...(keepAudio ? { audioBitsPerSecond: 192_000 } : {}),
     });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (event) => {
@@ -479,12 +459,6 @@ async function transcodeVideo(
   });
 }
 
-/** Tamaño por encima del cual el original no cumple ya el bitrate objetivo. */
-function passthroughSizeLimit(duration: number, variant: OptimizeVideoVariant): number {
-  if (duration <= 0) return ALWAYS_PASSTHROUGH_BYTES;
-  return Math.max(ALWAYS_PASSTHROUGH_BYTES, (duration * TARGET_BITRATE[variant]) / 8 * 1.25);
-}
-
 function sourceExtension(file: File): "mp4" | "webm" | "mov" {
   const fromName = file.name.split(".").pop()?.toLowerCase();
   if (fromName === "webm") return "webm";
@@ -501,12 +475,26 @@ function sourceMimeType(file: File, extension: "mp4" | "webm" | "mov"): string {
 }
 
 /**
- * Estrategia híbrida: si el vídeo ya está dentro del objetivo del dispositivo y no
- * hay recorte, se sube tal cual (sin pérdida). Si no, se recorta y recomprime.
+ * true cuando hay que recodificar: recorte, .mov (HEVC/QuickTime no se ve en todos
+ * los navegadores) o una URL ya subida. El tamaño y la resolución no cuentan:
+ * recomprimir era lo que bajaba la calidad.
+ */
+export function videoNeedsTranscode(args: {
+  force?: boolean;
+  crop: Area | null;
+  extension: "mp4" | "webm" | "mov" | null;
+  isRemoteUrl: boolean;
+}): boolean {
+  return Boolean(args.force) || args.crop !== null || args.extension === "mov" || args.isRemoteUrl;
+}
+
+/**
+ * MP4 y WebM se suben tal cual. Sólo se recodifica al recortar, al convertir un
+ * .mov o al reprocesar una URL ya subida.
  */
 export async function optimizeVideoForUpload(
   source: VideoSource,
-  variant: OptimizeVideoVariant,
+  _variant: OptimizeVideoVariant,
   options: OptimizeVideoOptions = {},
 ): Promise<OptimizedVideo> {
   const file = typeof source === "string" ? null : source;
@@ -536,16 +524,19 @@ export async function optimizeVideoForUpload(
     };
   };
 
-  const needsResize = probe.width > MAX_WIDTH[variant] || probe.height > MAX_HEIGHT[variant];
-  const needsShrink = file !== null && file.size > passthroughSizeLimit(probe.duration, variant);
   /**
    * Ningún navegador declara soportar el contenedor QuickTime, y el iPhone graba
    * en HEVC por defecto: un .mov puede subirse bien desde un equipo que sabe
    * decodificarlo y luego no verse en el del visitante. Al bucket sólo MP4 o WebM.
    */
-  const unsafeContainer = file !== null && sourceExtension(file) === "mov";
-  const mustTranscode =
-    Boolean(options.force) || crop !== null || needsResize || needsShrink || unsafeContainer || file === null;
+  const extension = file ? sourceExtension(file) : null;
+  const unsafeContainer = extension === "mov";
+  const mustTranscode = videoNeedsTranscode({
+    force: options.force,
+    crop,
+    extension,
+    isRemoteUrl: file === null,
+  });
 
   if (!mustTranscode) return passthrough();
 
@@ -563,13 +554,14 @@ export async function optimizeVideoForUpload(
     return passthrough();
   }
 
-  return transcodeVideo(source, variant, crop, options.onProgress);
+  return transcodeVideo(source, crop, options.onProgress);
 }
 
 /**
  * Extrae un fotograma como WebP (JPEG de reserva) para usarlo de póster.
  * `source` puede ser el archivo local o una URL ya subida.
- */export async function captureVideoPosterBlob(
+ */
+export async function captureVideoPosterBlob(
   source: VideoSource,
   atSecond = 0.1,
 ): Promise<{ blob: Blob; extension: "webp" | "jpg"; mimeType: string }> {

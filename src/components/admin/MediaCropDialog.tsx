@@ -191,7 +191,7 @@ const MediaCropDialog = ({
         <p className="text-xs text-carbon/40">
           {isVideo
             ? keepWholeVideo
-              ? "El vídeo se sube completo. Si pesa de más se recomprime, y eso tarda más o menos lo que dure."
+              ? "El vídeo se sube completo, sin recomprimir."
               : "Arrastra el vídeo y usa el zoom para elegir la zona visible. Al aplicar se vuelve a codificar, así que tarda más o menos lo que dure el vídeo."
             : "Arrastra la imagen y usa el zoom para elegir la zona visible."}
         </p>

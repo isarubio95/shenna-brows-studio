@@ -8,7 +8,6 @@ import {
 import {
   captureVideoPosterBlob,
   optimizeVideoForUpload,
-  VIDEO_UPLOAD_MAX_BYTES,
   type VideoSource,
 } from "@/lib/optimize-video-upload";
 
@@ -54,12 +53,18 @@ async function uploadBlob(bucket: string, filePath: string, blob: Blob, contentT
     upsert: true,
     contentType,
   });
-  if (error) throw error;
+  if (!error) return;
+  if (/exceeded the maximum allowed size|payload too large|maximum size/i.test(error.message)) {
+    throw new Error(
+      "El archivo supera el límite de Storage. Si pesa más de 50 MB, hay que subir el plan de Supabase (el Free no admite más).",
+    );
+  }
+  throw error;
 }
 
 /**
- * Sube un vídeo aplicando la optimización del dispositivo y deja el póster al lado,
- * con un nombre derivado del propio vídeo (ver `posterPathForVideoPath`).
+ * Sube un vídeo sin recomprimirlo (salvo recorte o conversión de .mov) y deja el
+ * póster al lado, con un nombre derivado del propio vídeo (ver `posterPathForVideoPath`).
  */
 export async function uploadVideoMedia(
   source: VideoSource,
@@ -67,12 +72,6 @@ export async function uploadVideoMedia(
 ): Promise<UploadedMedia> {
   const { bucket, pathPrefix, variant, crop, onProgress } = options;
   const optimized = await optimizeVideoForUpload(source, variant, { crop, onProgress });
-  if (optimized.blob.size > VIDEO_UPLOAD_MAX_BYTES) {
-    const mb = Math.round(optimized.blob.size / (1024 * 1024));
-    throw new Error(
-      `El vídeo ocupa ${mb} MB tras optimizarlo y el máximo son ${Math.round(VIDEO_UPLOAD_MAX_BYTES / (1024 * 1024))} MB. Acórtalo o súbelo ya comprimido.`,
-    );
-  }
   const filePath = `${pathPrefix}-${Date.now()}.${optimized.extension}`;
   await uploadBlob(bucket, filePath, optimized.blob, optimized.mimeType);
 
@@ -101,8 +100,8 @@ export async function uploadVideoMedia(
 }
 
 /**
- * Sube una imagen o un vídeo al bucket indicado aplicando la misma optimización
- * por dispositivo en ambos casos.
+ * Sube una imagen (optimizada) o un vídeo (sin recomprimir, salvo recorte o .mov)
+ * al bucket indicado.
  */
 export async function uploadMedia(file: File, options: UploadMediaOptions): Promise<UploadedMedia> {
   if (isVideoFile(file)) {
@@ -126,8 +125,8 @@ export function uploadResultDescription(result: UploadedMedia, variantLabel: str
     return `Versión ${variantLabel} optimizada (${result.extension.toUpperCase()}).`;
   }
   const base = result.transcoded
-    ? `Versión ${variantLabel} recomprimida (${result.extension.toUpperCase()}). Guarda para publicarla.`
-    : `Versión ${variantLabel} lista, ya estaba optimizada. Guarda para publicarla.`;
+    ? `Versión ${variantLabel} recodificada (${result.extension.toUpperCase()}). Guarda para publicarla.`
+    : `Versión ${variantLabel} subida sin recomprimir. Guarda para publicarla.`;
   return [base, videoUploadNotes(result)].filter(Boolean).join(" ");
 }
 
