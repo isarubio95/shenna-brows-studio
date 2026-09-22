@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
+import type { Area } from "react-easy-crop";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Monitor, Play, Plus, RotateCcw, Save, Smartphone, Sparkle, Trash2, Upload } from "lucide-react";
+import { Crop, Loader2, Monitor, Play, Plus, RotateCcw, Save, Smartphone, Sparkle, Trash2, Upload } from "lucide-react";
 import {
   DEFAULT_MARQUEE_CONFIG,
   DEFAULT_MARQUEE_ITEMS,
@@ -82,18 +83,22 @@ import {
 } from "@/lib/announcement-content";
 import IndexVideoSection from "@/components/IndexVideoSection";
 import { AnnouncementBarView } from "@/components/AnnouncementBar";
-import { optimizeImageForUpload, type OptimizeImageVariant } from "@/lib/optimize-image-upload";
+import { type OptimizeImageVariant } from "@/lib/optimize-image-upload";
 import {
   BANNER_MEDIA_ACCEPT,
-  BANNER_VIDEO_MAX_BYTES,
   isVideoFile,
   isVideoMediaUrl,
   pickDroppedMediaFile,
-  videoContentType,
-  videoFileExtension,
+  posterUrlForVideoUrl,
 } from "@/lib/media-url";
+import {
+  CAMPAIGN_BUCKET,
+  uploadMedia,
+  uploadResultDescription,
+  uploadVideoMedia,
+} from "@/lib/upload-media";
 import { HexColorField, toPickerColor } from "@/components/admin/HexColorField";
-import ProductImageCropDialog from "@/components/admin/ProductImageCropDialog";
+import MediaCropDialog from "@/components/admin/MediaCropDialog";
 import CampaignBanner, {
   CampaignPreviewFrame,
   CAMPAIGN_PREVIEW_VIEWPORT,
@@ -119,7 +124,6 @@ import { WhatsAppButtonView } from "@/components/WhatsAppFloatingButton";
 import { cn } from "@/lib/utils";
 import { invalidateAnnouncementBarCache } from "@/hooks/use-announcement-bar";
 
-const CAMPAIGN_BUCKET = "campaign-images";
 const CAMPAIGN_CTA_TIENDA_VALUE = "__tienda__";
 
 type CampaignProductOption = {
@@ -128,7 +132,6 @@ type CampaignProductOption = {
   slug: string;
   category: string | null;
 };
-const SUPABASE_URL = "https://vanhsuisvxvclxdgutaw.supabase.co";
 /** Proporción real del banner de tienda (1600×961, incluye degradé inferior). */
 const TIENDA_HERO_DESKTOP_ASPECT = 1600 / 961;
 const TIENDA_HERO_MOBILE_ASPECT = 9 / 16;
@@ -246,15 +249,35 @@ function AdminDropzonePreview({ src, alt }: { src: string; alt: string }) {
     return (
       <video
         src={src}
+        poster={posterUrlForVideoUrl(src)}
         className="h-full w-full object-cover"
+        autoPlay
         muted
+        loop
         playsInline
         preload="metadata"
+        disablePictureInPicture
         aria-hidden
       />
     );
   }
   return <img src={src} alt={alt} className="h-full w-full object-cover" />;
+}
+
+/** Botón que reabre el recorte sobre un vídeo ya subido. */
+function CropVideoButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      className="border-gold/20 text-carbon/60"
+    >
+      <Crop className="h-3.5 w-3.5 mr-1.5" />
+      Recortar vídeo
+    </Button>
+  );
 }
 
 const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
@@ -288,6 +311,8 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   });
   const [campaignDraft, setCampaignDraft] = useState<CampaignConfig>({ ...DEFAULT_CAMPAIGN });
   const [campaignProducts, setCampaignProducts] = useState<CampaignProductOption[]>([]);
+  /** Progreso (0-1) del re-encode de vídeo en curso; null cuando no hay ninguno. */
+  const [cropProgress, setCropProgress] = useState<number | null>(null);
   const [campaignUploading, setCampaignUploading] = useState<"desktop" | "mobile" | null>(null);
   const [campaignDragOver, setCampaignDragOver] = useState<"desktop" | "mobile" | null>(null);
   const [campaignCropOpen, setCampaignCropOpen] = useState(false);
@@ -338,6 +363,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     textColor: DEFAULT_ANNOUNCEMENT_BAR.textColor,
   });
   const [videoUploading, setVideoUploading] = useState(false);
+  const [videoCropOpen, setVideoCropOpen] = useState(false);
   const [videoDragOver, setVideoDragOver] = useState(false);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [tiendaHeroUploading, setTiendaHeroUploading] = useState<"desktop" | "mobile" | null>(null);
@@ -624,32 +650,67 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     };
   };
 
-  const uploadCampaignImage = async (file: File, variant: OptimizeImageVariant) => {
+  const variantLabel = (variant: OptimizeImageVariant) =>
+    variant === "desktop" ? "escritorio/tablet" : "móvil";
+
+  /**
+   * Punto único de subida de los assets del inicio y la tienda: aplica la
+   * optimización del dispositivo tanto a imagen como a vídeo y, en vídeo,
+   * deja además el póster junto al archivo.
+   */
+  const uploadBannerMedia = async (
+    source: File | string,
+    opts: {
+      pathPrefix: string;
+      variant: OptimizeImageVariant;
+      crop?: Area | null;
+      isVideo: boolean;
+    },
+  ) => {
+    const { pathPrefix, variant, crop = null, isVideo } = opts;
+    const options = {
+      bucket: CAMPAIGN_BUCKET,
+      pathPrefix,
+      variant,
+      crop,
+      onProgress: (ratio: number) => setCropProgress(ratio),
+    };
+    if (isVideo) setCropProgress(0);
+    try {
+      return isVideo
+        ? await uploadVideoMedia(source, options)
+        : await uploadMedia(source as File, options);
+    } finally {
+      setCropProgress(null);
+    }
+  };
+
+  const uploadCampaignMedia = async (
+    source: File | string,
+    variant: OptimizeImageVariant,
+    crop: Area | null,
+    isVideo: boolean,
+  ) => {
     setCampaignUploading(variant);
     try {
-      const optimized = await optimizeImageForUpload(file, variant);
-      const filePath = `${variant}-${Date.now()}.${optimized.extension}`;
-      const { error: uploadError } = await supabase.storage
-        .from(CAMPAIGN_BUCKET)
-        .upload(filePath, optimized.blob, {
-          upsert: true,
-          contentType: optimized.mimeType,
-        });
-      if (uploadError) throw uploadError;
-
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${CAMPAIGN_BUCKET}/${filePath}`;
+      const result = await uploadBannerMedia(source, {
+        pathPrefix: `campaign-${variant}`,
+        variant,
+        crop,
+        isVideo,
+      });
       setCampaignDraft((prev) => ({
         ...prev,
         ...(variant === "desktop"
-          ? { desktopImageUrl: publicUrl }
-          : { mobileImageUrl: publicUrl }),
+          ? { desktopImageUrl: result.url }
+          : { mobileImageUrl: result.url }),
       }));
       toast({
-        title: "Imagen subida",
-        description: `Versión ${variant === "desktop" ? "escritorio/tablet" : "móvil"} optimizada (${optimized.extension.toUpperCase()}).`,
+        title: result.kind === "video" ? "Vídeo subido" : "Imagen subida",
+        description: uploadResultDescription(result, variantLabel(variant)),
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "No se pudo subir la imagen.";
+      const message = err instanceof Error ? err.message : "No se pudo subir el archivo.";
       toast({ title: "Error al subir", description: message, variant: "destructive" });
       throw err instanceof Error ? err : new Error(message);
     } finally {
@@ -657,50 +718,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
   };
 
-  const uploadStorageVideo = async (file: File, pathPrefix: string) => {
-    if (!isVideoFile(file)) {
-      throw new Error("Sube un vídeo MP4, WebM o MOV.");
-    }
-    if (file.size > BANNER_VIDEO_MAX_BYTES) {
-      throw new Error("El tamaño máximo es 40 MB.");
-    }
-    const ext = videoFileExtension(file);
-    const filePath = `${pathPrefix}-${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from(CAMPAIGN_BUCKET)
-      .upload(filePath, file, {
-        upsert: true,
-        contentType: videoContentType(file, ext),
-      });
-    if (uploadError) throw uploadError;
-    return `${SUPABASE_URL}/storage/v1/object/public/${CAMPAIGN_BUCKET}/${filePath}`;
-  };
-
-  const uploadCampaignVideo = async (file: File, variant: OptimizeImageVariant) => {
-    setCampaignUploading(variant);
-    try {
-      const publicUrl = await uploadStorageVideo(file, `campaign-${variant}`);
-      setCampaignDraft((prev) => ({
-        ...prev,
-        ...(variant === "desktop"
-          ? { desktopImageUrl: publicUrl }
-          : { mobileImageUrl: publicUrl }),
-      }));
-      toast({
-        title: "Vídeo subido",
-        description: `Versión ${variant === "desktop" ? "escritorio/tablet" : "móvil"} lista. Guarda para publicarla.`,
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "No se pudo subir el vídeo.";
-      toast({ title: "Error al subir", description: message, variant: "destructive" });
-    } finally {
-      setCampaignUploading(null);
-    }
-  };
-
+  /** Imagen: se recorta antes de subir. Vídeo: se sube y se recorta después. */
   const handleCampaignFile = (file: File, variant: OptimizeImageVariant) => {
     if (isVideoFile(file)) {
-      void uploadCampaignVideo(file, variant);
+      void uploadCampaignMedia(file, variant, null, true).catch(() => {});
       return;
     }
     beginCampaignCrop(file, variant);
@@ -715,11 +736,15 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       });
       return;
     }
+    openCampaignCrop(URL.createObjectURL(file), variant);
+  };
+
+  const openCampaignCrop = (src: string, variant: OptimizeImageVariant) => {
     if (campaignCropSrc?.startsWith("blob:")) {
       URL.revokeObjectURL(campaignCropSrc);
     }
     setCampaignCropVariant(variant);
-    setCampaignCropSrc(URL.createObjectURL(file));
+    setCampaignCropSrc(src);
     setCampaignCropOpen(true);
   };
 
@@ -740,32 +765,32 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     if (file) handleCampaignFile(file, variant);
   };
 
-  const uploadTiendaHeroImage = async (file: File, variant: OptimizeImageVariant) => {
+  const uploadTiendaHeroMedia = async (
+    source: File | string,
+    variant: OptimizeImageVariant,
+    crop: Area | null,
+    isVideo: boolean,
+  ) => {
     setTiendaHeroUploading(variant);
     try {
-      const optimized = await optimizeImageForUpload(file, variant);
-      const filePath = `tienda-hero-${variant}-${Date.now()}.${optimized.extension}`;
-      const { error: uploadError } = await supabase.storage
-        .from(CAMPAIGN_BUCKET)
-        .upload(filePath, optimized.blob, {
-          upsert: true,
-          contentType: optimized.mimeType,
-        });
-      if (uploadError) throw uploadError;
-
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${CAMPAIGN_BUCKET}/${filePath}`;
+      const result = await uploadBannerMedia(source, {
+        pathPrefix: `tienda-hero-${variant}`,
+        variant,
+        crop,
+        isVideo,
+      });
       setTiendaHeroDraft((prev) => ({
         ...prev,
         ...(variant === "desktop"
-          ? { desktopImageUrl: publicUrl }
-          : { mobileImageUrl: publicUrl }),
+          ? { desktopImageUrl: result.url }
+          : { mobileImageUrl: result.url }),
       }));
       toast({
-        title: "Imagen subida",
-        description: `Fondo ${variant === "desktop" ? "escritorio/tablet" : "móvil"} optimizado (${optimized.extension.toUpperCase()}).`,
+        title: result.kind === "video" ? "Vídeo subido" : "Imagen subida",
+        description: uploadResultDescription(result, variantLabel(variant)),
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "No se pudo subir la imagen.";
+      const message = err instanceof Error ? err.message : "No se pudo subir el archivo.";
       toast({ title: "Error al subir", description: message, variant: "destructive" });
       throw err instanceof Error ? err : new Error(message);
     } finally {
@@ -773,20 +798,32 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
   };
 
+  const handleTiendaHeroFile = (file: File, variant: OptimizeImageVariant) => {
+    if (isVideoFile(file)) {
+      void uploadTiendaHeroMedia(file, variant, null, true).catch(() => {});
+      return;
+    }
+    beginTiendaHeroCrop(file, variant);
+  };
+
   const beginTiendaHeroCrop = (file: File, variant: OptimizeImageVariant) => {
     if (!file.type.startsWith("image/")) {
       toast({
         title: "Archivo no válido",
-        description: "Selecciona una imagen.",
+        description: "Selecciona una imagen o un vídeo.",
         variant: "destructive",
       });
       return;
     }
+    openTiendaHeroCrop(URL.createObjectURL(file), variant);
+  };
+
+  const openTiendaHeroCrop = (src: string, variant: OptimizeImageVariant) => {
     if (tiendaHeroCropSrc?.startsWith("blob:")) {
       URL.revokeObjectURL(tiendaHeroCropSrc);
     }
     setTiendaHeroCropVariant(variant);
-    setTiendaHeroCropSrc(URL.createObjectURL(file));
+    setTiendaHeroCropSrc(src);
     setTiendaHeroCropOpen(true);
   };
 
@@ -803,36 +840,36 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     e.stopPropagation();
     setTiendaHeroDragOver(null);
     if (tiendaHeroUploading || tiendaHeroCropOpen) return;
-    const file = Array.from(e.dataTransfer.files || []).find((f) => f.type.startsWith("image/"));
-    if (file) beginTiendaHeroCrop(file, variant);
+    const file = pickDroppedMediaFile(e.dataTransfer.files);
+    if (file) handleTiendaHeroFile(file, variant);
   };
 
-  const uploadHeroImage = async (file: File, variant: OptimizeImageVariant) => {
+  const uploadHeroMedia = async (
+    source: File | string,
+    variant: OptimizeImageVariant,
+    crop: Area | null,
+    isVideo: boolean,
+  ) => {
     setHeroUploading(variant);
     try {
-      const optimized = await optimizeImageForUpload(file, variant);
-      const filePath = `hero-${variant}-${Date.now()}.${optimized.extension}`;
-      const { error: uploadError } = await supabase.storage
-        .from(CAMPAIGN_BUCKET)
-        .upload(filePath, optimized.blob, {
-          upsert: true,
-          contentType: optimized.mimeType,
-        });
-      if (uploadError) throw uploadError;
-
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${CAMPAIGN_BUCKET}/${filePath}`;
+      const result = await uploadBannerMedia(source, {
+        pathPrefix: `hero-${variant}`,
+        variant,
+        crop,
+        isVideo,
+      });
       setHeroDraft((prev) => ({
         ...prev,
         ...(variant === "desktop"
-          ? { desktopImageUrl: publicUrl }
-          : { mobileImageUrl: publicUrl }),
+          ? { desktopImageUrl: result.url }
+          : { mobileImageUrl: result.url }),
       }));
       toast({
-        title: "Imagen subida",
-        description: `Versión ${variant === "desktop" ? "escritorio/tablet" : "móvil"} optimizada (${optimized.extension.toUpperCase()}).`,
+        title: result.kind === "video" ? "Vídeo subido" : "Imagen subida",
+        description: uploadResultDescription(result, variantLabel(variant)),
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "No se pudo subir la imagen.";
+      const message = err instanceof Error ? err.message : "No se pudo subir el archivo.";
       toast({ title: "Error al subir", description: message, variant: "destructive" });
       throw err instanceof Error ? err : new Error(message);
     } finally {
@@ -840,31 +877,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
   };
 
-  const uploadHeroVideo = async (file: File, variant: OptimizeImageVariant) => {
-    setHeroUploading(variant);
-    try {
-      const publicUrl = await uploadStorageVideo(file, `hero-${variant}`);
-      setHeroDraft((prev) => ({
-        ...prev,
-        ...(variant === "desktop"
-          ? { desktopImageUrl: publicUrl }
-          : { mobileImageUrl: publicUrl }),
-      }));
-      toast({
-        title: "Vídeo subido",
-        description: `Versión ${variant === "desktop" ? "escritorio/tablet" : "móvil"} lista. Guarda para publicarla.`,
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "No se pudo subir el vídeo.";
-      toast({ title: "Error al subir", description: message, variant: "destructive" });
-    } finally {
-      setHeroUploading(null);
-    }
-  };
-
   const handleHeroFile = (file: File, variant: OptimizeImageVariant) => {
     if (isVideoFile(file)) {
-      void uploadHeroVideo(file, variant);
+      void uploadHeroMedia(file, variant, null, true).catch(() => {});
       return;
     }
     beginHeroCrop(file, variant);
@@ -879,11 +894,15 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       });
       return;
     }
+    openHeroCrop(URL.createObjectURL(file), variant);
+  };
+
+  const openHeroCrop = (src: string, variant: OptimizeImageVariant) => {
     if (heroCropSrc?.startsWith("blob:")) {
       URL.revokeObjectURL(heroCropSrc);
     }
     setHeroCropVariant(variant);
-    setHeroCropSrc(URL.createObjectURL(file));
+    setHeroCropSrc(src);
     setHeroCropOpen(true);
   };
 
@@ -904,27 +923,26 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     if (file) handleHeroFile(file, variant);
   };
 
-  const uploadWelcomePopupImage = async (file: File) => {
+  const uploadWelcomePopupMedia = async (
+    source: File | string,
+    crop: Area | null,
+    isVideo: boolean,
+  ) => {
     setWelcomePopupUploading(true);
     try {
-      const optimized = await optimizeImageForUpload(file, "mobile");
-      const filePath = `welcome-popup-${Date.now()}.${optimized.extension}`;
-      const { error: uploadError } = await supabase.storage
-        .from(CAMPAIGN_BUCKET)
-        .upload(filePath, optimized.blob, {
-          upsert: true,
-          contentType: optimized.mimeType,
-        });
-      if (uploadError) throw uploadError;
-
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${CAMPAIGN_BUCKET}/${filePath}`;
-      setWelcomePopupDraft((prev) => ({ ...prev, imageUrl: publicUrl }));
+      const result = await uploadBannerMedia(source, {
+        pathPrefix: "welcome-popup",
+        variant: "mobile",
+        crop,
+        isVideo,
+      });
+      setWelcomePopupDraft((prev) => ({ ...prev, imageUrl: result.url }));
       toast({
-        title: "Imagen subida",
-        description: `Imagen del popup optimizada (${optimized.extension.toUpperCase()}).`,
+        title: result.kind === "video" ? "Vídeo subido" : "Imagen subida",
+        description: uploadResultDescription(result, "del popup"),
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "No se pudo subir la imagen.";
+      const message = err instanceof Error ? err.message : "No se pudo subir el archivo.";
       toast({ title: "Error al subir", description: message, variant: "destructive" });
       throw err instanceof Error ? err : new Error(message);
     } finally {
@@ -932,19 +950,31 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
   };
 
+  const handleWelcomePopupFile = (file: File) => {
+    if (isVideoFile(file)) {
+      void uploadWelcomePopupMedia(file, null, true).catch(() => {});
+      return;
+    }
+    beginWelcomePopupCrop(file);
+  };
+
   const beginWelcomePopupCrop = (file: File) => {
     if (!file.type.startsWith("image/")) {
       toast({
         title: "Archivo no válido",
-        description: "Selecciona una imagen.",
+        description: "Selecciona una imagen o un vídeo.",
         variant: "destructive",
       });
       return;
     }
+    openWelcomePopupCrop(URL.createObjectURL(file));
+  };
+
+  const openWelcomePopupCrop = (src: string) => {
     if (welcomePopupCropSrc?.startsWith("blob:")) {
       URL.revokeObjectURL(welcomePopupCropSrc);
     }
-    setWelcomePopupCropSrc(URL.createObjectURL(file));
+    setWelcomePopupCropSrc(src);
     setWelcomePopupCropOpen(true);
   };
 
@@ -961,26 +991,35 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     e.stopPropagation();
     setWelcomePopupDragOver(false);
     if (welcomePopupUploading || welcomePopupCropOpen) return;
-    const file = Array.from(e.dataTransfer.files || []).find((f) => f.type.startsWith("image/"));
-    if (file) beginWelcomePopupCrop(file);
+    const file = pickDroppedMediaFile(e.dataTransfer.files);
+    if (file) handleWelcomePopupFile(file);
   };
 
-  const uploadIndexVideo = async (file: File) => {
+  const uploadIndexVideo = async (source: File | string, crop: Area | null) => {
     setVideoUploading(true);
     try {
-      const publicUrl = await uploadStorageVideo(file, "index-video");
+      const result = await uploadBannerMedia(source, {
+        pathPrefix: "index-video",
+        // La sección del inicio se ve en vertical y a poco ancho: basta el perfil móvil.
+        variant: "mobile",
+        crop,
+        isVideo: true,
+      });
       setVideoDraft((prev) => ({
         ...prev,
-        videoUrl: publicUrl,
-        posterUrl: "",
+        videoUrl: result.url,
+        posterUrl: result.posterUrl ?? "",
       }));
       toast({
         title: "Vídeo subido",
-        description: "Guarda para publicarlo en la web.",
+        description: result.transcoded
+          ? "Recomprimido para la web. Guarda para publicarlo."
+          : "Ya estaba optimizado. Guarda para publicarlo.",
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "No se pudo subir el vídeo.";
       toast({ title: "Error al subir", description: message, variant: "destructive" });
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setVideoUploading(false);
     }
@@ -992,7 +1031,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     setVideoDragOver(false);
     if (videoUploading) return;
     const file = Array.from(e.dataTransfer.files || []).find(isVideoFile);
-    if (file) void uploadIndexVideo(file);
+    if (file) void uploadIndexVideo(file, null).catch(() => {});
   };
 
   useEffect(() => {
@@ -2003,7 +2042,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         e.target.value = "";
-                        if (file) void uploadIndexVideo(file);
+                        if (file) void uploadIndexVideo(file, null).catch(() => {});
                       }}
                     />
                     <div
@@ -2064,6 +2103,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                       )}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {isVideoMediaUrl(videoDraft.videoUrl) &&
+                        videoDraft.videoUrl !== DEFAULT_INDEX_VIDEO.videoUrl && (
+                        <CropVideoButton onClick={() => setVideoCropOpen(true)} />
+                      )}
                       {videoDraft.videoUrl !== DEFAULT_INDEX_VIDEO.videoUrl && (
                         <Button
                           type="button"
@@ -2083,7 +2126,8 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         </Button>
                       )}
                       <p className="text-xs text-carbon/30">
-                        MP4, WebM o MOV. Máximo 40 MB.
+                        MP4, WebM o MOV. Se recomprime a 1080px si hace falta; si ya está
+                        optimizado se sube tal cual.
                       </p>
                     </div>
                   </div>
@@ -2347,6 +2391,11 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         )}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {isVideoMediaUrl(heroDraft.desktopImageUrl) && (
+                          <CropVideoButton
+                            onClick={() => openHeroCrop(heroDraft.desktopImageUrl, "desktop")}
+                          />
+                        )}
                         {heroDraft.desktopImageUrl &&
                           heroDraft.desktopImageUrl !== DEFAULT_HERO.desktopImageUrl && (
                           <Button
@@ -2450,6 +2499,11 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         )}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {isVideoMediaUrl(heroDraft.mobileImageUrl) && (
+                          <CropVideoButton
+                            onClick={() => openHeroCrop(heroDraft.mobileImageUrl, "mobile")}
+                          />
+                        )}
                         {heroDraft.mobileImageUrl && (
                           <Button
                             type="button"
@@ -2836,17 +2890,17 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
 
                   <div>
                     <Label className="text-carbon/60 text-xs uppercase tracking-wider">
-                      Imagen de fondo
+                      Imagen o vídeo de fondo
                     </Label>
                     <input
                       ref={welcomePopupInputRef}
                       type="file"
-                      accept="image/*"
+                      accept={BANNER_MEDIA_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         e.target.value = "";
-                        if (file) beginWelcomePopupCrop(file);
+                        if (file) handleWelcomePopupFile(file);
                       }}
                     />
                     <div
@@ -2894,34 +2948,40 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         </div>
                       )}
                       {welcomePopupDraft.imageUrl ? (
-                        <img
+                        <AdminDropzonePreview
                           src={welcomePopupDraft.imageUrl}
                           alt="Vista previa popup"
-                          className="h-full w-full object-cover"
                         />
                       ) : (
                         <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
                           <Upload className="h-8 w-8" />
                           <span className="text-sm text-center">
-                            Arrastra una imagen o haz clic (vertical)
+                            Arrastra una imagen o un vídeo, o haz clic (vertical)
                           </span>
                         </div>
                       )}
                     </div>
-                    {welcomePopupDraft.imageUrl ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-2 border-gold/20"
-                        onClick={() =>
-                          setWelcomePopupDraft((prev) => ({ ...prev, imageUrl: "" }))
-                        }
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                        Quitar imagen
-                      </Button>
-                    ) : null}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {isVideoMediaUrl(welcomePopupDraft.imageUrl) && (
+                        <CropVideoButton
+                          onClick={() => openWelcomePopupCrop(welcomePopupDraft.imageUrl)}
+                        />
+                      )}
+                      {welcomePopupDraft.imageUrl ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-gold/20"
+                          onClick={() =>
+                            setWelcomePopupDraft((prev) => ({ ...prev, imageUrl: "" }))
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                          Quitar
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3327,6 +3387,11 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         )}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {isVideoMediaUrl(campaignDraft.desktopImageUrl) && (
+                          <CropVideoButton
+                            onClick={() => openCampaignCrop(campaignDraft.desktopImageUrl, "desktop")}
+                          />
+                        )}
                         {campaignDraft.desktopImageUrl && (
                           <Button
                             type="button"
@@ -3424,6 +3489,11 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         )}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {isVideoMediaUrl(campaignDraft.mobileImageUrl) && (
+                          <CropVideoButton
+                            onClick={() => openCampaignCrop(campaignDraft.mobileImageUrl, "mobile")}
+                          />
+                        )}
                         {campaignDraft.mobileImageUrl && (
                           <Button
                             type="button"
@@ -3917,12 +3987,12 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                       <input
                         ref={tiendaHeroDesktopInputRef}
                         type="file"
-                        accept="image/*"
+                        accept={BANNER_MEDIA_ACCEPT}
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           e.target.value = "";
-                          if (file) beginTiendaHeroCrop(file, "desktop");
+                          if (file) handleTiendaHeroFile(file, "desktop");
                         }}
                       />
                       <div
@@ -3968,26 +4038,34 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           </div>
                         )}
                         {tiendaHeroDraft.desktopImageUrl ? (
-                          <img
+                          <AdminDropzonePreview
                             src={tiendaHeroDraft.desktopImageUrl}
                             alt="Vista previa escritorio"
-                            className="h-full w-full object-cover"
                           />
                         ) : (
                           <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
                             <Upload className="h-8 w-8" />
-                            <span className="text-sm text-center">Arrastra una imagen o haz clic</span>
+                            <span className="text-sm text-center">
+                              Arrastra una imagen o un vídeo, o haz clic
+                            </span>
                           </div>
                         )}
                         {tiendaHeroDraft.desktopImageUrl && tiendaHeroUploading !== "desktop" && (
                           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-carbon/0 opacity-0 transition-opacity hover:bg-carbon/30 hover:opacity-100">
                             <span className="rounded-lg bg-carbon/60 px-3 py-1.5 text-xs text-white">
-                              Cambiar imagen
+                              Cambiar archivo
                             </span>
                           </div>
                         )}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {isVideoMediaUrl(tiendaHeroDraft.desktopImageUrl) && (
+                          <CropVideoButton
+                            onClick={() =>
+                              openTiendaHeroCrop(tiendaHeroDraft.desktopImageUrl, "desktop")
+                            }
+                          />
+                        )}
                         {tiendaHeroDraft.desktopImageUrl && (
                           <Button
                             type="button"
@@ -4015,12 +4093,12 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                       <input
                         ref={tiendaHeroMobileInputRef}
                         type="file"
-                        accept="image/*"
+                        accept={BANNER_MEDIA_ACCEPT}
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           e.target.value = "";
-                          if (file) beginTiendaHeroCrop(file, "mobile");
+                          if (file) handleTiendaHeroFile(file, "mobile");
                         }}
                       />
                       <div
@@ -4066,26 +4144,34 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           </div>
                         )}
                         {tiendaHeroDraft.mobileImageUrl ? (
-                          <img
+                          <AdminDropzonePreview
                             src={tiendaHeroDraft.mobileImageUrl}
                             alt="Vista previa móvil"
-                            className="h-full w-full object-cover"
                           />
                         ) : (
                           <div className="flex h-full min-h-36 flex-col items-center justify-center gap-2 px-4 py-8 text-carbon/40">
                             <Upload className="h-8 w-8" />
-                            <span className="text-sm text-center">Arrastra una imagen o haz clic</span>
+                            <span className="text-sm text-center">
+                              Arrastra una imagen o un vídeo, o haz clic
+                            </span>
                           </div>
                         )}
                         {tiendaHeroDraft.mobileImageUrl && tiendaHeroUploading !== "mobile" && (
                           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-carbon/0 opacity-0 transition-opacity hover:bg-carbon/30 hover:opacity-100">
                             <span className="rounded-lg bg-carbon/60 px-3 py-1.5 text-xs text-white">
-                              Cambiar imagen
+                              Cambiar archivo
                             </span>
                           </div>
                         )}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {isVideoMediaUrl(tiendaHeroDraft.mobileImageUrl) && (
+                          <CropVideoButton
+                            onClick={() =>
+                              openTiendaHeroCrop(tiendaHeroDraft.mobileImageUrl, "mobile")
+                            }
+                          />
+                        )}
                         {tiendaHeroDraft.mobileImageUrl && (
                           <Button
                             type="button"
@@ -4108,8 +4194,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                   </div>
 
                   <p className="text-xs text-carbon/30">
-                    Tras elegir la imagen podrás recortar la zona visible. Se convierte a WebP
-                    (máx. 1920px escritorio / 1080px móvil), igual que en la campaña publicitaria.
+                    Acepta imagen y vídeo (MP4, WebM o MOV). La imagen se recorta antes de subir y
+                    se convierte a WebP; el vídeo se sube y se recorta después con el botón
+                    «Recortar vídeo». En ambos casos se ajusta a máx. 1920px en escritorio y 1080px
+                    en móvil, igual que en la campaña publicitaria.
                   </p>
 
                   <div>
@@ -4722,9 +4810,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       })}
     </div>
 
-    <ProductImageCropDialog
+    <MediaCropDialog
       open={tiendaHeroCropOpen}
-      imageSrc={tiendaHeroCropSrc}
+      src={tiendaHeroCropSrc}
+      progress={cropProgress}
       onOpenChange={handleTiendaHeroCropOpenChange}
       aspect={
         tiendaHeroCropVariant === "desktop" ? TIENDA_HERO_DESKTOP_ASPECT : TIENDA_HERO_MOBILE_ASPECT
@@ -4735,49 +4824,82 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
           ? "Recortar fondo · Escritorio / tablet"
           : "Recortar fondo · Móvil"
       }
-      onCropped={async (file) => {
-        await uploadTiendaHeroImage(file, tiendaHeroCropVariant);
+      onCropped={async ({ kind, file, crop }) => {
+        await uploadTiendaHeroMedia(
+          kind === "video" ? (tiendaHeroCropSrc as string) : (file as File),
+          tiendaHeroCropVariant,
+          crop,
+          kind === "video",
+        );
       }}
     />
-    <ProductImageCropDialog
+    <MediaCropDialog
       open={campaignCropOpen}
-      imageSrc={campaignCropSrc}
+      src={campaignCropSrc}
+      progress={cropProgress}
       onOpenChange={handleCampaignCropOpenChange}
       aspect={campaignCropVariant === "desktop" ? CAMPAIGN_DESKTOP_ASPECT : CAMPAIGN_MOBILE_ASPECT}
       maxOutputSize={campaignCropVariant === "desktop" ? 1920 : 1080}
       title={
         campaignCropVariant === "desktop"
-          ? "Recortar imagen · Escritorio / tablet"
-          : "Recortar imagen · Móvil"
+          ? "Recortar · Escritorio / tablet"
+          : "Recortar · Móvil"
       }
-      onCropped={async (file) => {
-        await uploadCampaignImage(file, campaignCropVariant);
+      onCropped={async ({ kind, file, crop }) => {
+        await uploadCampaignMedia(
+          kind === "video" ? (campaignCropSrc as string) : (file as File),
+          campaignCropVariant,
+          crop,
+          kind === "video",
+        );
       }}
     />
-    <ProductImageCropDialog
+    <MediaCropDialog
       open={heroCropOpen}
-      imageSrc={heroCropSrc}
+      src={heroCropSrc}
+      progress={cropProgress}
       onOpenChange={handleHeroCropOpenChange}
       aspect={heroCropVariant === "desktop" ? HERO_DESKTOP_ASPECT : HERO_MOBILE_ASPECT}
       maxOutputSize={heroCropVariant === "desktop" ? 1920 : 1080}
       title={
         heroCropVariant === "desktop"
-          ? "Recortar imagen · Hero escritorio/tablet"
-          : "Recortar imagen · Hero móvil"
+          ? "Recortar · Hero escritorio/tablet"
+          : "Recortar · Hero móvil"
       }
-      onCropped={async (file) => {
-        await uploadHeroImage(file, heroCropVariant);
+      onCropped={async ({ kind, file, crop }) => {
+        await uploadHeroMedia(
+          kind === "video" ? (heroCropSrc as string) : (file as File),
+          heroCropVariant,
+          crop,
+          kind === "video",
+        );
       }}
     />
-    <ProductImageCropDialog
+    <MediaCropDialog
+      open={videoCropOpen}
+      src={videoDraft.videoUrl}
+      progress={cropProgress}
+      onOpenChange={setVideoCropOpen}
+      aspect={9 / 16}
+      title="Recortar · Vídeo del inicio"
+      onCropped={async ({ crop }) => {
+        await uploadIndexVideo(videoDraft.videoUrl, crop);
+      }}
+    />
+    <MediaCropDialog
       open={welcomePopupCropOpen}
-      imageSrc={welcomePopupCropSrc}
+      src={welcomePopupCropSrc}
+      progress={cropProgress}
       onOpenChange={handleWelcomePopupCropOpenChange}
       aspect={WELCOME_POPUP_ASPECT}
       maxOutputSize={1080}
-      title="Recortar imagen · Popup bienvenida"
-      onCropped={async (file) => {
-        await uploadWelcomePopupImage(file);
+      title="Recortar · Popup bienvenida"
+      onCropped={async ({ kind, file, crop }) => {
+        await uploadWelcomePopupMedia(
+          kind === "video" ? (welcomePopupCropSrc as string) : (file as File),
+          crop,
+          kind === "video",
+        );
       }}
     />
     <WelcomePromoDialogView

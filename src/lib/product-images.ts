@@ -1,3 +1,4 @@
+import { isVideoMediaUrl, posterUrlForVideoUrl } from "@/lib/media-url";
 import productPinzas from "@/assets/product-pinzas.jpg";
 import productTijeras from "@/assets/product-tijeras.jpg";
 import productEspuma from "@/assets/product-espuma.jpg";
@@ -66,4 +67,18 @@ export const getProductImageGallery = (imageUrl: string | null | undefined, slug
   const gallery = parseProductImages(imageUrl).filter((entry) => entry !== "/placeholder.svg");
   if (gallery.length > 0) return gallery;
   return [localFallbacks[slug] || "/placeholder.svg"];
+};
+
+/**
+ * Variante estática de `getProductImageUrl` para contextos que exigen una imagen:
+ * datos estructurados, Open Graph y correos. Si el elemento principal es un vídeo
+ * devuelve su póster.
+ */
+export const getProductPosterUrl = (
+  imageUrl: string | null | undefined,
+  slug: string,
+): string => {
+  const primary = getProductImageUrl(imageUrl, slug);
+  if (!isVideoMediaUrl(primary)) return primary;
+  return posterUrlForVideoUrl(primary) ?? localFallbacks[slug] ?? "/placeholder.svg";
 };

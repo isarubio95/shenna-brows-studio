@@ -16,7 +16,15 @@ import { Loader2, Upload, ImageIcon, Plus, X, Bold, Italic, List, ListOrdered, L
 import type { Tables } from "@/integrations/supabase/types";
 import { normalizeHex, parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import { cn } from "@/lib/utils";
-import ProductImageCropDialog from "@/components/admin/ProductImageCropDialog";
+import MediaCropDialog from "@/components/admin/MediaCropDialog";
+import ProductMedia from "@/components/ProductMedia";
+import {
+  isBannerMediaFile as isProductMediaFile,
+  isVideoMediaUrl,
+  PRODUCT_MEDIA_ACCEPT,
+} from "@/lib/media-url";
+import { PRODUCT_BUCKET, uploadMedia, uploadVideoMedia } from "@/lib/upload-media";
+import type { Area } from "react-easy-crop";
 
 type Product = Tables<"products">;
 
@@ -67,8 +75,7 @@ async function fetchConflictingProductBySlug(
   return rows.find((row) => row.id !== excludeProductId) ?? null;
 }
 
-const BUCKET = "product-images";
-const SUPABASE_URL = "https://vanhsuisvxvclxdgutaw.supabase.co";
+
 
 const normalizeDescriptionHtml = (html: string) => {
   const trimmed = (html || "").trim();
@@ -145,6 +152,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const [form, setForm] = useState<Partial<Product & { materials_label?: string }>>({});
   const [materialItems, setMaterialItems] = useState<string[]>([""]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  /** Progreso (0-1) del re-encode de vídeo; null si no hay ninguno en curso. */
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [cropOpen, setCropOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -376,93 +385,100 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
 
   const colorPickerValue = (row: ColorVariantFormRow) => normalizeHex(row.hexDraft ?? row.hex) ?? row.hex;
 
-  const uploadImage = useCallback(
+  /** Prefijo de los archivos del producto en el bucket. */
+  const mediaPathPrefix = useCallback(() => {
+    const nameForSlug = (form.category || "").trim() || (form.name || "").trim();
+    return mode === "create"
+      ? (nameForSlug ? slugify(nameForSlug) : `borrador-${Date.now()}`)
+      : (currentProduct?.slug ?? "producto");
+  }, [currentProduct, form.category, form.name, mode]);
+
+  /** Sube una foto o un vídeo y lo añade al final de la galería. */
+  const uploadGalleryMedia = useCallback(
     async (file: File) => {
       if (mode !== "create" && !currentProduct) return;
       setUploading(true);
       try {
-        const ext = file.name.split(".").pop() || "jpg";
-        const nameForSlug = (form.category || "").trim() || (form.name || "").trim();
-        const slugBase =
-          mode === "create"
-            ? (nameForSlug ? slugify(nameForSlug) : `borrador-${Date.now()}`)
-            : (currentProduct?.slug ?? "producto");
-        const filePath = `${slugBase}-${Date.now()}.${ext}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from(BUCKET)
-          .upload(filePath, file, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${filePath}`;
+        const result = await uploadMedia(file, {
+          bucket: PRODUCT_BUCKET,
+          pathPrefix: mediaPathPrefix(),
+          // La ficha se ve en un cuadrado de ~700px: basta el perfil móvil.
+          variant: "mobile",
+          onProgress: setUploadProgress,
+        });
         setImageUrls((prev) => {
-          const next = [...prev, publicUrl];
+          const next = [...prev, result.url];
           setForm((formPrev) => ({ ...formPrev, image_url: serializeProductImages(next) }));
           setPreviewIndex(next.length - 1);
           return next;
         });
-        toast({ title: "Imagen subida correctamente", description: "La imagen se añadió a la galería del producto." });
-      } catch (err: any) {
-        toast({ title: "Error al subir imagen", description: err.message, variant: "destructive" });
+        toast({
+          title: result.kind === "video" ? "Vídeo subido correctamente" : "Imagen subida correctamente",
+          description: "Se añadió a la galería del producto.",
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "No se pudo subir el archivo.";
+        toast({ title: "Error al subir", description: message, variant: "destructive" });
       } finally {
+        setUploadProgress(null);
         setUploading(false);
       }
     },
-    [currentProduct, form.category, form.name, mode, toast]
+    [currentProduct, mediaPathPrefix, mode, toast]
   );
 
-  const replaceImageAtIndex = useCallback(
-    async (index: number, file: File) => {
+  /** Reemplaza el elemento `index` por el resultado del recorte. */
+  const replaceMediaAtIndex = useCallback(
+    async (index: number, source: File | string, crop: Area | null) => {
       if (mode !== "create" && !currentProduct) return;
       if (index < 0) return;
       setUploading(true);
       try {
-        const ext = file.name.split(".").pop() || "jpg";
-        const nameForSlug = (form.category || "").trim() || (form.name || "").trim();
-        const slugBase =
-          mode === "create"
-            ? (nameForSlug ? slugify(nameForSlug) : `borrador-${Date.now()}`)
-            : (currentProduct?.slug ?? "producto");
-        const filePath = `${slugBase}-crop-${Date.now()}.${ext}`;
+        const options = {
+          bucket: PRODUCT_BUCKET,
+          pathPrefix: `${mediaPathPrefix()}-crop`,
+          variant: "mobile" as const,
+          crop,
+          onProgress: setUploadProgress,
+        };
+        const result =
+          typeof source === "string"
+            ? await uploadVideoMedia(source, options)
+            : await uploadMedia(source, options);
 
-        const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file, {
-          upsert: true,
-          contentType: file.type || undefined,
-        });
-
-        if (uploadError) throw uploadError;
-
-        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${filePath}`;
         setImageUrls((prev) => {
           if (index >= prev.length) return prev;
           const next = [...prev];
-          next[index] = publicUrl;
+          next[index] = result.url;
           setForm((formPrev) => ({ ...formPrev, image_url: serializeProductImages(next) }));
           return next;
         });
-        toast({ title: "Imagen recortada", description: "Se actualizó la imagen en la galería." });
+        toast({
+          title: result.kind === "video" ? "Vídeo recortado" : "Imagen recortada",
+          description: "Se actualizó el archivo en la galería.",
+        });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "No se pudo guardar el recorte.";
         toast({ title: "Error al guardar recorte", description: message, variant: "destructive" });
         throw err instanceof Error ? err : new Error(message);
       } finally {
+        setUploadProgress(null);
         setUploading(false);
       }
     },
-    [currentProduct, form.category, form.name, mode, toast],
+    [currentProduct, mediaPathPrefix, mode, toast],
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
-      const files = Array.from(e.dataTransfer.files || []).filter((file) => file.type.startsWith("image/"));
+      const files = Array.from(e.dataTransfer.files || []).filter(isProductMediaFile);
       files.forEach((file) => {
-        uploadImage(file);
+        void uploadGalleryMedia(file);
       });
     },
-    [uploadImage]
+    [uploadGalleryMedia]
   );
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -473,9 +489,9 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const handleDragLeave = () => setIsDragging(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter((file) => file.type.startsWith("image/"));
+    const files = Array.from(e.target.files || []).filter(isProductMediaFile);
     files.forEach((file) => {
-      uploadImage(file);
+      void uploadGalleryMedia(file);
     });
     e.target.value = "";
   };
@@ -709,7 +725,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           {/* Image Drop Zone */}
           <div>
             <Label className="text-carbon/70 text-xs uppercase tracking-wider mb-2 block">
-              Imagen del producto
+              Fotos y vídeos del producto
             </Label>
             <div
               onDrop={handleDrop}
@@ -723,20 +739,28 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
               `}
             >
               {uploading && (
-                <div className="absolute inset-0 bg-carbon/40 flex items-center justify-center z-10 rounded-xl">
+                <div className="absolute inset-0 bg-carbon/40 flex flex-col items-center justify-center gap-2 z-10 rounded-xl">
                   <Loader2 className="h-8 w-8 animate-spin text-white" />
+                  {uploadProgress === null ? null : (
+                    <span className="text-xs text-white">
+                      Procesando vídeo… {Math.round(uploadProgress * 100)}%
+                    </span>
+                  )}
                 </div>
               )}
               {displayImage ? (
-                <img
+                <ProductMedia
                   src={displayImage}
-                  alt="Preview"
+                  alt="Vista previa"
                   className="absolute inset-0 h-full w-full object-cover"
+                  playable={false}
                 />
               ) : (
                 <div className="flex flex-col items-center gap-2 text-carbon/40">
                   <ImageIcon className="h-10 w-10" />
-                  <span className="text-sm">Arrastra una o varias imágenes, o haz clic</span>
+                  <span className="text-sm text-center px-4">
+                    Arrastra fotos o vídeos, o haz clic
+                  </span>
                 </div>
               )}
               {galleryPreview && !uploading && (
@@ -749,8 +773,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                     e.stopPropagation();
                     setCropOpen(true);
                   }}
-                  aria-label="Recortar imagen"
-                  title="Recortar imagen"
+                  aria-label={isVideoMediaUrl(galleryPreview) ? "Recortar vídeo" : "Recortar imagen"}
+                  title={isVideoMediaUrl(galleryPreview) ? "Recortar vídeo" : "Recortar imagen"}
                 >
                   <Crop className="h-4 w-4" />
                 </Button>
@@ -786,14 +810,17 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 <div className="absolute inset-0 bg-carbon/0 hover:bg-carbon/30 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 pointer-events-none">
                   <div className="flex items-center gap-2 text-white bg-carbon/60 rounded-lg px-4 py-2 text-sm">
                     <Upload className="h-4 w-4" />
-                    Añadir más imágenes
+                    Añadir más archivos
                   </div>
                 </div>
               )}
             </div>
             {imageUrls.length > 0 && (
               <div className="mt-3 space-y-2">
-                <p className="text-xs text-carbon/45">Arrastra las miniaturas para cambiar el orden. La primera es la principal.</p>
+                <p className="text-xs text-carbon/45">
+                  Arrastra las miniaturas para cambiar el orden. La primera es la principal y es la
+                  que se usa en las tarjetas del catálogo.
+                </p>
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                   {imageUrls.map((url, index) => (
                     <div
@@ -842,11 +869,11 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                         thumbDragOverIndex === index && thumbDragIndex !== index && "ring-2 ring-gold border-gold",
                       )}
                     >
-                      <img
+                      <ProductMedia
                         src={url}
-                        alt={`Imagen ${index + 1}`}
+                        alt={`Archivo ${index + 1}`}
                         className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-                        draggable={false}
+                        playable={false}
                       />
                       {index === 0 && (
                         <span className="absolute top-1 left-1 text-[10px] bg-gold text-white px-1.5 py-0.5 rounded pointer-events-none">
@@ -876,7 +903,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept={PRODUCT_MEDIA_ACCEPT}
               multiple
               className="hidden"
               onChange={handleFileSelect}
@@ -1289,13 +1316,18 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       </DialogContent>
     </Dialog>
 
-    <ProductImageCropDialog
+    <MediaCropDialog
       open={cropOpen}
-      imageSrc={galleryPreview}
+      src={galleryPreview}
+      progress={uploadProgress}
       onOpenChange={setCropOpen}
-      onCropped={async (file) => {
+      onCropped={async ({ kind, file, crop }) => {
         const index = Math.min(previewIndex, Math.max(0, imageUrls.length - 1));
-        await replaceImageAtIndex(index, file);
+        await replaceMediaAtIndex(
+          index,
+          kind === "video" ? (galleryPreview as string) : (file as File),
+          crop,
+        );
       }}
     />
     </>

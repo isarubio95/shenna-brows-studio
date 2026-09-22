@@ -6,7 +6,8 @@ import { ShoppingCart, Plus, Sparkles, ChevronLeft, ChevronRight } from "lucide-
 import Autoplay from "embla-carousel-autoplay";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { getProductImageGallery, getProductImageUrl } from "@/lib/product-images";
+import { getProductImageGallery, getProductPosterUrl } from "@/lib/product-images";
+import ProductMedia from "@/components/ProductMedia";
 import { useCart } from "@/context/CartContext";
 import AnimatedSection from "@/components/AnimatedSection";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
@@ -123,13 +124,12 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
               Sin stock
             </span>
           )}
-          <img
+          <ProductMedia
             src={gallery[currentImageIndex]}
             alt={`${product.name} - Shenna Brows`}
             className={`w-full h-full object-cover transition-transform duration-700 ${
               outOfStock ? "grayscale-[0.4] opacity-90" : "hover:scale-105"
             }`}
-            loading="lazy"
           />
           {gallery.length > 1 && (
             <>
@@ -295,7 +295,7 @@ const Tienda = () => {
           "@type": "Product",
           name: product.name,
           description: stripHtml(product.description) || product.tagline || "",
-          image: getProductImageUrl(product.image_url, product.slug),
+          image: getProductPosterUrl(product.image_url, product.slug),
           brand: { "@type": "Brand", name: "Shenna Brows" },
           offers: {
             "@type": "Offer",

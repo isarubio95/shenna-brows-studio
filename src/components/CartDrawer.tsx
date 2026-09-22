@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
 import { Minus, Plus, Trash2, ShoppingBag, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getProductImageUrl } from "@/lib/product-images";
+import { getProductPosterUrl } from "@/lib/product-images";
 
 const CartDrawer = () => {
   const { items, isOpen, closeCart, removeItem, updateQuantity, totalPrice } = useCart();
@@ -40,7 +40,7 @@ const CartDrawer = () => {
                 >
                   <div className="w-16 h-16 rounded-md bg-muted shrink-0 overflow-hidden">
                     <img
-                      src={getProductImageUrl(item.product.image_url, item.product.slug)}
+                      src={getProductPosterUrl(item.product.image_url, item.product.slug)}
                       alt={item.product.name}
                       className="w-full h-full object-cover"
                     />

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { isVideoMediaUrl, posterUrlForVideoUrl } from "@/lib/media-url";
 import { Link, useLocation } from "react-router-dom";
 import { Sparkle } from "lucide-react";
 import {
@@ -60,6 +61,7 @@ export const WelcomePromoDialogView = ({
   const [submitting, setSubmitting] = useState(false);
 
   const bgImage = config.imageUrl.trim();
+  const bgIsVideo = isVideoMediaUrl(bgImage);
   const pink = config.pink || DEFAULT_WELCOME_POPUP.pink;
   const gold = config.gold || DEFAULT_WELCOME_POPUP.gold;
 
@@ -159,11 +161,25 @@ export const WelcomePromoDialogView = ({
           className="animate__animated animate__fadeInDown relative flex min-h-128 flex-col bg-cover bg-center"
           style={{
             backgroundColor: FALLBACK_BG,
-            ...(bgImage ? { backgroundImage: `url(${bgImage})` } : {}),
+            ...(bgImage && !bgIsVideo ? { backgroundImage: `url(${bgImage})` } : {}),
           }}
           role="img"
           aria-label={config.alt}
         >
+          {bgIsVideo ? (
+            <video
+              src={bgImage}
+              poster={posterUrlForVideoUrl(bgImage)}
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              disablePictureInPicture
+              aria-hidden
+            />
+          ) : null}
           {bgImage ? (
             <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/55 via-white/20 to-black/35" />
           ) : null}

@@ -7,7 +7,8 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import { ShoppingBag, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
-import { getProductImageGallery, getProductImageUrl } from "@/lib/product-images";
+import { getProductImageGallery, getProductPosterUrl } from "@/lib/product-images";
+import ProductMedia from "@/components/ProductMedia";
 import { getEffectivePrice } from "@/lib/product-pricing";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import { useSiteBadges } from "@/hooks/use-site-badges";
@@ -218,10 +219,13 @@ const ProductPage = () => {
                     Sin stock
                   </span>
                 )}
-                <img
+                <ProductMedia
                   src={gallery[currentImageIndex]}
                   alt={product.name}
                   className={`w-full h-full object-cover ${outOfStock ? "grayscale-[0.35] opacity-90" : ""}`}
+                  playable
+                  loading="eager"
+                  fetchPriority="high"
                 />
                 {gallery.length > 1 && (
                   <>
@@ -250,13 +254,17 @@ const ProductPage = () => {
                     <button
                       key={`${product.id}-thumb-${index}`}
                       type="button"
-                      aria-label={`Ver imagen ${index + 1}`}
+                      aria-label={`Ver archivo ${index + 1}`}
                       onClick={() => setCurrentImageIndex(index)}
                       className={`aspect-square rounded-lg overflow-hidden border transition ${
                         index === currentImageIndex ? "border-gold ring-2 ring-gold/30" : "border-gold/15 hover:border-gold/40"
                       }`}
                     >
-                      <img src={imageUrl} alt={`${product.name} miniatura ${index + 1}`} className="w-full h-full object-cover" />
+                      <ProductMedia
+                        src={imageUrl}
+                        alt={`${product.name} miniatura ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
                     </button>
                   ))}
                 </div>
@@ -432,7 +440,7 @@ const ProductPage = () => {
                     >
                       <div className="aspect-4/3 bg-muted/80 overflow-hidden">
                         <img
-                          src={getProductImageUrl(p.image_url, p.slug)}
+                          src={getProductPosterUrl(p.image_url, p.slug)}
                           alt={p.name}
                           className="w-full h-full object-cover opacity-[0.92] hover:opacity-100 scale-[1.02] hover:scale-105 transition-[opacity,transform] duration-500"
                           loading="lazy"

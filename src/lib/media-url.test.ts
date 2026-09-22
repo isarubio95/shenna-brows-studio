@@ -5,8 +5,11 @@ import {
   isBannerMediaFile,
   isVideoFile,
   isVideoMediaUrl,
+  posterPathForVideoPath,
+  posterUrlForVideoUrl,
   videoFileExtension,
 } from "./media-url";
+import { getProductPosterUrl, serializeProductImages } from "./product-images";
 
 describe("isVideoMediaUrl", () => {
   it("detects common video extensions in absolute and relative URLs", () => {
@@ -67,5 +70,44 @@ describe("hero and campaign configs keep video URLs", () => {
     );
     expect(parsed.desktopImageUrl).toBe("https://cdn.example.com/campaign.mp4");
     expect(isVideoMediaUrl(parsed.desktopImageUrl)).toBe(true);
+  });
+});
+
+describe("póster derivado del vídeo", () => {
+  it("cambia la extensión del archivo subido", () => {
+    expect(posterPathForVideoPath("hero-desktop-123.mp4")).toBe("hero-desktop-123.poster.webp");
+    expect(posterPathForVideoPath("index-video-9.webm")).toBe("index-video-9.poster.webp");
+  });
+
+  it("deriva la URL del póster conservando query y hash", () => {
+    expect(posterUrlForVideoUrl("https://cdn.example.com/hero.mp4")).toBe(
+      "https://cdn.example.com/hero.poster.webp",
+    );
+    expect(posterUrlForVideoUrl("https://cdn.example.com/hero.mov?v=3")).toBe(
+      "https://cdn.example.com/hero.poster.webp?v=3",
+    );
+  });
+
+  it("no devuelve póster para imágenes ni valores vacíos", () => {
+    expect(posterUrlForVideoUrl("https://cdn.example.com/hero.webp")).toBeUndefined();
+    expect(posterUrlForVideoUrl("")).toBeUndefined();
+    expect(posterUrlForVideoUrl(null)).toBeUndefined();
+  });
+});
+
+describe("galería de producto con vídeo", () => {
+  it("usa el póster cuando el elemento principal es un vídeo", () => {
+    const stored = serializeProductImages([
+      "https://cdn.example.com/espuma-1.mp4",
+      "https://cdn.example.com/espuma-2.webp",
+    ]);
+    expect(getProductPosterUrl(stored, "espuma")).toBe(
+      "https://cdn.example.com/espuma-1.poster.webp",
+    );
+  });
+
+  it("devuelve la imagen tal cual cuando la principal es una foto", () => {
+    const stored = serializeProductImages(["https://cdn.example.com/espuma-1.webp"]);
+    expect(getProductPosterUrl(stored, "espuma")).toBe("https://cdn.example.com/espuma-1.webp");
   });
 });

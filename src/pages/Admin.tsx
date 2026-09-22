@@ -34,7 +34,7 @@ import {
   returnStatusBlocksFulfillment,
   type ReturnRequestStatus,
 } from "@/lib/returns";
-import { getProductImageUrl } from "@/lib/product-images";
+import { getProductPosterUrl } from "@/lib/product-images";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { isProductOnSale } from "@/lib/product-pricing";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
@@ -1802,7 +1802,7 @@ const Admin = () => {
             {products.map((p) => (
               <div key={p.id} className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden group">
                 <div className="aspect-square bg-muted overflow-hidden">
-                  <img src={getProductImageUrl(p.image_url, p.slug)} alt={p.name} className="w-full h-full object-cover" />
+                  <img src={getProductPosterUrl(p.image_url, p.slug)} alt={p.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="p-4">
                   <h3 className="font-medium text-carbon">{p.name}</h3>

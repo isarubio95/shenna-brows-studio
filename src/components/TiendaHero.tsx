@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import AnimatedSection from "@/components/AnimatedSection";
+import { isVideoMediaUrl, posterUrlForVideoUrl } from "@/lib/media-url";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -242,31 +243,61 @@ const TiendaHero = ({
   const contentBlockClass =
     "w-full max-w-4xl px-4 sm:px-6 md:px-8 text-center";
 
+  /** El fondo admite foto o vídeo; el vídeo va mudo y en bucle, como en el hero. */
+  const renderBackgroundVideo = (src: string, className: string) => (
+    <video
+      src={src}
+      poster={posterUrlForVideoUrl(src)}
+      className={className}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      disablePictureInPicture
+      aria-label={imageAlt}
+    />
+  );
+
   const renderMobileImage = (src: string) => (
     <div className="relative aspect-[9/16] w-full overflow-hidden bg-[#f8f5f2] md:hidden">
-      <img
-        src={src}
-        alt={imageAlt}
-        className="block h-auto w-full"
-        loading="eager"
-        decoding="async"
-        draggable={false}
-      />
+      {isVideoMediaUrl(src) ? (
+        renderBackgroundVideo(src, "absolute inset-0 h-full w-full object-cover")
+      ) : (
+        <img
+          src={src}
+          alt={imageAlt}
+          className="block h-auto w-full"
+          loading="eager"
+          decoding="async"
+          draggable={false}
+        />
+      )}
     </div>
   );
 
-  const renderDesktopImage = (src: string) => (
-    <div className="relative hidden overflow-hidden md:block">
-      <img
-        src={src}
-        alt={imageAlt}
-        className="block h-auto w-full scale-[1.02] origin-top"
-        loading="eager"
-        decoding="async"
-        draggable={false}
-      />
-    </div>
-  );
+  const renderDesktopImage = (src: string) =>
+    isVideoMediaUrl(src) ? (
+      // Sin dimensiones intrínsecas conocidas fijamos la proporción del banner
+      // (la misma a la que recorta el admin) para no provocar salto de layout.
+      <div className="relative hidden aspect-[1600/961] w-full overflow-hidden md:block">
+        {renderBackgroundVideo(
+          src,
+          "absolute inset-0 h-full w-full origin-top scale-[1.02] object-cover",
+        )}
+      </div>
+    ) : (
+      <div className="relative hidden overflow-hidden md:block">
+        <img
+          src={src}
+          alt={imageAlt}
+          className="block h-auto w-full scale-[1.02] origin-top"
+          loading="eager"
+          decoding="async"
+          draggable={false}
+        />
+      </div>
+    );
 
   const imageElement = preview ? (
     useMobileLayout ? renderMobileImage(previewSrc) : renderDesktopImage(previewSrc)

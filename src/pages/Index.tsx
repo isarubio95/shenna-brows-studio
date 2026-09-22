@@ -15,6 +15,7 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { getProductImageUrl } from "@/lib/product-images";
+import ProductMedia from "@/components/ProductMedia";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import CeoSection from "@/components/CeoSection";
@@ -200,11 +201,10 @@ const Index = () => {
                           >
                             <div className="relative aspect-square bg-muted overflow-hidden">
                               <ProductSaleBadge product={product} />
-                              <img
+                              <ProductMedia
                                 src={getProductImageUrl(product.image_url, product.slug)}
                                 alt={product.name}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                                loading="lazy"
                               />
                             </div>
                             <div className="p-6 flex-1 flex flex-col justify-between">
