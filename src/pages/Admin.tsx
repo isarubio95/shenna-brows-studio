@@ -23,6 +23,7 @@ import AdminSectionNav, {
   type AdminSection,
 } from "@/components/admin/AdminSectionNav";
 import AdminFaqEditor from "@/components/admin/AdminFaqEditor";
+import AdminMediaManager from "@/components/admin/AdminMediaManager";
 import {
   canDownloadOrderInvoice,
   getOrderInvoiceButtonLabel,
@@ -1977,6 +1978,12 @@ const Admin = () => {
           }}
           onSaved={refreshProducts}
         />
+
+        {activeSection === "media" && (
+          <AnimatedSection delay={0.05}>
+            <AdminMediaManager />
+          </AnimatedSection>
+        )}
 
         {activeSection === "correos" && (
           <AnimatedSection delay={0.05}>

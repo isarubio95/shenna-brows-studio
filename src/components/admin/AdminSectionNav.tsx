@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  ADMIN_STORAGE_USAGE_QUERY_KEY,
+  formatStorageBytes,
+} from "@/lib/storage-usage";
 import {
   ArrowLeft,
   CircleHelp,
   FileText,
+  Images,
   Mail,
   Megaphone,
   Menu,
@@ -27,34 +33,23 @@ import { Progress } from "@/components/ui/progress";
 /** Cuota de Storage del plan Free de Supabase. Actualizar si se cambia de plan. */
 const STORAGE_QUOTA_BYTES = 1024 * 1024 * 1024;
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
-}
-
 function useStorageUsage() {
-  const [usedBytes, setUsedBytes] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    supabase
-      .rpc("get_storage_usage_bytes")
-      .then(({ data, error }) => {
-        if (cancelled || error || data == null) return;
-        setUsedBytes(Number(data));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return usedBytes;
+  const { data } = useQuery({
+    queryKey: ADMIN_STORAGE_USAGE_QUERY_KEY,
+    queryFn: async () => {
+      const { data: used, error } = await supabase.rpc("get_storage_usage_bytes");
+      if (error || used == null) return null;
+      return Number(used);
+    },
+  });
+  return data ?? null;
 }
 
 export type AdminSection =
   | "pedidos"
   | "devoluciones"
   | "catalogo"
+  | "media"
   | "correos"
   | "newsletter"
   | "codigos_dto"
@@ -66,6 +61,7 @@ const SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
   { id: "pedidos", label: "Pedidos", icon: ShoppingBag },
   { id: "devoluciones", label: "Devoluciones", icon: RotateCcw },
   { id: "catalogo", label: "Catálogo", icon: Package },
+  { id: "media", label: "Media", icon: Images },
   { id: "correos", label: "Correos", icon: Mail },
   { id: "newsletter", label: "Newsletter", icon: Megaphone },
   { id: "codigos_dto", label: "Códigos dto.", icon: Ticket },
@@ -78,6 +74,7 @@ const SECTION_DESCRIPTIONS: Record<AdminSection, string> = {
   pedidos: "Gestiona pedidos.",
   devoluciones: "Gestiona solicitudes de devolución y reembolsos.",
   catalogo: "Controla stock y productos del catálogo.",
+  media: "Archivos subidos a Storage y cuáles están en uso.",
   correos: "Envía correos individuales a clientes.",
   newsletter: "Campañas a suscriptores con consentimiento activo.",
   codigos_dto: "Crea y gestiona códigos promocionales y sus usos.",
@@ -157,7 +154,7 @@ function StorageUsageBar() {
       <div className="mb-1.5 flex items-center justify-between text-xs text-carbon/50">
         <span>Almacenamiento</span>
         <span>
-          {formatBytes(usedBytes)} / {formatBytes(STORAGE_QUOTA_BYTES)}
+          {formatStorageBytes(usedBytes)} / {formatStorageBytes(STORAGE_QUOTA_BYTES)}
         </span>
       </div>
       <Progress value={percent} className="h-1.5" />

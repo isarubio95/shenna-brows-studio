@@ -505,6 +505,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      list_storage_objects: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          bucket_id: string
+          created_at: string
+          mime_type: string
+          name: string
+          size_bytes: number
+          updated_at: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
