@@ -41,6 +41,8 @@ export interface UploadedMedia {
   posterUrl?: string;
   /** Sólo en vídeo: false cuando el original ya cumplía y se subió sin recomprimir. */
   transcoded?: boolean;
+  /** Sólo en vídeo: true cuando el original traía sonido y el re-encode lo perdió. */
+  audioDropped?: boolean;
   /** Sólo en vídeo: dimensiones del archivo subido, para reservar su hueco al pintarlo. */
   width?: number;
   height?: number;
@@ -91,6 +93,7 @@ export async function uploadVideoMedia(
     kind: "video",
     posterUrl,
     transcoded: optimized.transcoded,
+    audioDropped: optimized.audioDropped,
     width: optimized.width,
     height: optimized.height,
     extension: optimized.extension,
@@ -122,7 +125,26 @@ export function uploadResultDescription(result: UploadedMedia, variantLabel: str
   if (result.kind === "image") {
     return `Versión ${variantLabel} optimizada (${result.extension.toUpperCase()}).`;
   }
-  return result.transcoded
+  const base = result.transcoded
     ? `Versión ${variantLabel} recomprimida (${result.extension.toUpperCase()}). Guarda para publicarla.`
     : `Versión ${variantLabel} lista, ya estaba optimizada. Guarda para publicarla.`;
+  return [base, videoUploadNotes(result)].filter(Boolean).join(" ");
+}
+
+/**
+ * Lo que el admin necesita saber del archivo que acaba de quedar subido. Vacío
+ * cuando no hay nada que advertir, que es el caso corriente.
+ */
+export function videoUploadNotes(result: UploadedMedia): string {
+  const notes: string[] = [];
+  if (result.audioDropped) {
+    notes.push(
+      "El vídeo se ha quedado sin sonido al recomprimirlo: súbelo ya optimizado si lo necesitas con audio.",
+    );
+  }
+  if (result.transcoded && result.extension === "webm") {
+    // Este navegador no sabe grabar MP4 con AAC, y un MP4 con Opus sale mudo en iOS.
+    notes.push("Se ha guardado en WebM para conservar el sonido: los iPhone con iOS anterior a 17.4 no lo reproducen.");
+  }
+  return notes.join(" ");
 }

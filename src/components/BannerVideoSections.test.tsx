@@ -68,4 +68,32 @@ describe("hero and campaign video backgrounds", () => {
       true,
     );
   });
+
+  it("ofrece el botón de sonido cuando el fondo es un vídeo", () => {
+    const config = parseCampaignConfig(
+      JSON.stringify({ desktopImageUrl: "https://cdn.example.com/campaign.mp4" }),
+    );
+    const { container } = render(
+      <MemoryRouter>
+        <CampaignBanner config={config} />
+      </MemoryRouter>,
+    );
+    const button = container.querySelector('button[aria-pressed="false"]');
+    expect(button).not.toBeNull();
+    expect(button).toHaveAttribute("aria-label", "Activar el sonido del vídeo");
+    expect(button?.className).not.toContain("hidden");
+  });
+
+  it("esconde el botón de sonido cuando el fondo es una imagen", () => {
+    const config = parseCampaignConfig(
+      JSON.stringify({ desktopImageUrl: "https://cdn.example.com/campaign.jpg" }),
+    );
+    const { container } = render(
+      <MemoryRouter>
+        <CampaignBanner config={config} />
+      </MemoryRouter>,
+    );
+    const button = container.querySelector('button[aria-pressed="false"]');
+    expect(button?.className ?? "hidden").toContain("hidden");
+  });
 });

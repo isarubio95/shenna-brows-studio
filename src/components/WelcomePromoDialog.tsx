@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import BackgroundSoundButton, { backgroundSoundProps } from "@/components/BackgroundSoundButton";
 import { isVideoMediaUrl, posterUrlForVideoUrl } from "@/lib/media-url";
 import { Link, useLocation } from "react-router-dom";
 import { Sparkle } from "lucide-react";
@@ -171,6 +172,7 @@ export const WelcomePromoDialogView = ({
               src={bgImage}
               poster={posterUrlForVideoUrl(bgImage)}
               className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+              {...backgroundSoundProps}
               autoPlay
               muted
               loop
@@ -183,6 +185,7 @@ export const WelcomePromoDialogView = ({
           {bgImage ? (
             <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/55 via-white/20 to-black/35" />
           ) : null}
+          {bgIsVideo ? <BackgroundSoundButton className="bottom-auto right-auto left-3 top-3 z-20" /> : null}
 
           <div className="relative z-10 flex flex-1 flex-col px-5 pb-5 pt-8">
             {step === "offer" ? (

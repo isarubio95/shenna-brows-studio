@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import AnimatedSection from "@/components/AnimatedSection";
 import BannerBackgroundMedia from "@/components/BannerBackgroundMedia";
+import BackgroundSoundButton from "@/components/BackgroundSoundButton";
 import {
   clampHeroTextPos,
   type HeroConfig,
@@ -275,6 +276,8 @@ const HeroSection = ({
       >
         {ready ? textInner : null}
       </div>
+
+      <BackgroundSoundButton containerRef={sectionRef} className="bottom-6 z-4" />
 
       {preview ? (
         scrollChevron

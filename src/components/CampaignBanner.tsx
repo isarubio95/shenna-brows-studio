@@ -9,6 +9,7 @@ import {
 import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
 import BannerBackgroundMedia from "@/components/BannerBackgroundMedia";
+import BackgroundSoundButton from "@/components/BackgroundSoundButton";
 import {
   clampCampaignTextPos,
   campaignCtaPath,
@@ -258,6 +259,8 @@ const CampaignBanner = ({
       >
         {preview ? textInner : <AnimatedSection>{textInner}</AnimatedSection>}
       </div>
+
+      {hasMedia ? <BackgroundSoundButton containerRef={sectionRef} className="z-2" /> : null}
 
       {preview && !hasMedia && (
         <p className="absolute bottom-4 left-6 z-1 text-sm text-carbon/40">

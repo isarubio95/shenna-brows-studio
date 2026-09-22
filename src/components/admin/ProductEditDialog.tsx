@@ -33,7 +33,12 @@ import {
   PRODUCT_FEATURE_VIDEOS_MAX,
   type ProductFeatureVideo,
 } from "@/lib/product-feature-videos";
-import { PRODUCT_BUCKET, uploadMedia, uploadVideoMedia } from "@/lib/upload-media";
+import {
+  PRODUCT_BUCKET,
+  uploadMedia,
+  uploadVideoMedia,
+  videoUploadNotes,
+} from "@/lib/upload-media";
 import type { Area } from "react-easy-crop";
 
 type Product = Tables<"products">;
@@ -537,7 +542,12 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         );
         toast({
           title: targetId === null ? "Vídeo añadido" : "Vídeo reemplazado",
-          description: "Ponle el título que verá el cliente y guarda los cambios.",
+          description: [
+            videoUploadNotes(result),
+            "Ponle el título que verá el cliente y guarda los cambios.",
+          ]
+            .filter(Boolean)
+            .join(" "),
         });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "No se pudo subir el vídeo.";

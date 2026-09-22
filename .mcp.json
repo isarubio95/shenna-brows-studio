@@ -1,0 +1,58 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["-y", "shadcn@latest", "mcp"]
+    },
+    "eslint": {
+      "command": "npx",
+      "args": ["-y", "@eslint/mcp"]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=<TU_SUPABASE_PROJECT_REF>"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "<TU_SUPABASE_ACCESS_TOKEN>"
+      }
+    },
+    "stripe": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@stripe/mcp",
+        "--tools=all",
+        "--api-key=<TU_STRIPE_SECRET_KEY>"
+      ]
+    },
+    "vercel": {
+      "type": "http",
+      "url": "https://mcp.vercel.com/api/mcp"
+    },
+    "huggingface": {
+      "type": "http",
+      "url": "https://huggingface.co/mcp",
+      "headers": {
+        "Authorization": "Bearer <TU_HF_TOKEN>"
+      }
+    },
+    "mobbin": {
+      "command": "npx",
+      "args": ["-y", "@aos-engineer/mobbin-mcp"],
+      "env": {
+        "MOBBIN_API_KEY": "<TU_MOBBIN_API_KEY>"
+      }
+    }
+  }
+}

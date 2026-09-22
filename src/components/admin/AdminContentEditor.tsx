@@ -96,6 +96,7 @@ import {
   uploadMedia,
   uploadResultDescription,
   uploadVideoMedia,
+  videoUploadNotes,
 } from "@/lib/upload-media";
 import { HexColorField, toPickerColor } from "@/components/admin/HexColorField";
 import MediaCropDialog from "@/components/admin/MediaCropDialog";
@@ -1012,9 +1013,14 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       }));
       toast({
         title: "Vídeo subido",
-        description: result.transcoded
-          ? "Recomprimido para la web. Guarda para publicarlo."
-          : "Ya estaba optimizado. Guarda para publicarlo.",
+        description: [
+          result.transcoded
+            ? "Recomprimido para la web. Guarda para publicarlo."
+            : "Ya estaba optimizado. Guarda para publicarlo.",
+          videoUploadNotes(result),
+        ]
+          .filter(Boolean)
+          .join(" "),
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "No se pudo subir el vídeo.";

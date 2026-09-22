@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { backgroundSoundProps } from "@/components/BackgroundSoundButton";
 import { isVideoMediaUrl } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,7 @@ function BackgroundVideo({
       ref={ref}
       src={src}
       className={cn(MEDIA_CLASS, className)}
+      {...backgroundSoundProps}
       autoPlay
       muted
       loop

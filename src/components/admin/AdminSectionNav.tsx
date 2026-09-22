@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowLeft,
   CircleHelp,
@@ -21,6 +22,34 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Progress } from "@/components/ui/progress";
+
+/** Cuota de Storage del plan Free de Supabase. Actualizar si se cambia de plan. */
+const STORAGE_QUOTA_BYTES = 1024 * 1024 * 1024;
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+}
+
+function useStorageUsage() {
+  const [usedBytes, setUsedBytes] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .rpc("get_storage_usage_bytes")
+      .then(({ data, error }) => {
+        if (cancelled || error || data == null) return;
+        setUsedBytes(Number(data));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return usedBytes;
+}
 
 export type AdminSection =
   | "pedidos"
@@ -117,9 +146,29 @@ function SidebarBrand() {
   );
 }
 
+function StorageUsageBar() {
+  const usedBytes = useStorageUsage();
+  if (usedBytes == null) return null;
+
+  const percent = Math.min(100, (usedBytes / STORAGE_QUOTA_BYTES) * 100);
+
+  return (
+    <div className="mb-4">
+      <div className="mb-1.5 flex items-center justify-between text-xs text-carbon/50">
+        <span>Almacenamiento</span>
+        <span>
+          {formatBytes(usedBytes)} / {formatBytes(STORAGE_QUOTA_BYTES)}
+        </span>
+      </div>
+      <Progress value={percent} className="h-1.5" />
+    </div>
+  );
+}
+
 function SidebarFooter() {
   return (
     <div className="mt-auto pt-6 border-t border-gold/10">
+      <StorageUsageBar />
       <Link
         to="/"
         className="inline-flex items-center gap-2 text-sm text-carbon/50 hover:text-carbon transition-colors"

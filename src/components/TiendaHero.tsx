@@ -5,6 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link } from "react-router-dom";
+import BackgroundSoundButton, { backgroundSoundProps } from "@/components/BackgroundSoundButton";
 import {
   Award,
   BadgeCheck,
@@ -243,12 +244,13 @@ const TiendaHero = ({
   const contentBlockClass =
     "w-full max-w-4xl px-4 sm:px-6 md:px-8 text-center";
 
-  /** El fondo admite foto o vídeo; el vídeo va mudo y en bucle, como en el hero. */
+  /** El fondo admite foto o vídeo; arranca mudo y en bucle, con botón de sonido. */
   const renderBackgroundVideo = (src: string, className: string) => (
     <video
       src={src}
       poster={posterUrlForVideoUrl(src)}
       className={className}
+      {...backgroundSoundProps}
       autoPlay
       muted
       loop
@@ -262,7 +264,10 @@ const TiendaHero = ({
   const renderMobileImage = (src: string) => (
     <div className="relative aspect-[9/16] w-full overflow-hidden bg-[#f8f5f2] md:hidden">
       {isVideoMediaUrl(src) ? (
-        renderBackgroundVideo(src, "absolute inset-0 h-full w-full object-cover")
+        <>
+          {renderBackgroundVideo(src, "absolute inset-0 h-full w-full object-cover")}
+          <BackgroundSoundButton />
+        </>
       ) : (
         <img
           src={src}
@@ -285,6 +290,7 @@ const TiendaHero = ({
           src,
           "absolute inset-0 h-full w-full origin-top scale-[1.02] object-cover",
         )}
+        <BackgroundSoundButton />
       </div>
     ) : (
       <div className="relative hidden overflow-hidden md:block">

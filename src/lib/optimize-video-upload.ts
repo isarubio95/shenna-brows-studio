@@ -45,6 +45,8 @@ export interface OptimizedVideo {
   height: number;
   /** false cuando el archivo original ya cumplía y se sube tal cual. */
   transcoded: boolean;
+  /** true cuando el original traía sonido y el re-encode no ha podido conservarlo. */
+  audioDropped: boolean;
 }
 
 /** Origen de un vídeo: el archivo recién elegido o una URL ya subida. */
@@ -65,19 +67,34 @@ export interface OptimizeVideoOptions {
   force?: boolean;
 }
 
-const MIME_CANDIDATES = [
+/**
+ * Con sonido el MP4 sólo vale si el navegador sabe meter AAC: pedirle un MP4 «a
+ * secas» hace que Chrome muxee Opus dentro del MP4, y Safari y iOS ignoran esa
+ * pista (se ve el vídeo, pero mudo). Si no hay AAC, mejor un WebM honesto, cuyo
+ * Opus sí reproduce todo el que abre el contenedor.
+ */
+const MIME_CANDIDATES_WITH_AUDIO = [
   "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-  "video/mp4;codecs=avc1.42E01E",
-  "video/mp4",
   "video/webm;codecs=vp9,opus",
   "video/webm;codecs=vp8,opus",
+  "video/webm",
+];
+
+/** Sin sonido que preservar, el MP4 es lo que reproduce cualquier navegador. */
+const MIME_CANDIDATES_SILENT = [
+  "video/mp4;codecs=avc1.42E01E",
+  "video/mp4",
   "video/webm;codecs=vp9",
   "video/webm",
 ];
 
-function pickRecorderMimeType(): string | null {
+function pickRecorderMimeType(withAudio = false): string | null {
   if (typeof MediaRecorder === "undefined") return null;
-  return MIME_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
+  const supported = (list: string[]) => list.find((type) => MediaRecorder.isTypeSupported(type));
+  // Sin ningún contenedor con audio se graba mudo antes que no grabar nada.
+  return (withAudio ? supported(MIME_CANDIDATES_WITH_AUDIO) : undefined)
+    ?? supported(MIME_CANDIDATES_SILENT)
+    ?? null;
 }
 
 /** true cuando el navegador puede recortar y recomprimir vídeo por su cuenta. */
@@ -166,13 +183,26 @@ function fitOutputSize(
   return { width: toEven(sourceWidth), height: toEven(sourceHeight) };
 }
 
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Sin gesto del usuario `resume()` no resuelve nunca, así que se corre contra el reloj. */
+const AUDIO_RESUME_TIMEOUT_MS = 1500;
+
+interface CapturedAudio {
+  /** null cuando el navegador no da Web Audio o el contexto no llegó a arrancar. */
+  track: MediaStreamTrack | null;
+  close: () => void;
+}
+
 /**
  * Captura el audio del elemento sin sacarlo por los altavoces: el grafo de Web Audio
  * termina en un destino de MediaStream y nunca se conecta a `ctx.destination`.
+ *
+ * Un `AudioContext` recién creado nace suspendido y, suspendido, no procesa nada:
+ * la pista saldría muda. De ahí el `resume()`, que la política de reproducción
+ * concede porque el admin viene de pulsar el selector de archivos.
  */
-function captureSilentAudioTrack(
-  video: HTMLVideoElement,
-): { track: MediaStreamTrack | null; close: () => void } {
+async function captureAudioTrack(video: HTMLVideoElement): Promise<CapturedAudio> {
   const AudioCtx =
     typeof window === "undefined"
       ? undefined
@@ -184,21 +214,107 @@ function captureSilentAudioTrack(
     const source = ctx.createMediaElementSource(video);
     const destination = ctx.createMediaStreamDestination();
     source.connect(destination);
-    const track = destination.stream.getAudioTracks()[0] ?? null;
-    return {
-      track,
-      close: () => {
-        try {
-          source.disconnect();
-        } catch {
-          /* ya desconectado */
-        }
-        void ctx.close();
-      },
+    const close = () => {
+      try {
+        source.disconnect();
+      } catch {
+        /* ya desconectado */
+      }
+      void ctx.close();
     };
+
+    if (ctx.state === "suspended") {
+      await Promise.race([
+        ctx.resume().catch(() => {
+          /* el estado se comprueba abajo */
+        }),
+        wait(AUDIO_RESUME_TIMEOUT_MS),
+      ]);
+    }
+    // Sigue suspendido: grabaríamos silencio, así que mejor un archivo sin pista.
+    if (ctx.state !== "running") {
+      close();
+      return { track: null, close: () => {} };
+    }
+
+    return { track: destination.stream.getAudioTracks()[0] ?? null, close };
   } catch {
     return { track: null, close: () => {} };
   }
+}
+
+/**
+ * ¿Trae sonido el original? Sólo cuenta la confirmación: ante la duda se graba en
+ * MP4 mudo, que es lo que reproduce cualquier navegador, en vez de arriesgar un
+ * WebM por un audio que quizá ni exista.
+ *
+ * `webkitAudioDecodedByteCount` (Chrome) sólo sube cuando ya se ha decodificado
+ * audio, de ahí la reproducción de sondeo previa.
+ */
+function sourceHasAudio(video: HTMLVideoElement): boolean {
+  const probe = video as HTMLVideoElement & {
+    mozHasAudio?: boolean;
+    audioTracks?: { length: number };
+    webkitAudioDecodedByteCount?: number;
+  };
+  if (typeof probe.mozHasAudio === "boolean") return probe.mozHasAudio;
+  if (probe.audioTracks && typeof probe.audioTracks.length === "number") {
+    return probe.audioTracks.length > 0;
+  }
+  return (probe.webkitAudioDecodedByteCount ?? 0) > 0;
+}
+
+/** Hay archivos en los que el salto no confirma nunca, de ahí el tope de espera. */
+const SEEK_TIMEOUT_MS = 1000;
+
+function seekToStart(video: HTMLVideoElement): Promise<void> {
+  if (video.currentTime === 0) return Promise.resolve();
+  const seeked = new Promise<void>((resolve) => {
+    video.onseeked = () => {
+      video.onseeked = null;
+      resolve();
+    };
+    video.currentTime = 0;
+  });
+  return Promise.race([seeked, wait(SEEK_TIMEOUT_MS)]);
+}
+
+/**
+ * Espera a que haya fotograma que pintar. Se sondea en vez de escuchar `loadeddata`
+ * porque ese evento ya se ha disparado antes del sondeo y no vuelve a repetirse:
+ * esperarlo dejaba la subida colgada para siempre.
+ */
+async function waitForFrameData(video: HTMLVideoElement): Promise<void> {
+  const deadline = performance.now() + FRAME_DATA_TIMEOUT_MS;
+  while (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA && performance.now() < deadline) {
+    await wait(50);
+  }
+}
+
+const FRAME_DATA_TIMEOUT_MS = 3000;
+
+/** Lo que se reproduce para que el decodificador toque el audio, y su tope de espera. */
+const SNIFF_PLAY_MS = 250;
+const SNIFF_TIMEOUT_MS = 3000;
+
+/**
+ * Reproduce un instante para saber si el archivo trae sonido y si la política de
+ * reproducción nos deja arrancarlo sin silenciar. No se oye nada: el audio ya va
+ * enrutado al grafo de Web Audio.
+ */
+async function sniffSource(video: HTMLVideoElement): Promise<{ playable: boolean; hasAudio: boolean }> {
+  let playable = true;
+  try {
+    // El sondeo tampoco puede colgarse: si `play()` no resuelve, se da por perdido.
+    await Promise.race([video.play(), wait(SNIFF_TIMEOUT_MS)]);
+    await wait(SNIFF_PLAY_MS);
+  } catch {
+    playable = false;
+  }
+  const hasAudio = sourceHasAudio(video);
+  video.pause();
+  await seekToStart(video);
+  return { playable, hasAudio };
 }
 
 function drawFrame(
@@ -231,8 +347,7 @@ async function transcodeVideo(
   crop: Area | null,
   onProgress?: (ratio: number) => void,
 ): Promise<OptimizedVideo> {
-  const mimeType = pickRecorderMimeType();
-  if (!mimeType) {
+  if (!pickRecorderMimeType()) {
     throw new Error("Este navegador no puede procesar vídeo. Sube un archivo ya optimizado.");
   }
 
@@ -258,14 +373,27 @@ async function transcodeVideo(
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("No se pudo procesar el vídeo.");
 
+    // El grafo de audio se monta antes del sondeo para que éste no se oiga.
+    const audio = await captureAudioTrack(video);
+    const sniff = await sniffSource(video);
+    // Sin poder reproducir sin silenciar no hay sonido que grabar (ni que prometer).
+    const keepAudio = Boolean(audio.track) && sniff.hasAudio && sniff.playable;
+    if (!keepAudio) {
+      // Sin grafo que se quede el audio, silenciar es lo que garantiza que el
+      // re-encode no salga por los altavoces del admin.
+      video.muted = true;
+      audio.close();
+    }
+
+    const mimeType = pickRecorderMimeType(keepAudio)!;
+
     const stream = canvas.captureStream(TARGET_FPS);
-    const audio = captureSilentAudioTrack(video);
-    if (audio.track) stream.addTrack(audio.track);
+    if (keepAudio && audio.track) stream.addTrack(audio.track);
 
     const recorder = new MediaRecorder(stream, {
       mimeType,
       videoBitsPerSecond: TARGET_BITRATE[variant],
-      audioBitsPerSecond: 128_000,
+      ...(keepAudio ? { audioBitsPerSecond: 128_000 } : {}),
     });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (event) => {
@@ -287,13 +415,7 @@ async function transcodeVideo(
 
     // El primer fotograma debe estar en el canvas antes de arrancar la grabación.
     video.currentTime = 0;
-    await new Promise<void>((resolve) => {
-      if (video.readyState >= 2) {
-        resolve();
-        return;
-      }
-      video.onloadeddata = () => resolve();
-    });
+    await waitForFrameData(video);
     drawFrame(ctx, video, crop, width, height);
 
     // El fin de la reproducción cierra la grabación, así que se engancha antes
@@ -310,8 +432,8 @@ async function transcodeVideo(
     try {
       await video.play();
     } catch {
-      // La política de autoplay sólo deja arrancar en mudo si se ha perdido el
-      // gesto del usuario. La pista de audio sigue en la grabación, muda.
+      // Sin gesto del usuario la política de reproducción sólo deja arrancar en
+      // mudo. El sondeo ya lo detectó, así que la grabación va sin pista de audio.
       video.muted = true;
       await video.play();
     }
@@ -337,7 +459,7 @@ async function transcodeVideo(
       await recorded;
     } finally {
       clearTimeout(watchdog);
-      audio.close();
+      if (keepAudio) audio.close();
     }
 
     const blob = new Blob(chunks, { type: mimeType });
@@ -352,6 +474,7 @@ async function transcodeVideo(
       width,
       height,
       transcoded: true,
+      audioDropped: sniff.hasAudio && !keepAudio,
     };
   });
 }
@@ -408,6 +531,8 @@ export async function optimizeVideoForUpload(
       width: probe.width,
       height: probe.height,
       transcoded: false,
+      // Se sube el archivo tal cual, así que conserva el sonido que trajera.
+      audioDropped: false,
     };
   };
 

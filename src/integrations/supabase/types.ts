@@ -501,6 +501,10 @@ export type Database = {
       }
     }
     Functions: {
+      get_storage_usage_bytes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
