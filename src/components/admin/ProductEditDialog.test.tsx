@@ -24,6 +24,7 @@ const product: Product = {
   is_on_sale: false,
   sale_price: null,
   color_variants: [],
+  feature_videos: [],
   created_at: null,
   updated_at: null,
   stripe_price_id: null,
@@ -83,6 +84,62 @@ describe("ProductEditDialog description editor", () => {
     fireEvent.change(nameInput, { target: { value: "Nombre nuevo" } });
 
     expect(document.getElementById("description")?.innerHTML).toContain("Texto editado ahora");
+  });
+});
+
+describe("ProductEditDialog vídeos de la ficha", () => {
+  it("explica dónde salen los vídeos y deja claro que son opcionales", () => {
+    render(
+      <ProductEditDialog
+        product={product}
+        mode="edit"
+        open
+        onOpenChange={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Vídeos de la ficha")).toBeInTheDocument();
+    expect(screen.getByText(/columna de la izquierda, al lado de la descripción/)).toBeInTheDocument();
+    expect(screen.getByText(/carrusel debajo de «Envío»/)).toBeInTheDocument();
+    expect(screen.getByText(/la ficha muestra solo las fotos y el texto/i)).toBeInTheDocument();
+  });
+
+  it("precarga los vídeos guardados con su título", () => {
+    render(
+      <ProductEditDialog
+        product={{
+          ...product,
+          feature_videos: [
+            { id: "v1", title: "El anuncio", videoUrl: "https://x/a.mp4", aspectRatio: 0.5625 },
+            { id: "v2", title: "Cómo se utiliza", videoUrl: "https://x/b.mp4", aspectRatio: 0.5625 },
+          ],
+        }}
+        mode="edit"
+        open
+        onOpenChange={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+
+    const titles = screen
+      .getAllByLabelText("Título: qué se ve en el vídeo")
+      .map((input) => (input as HTMLInputElement).value);
+    expect(titles).toEqual(["El anuncio", "Cómo se utiliza"]);
+  });
+
+  it("no arrastra los vídeos de otro producto al crear uno nuevo", () => {
+    render(
+      <ProductEditDialog
+        product={null}
+        mode="create"
+        open
+        onOpenChange={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+
+    expect(screen.queryAllByLabelText("Título: qué se ve en el vídeo")).toHaveLength(0);
   });
 });
 

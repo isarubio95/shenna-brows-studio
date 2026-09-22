@@ -13,3 +13,19 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+
+// jsdom no implementa ResizeObserver y los carruseles lo usan para recalcular
+// el paso del scroll. Basta un doble sin comportamiento.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+if (!("ResizeObserver" in window)) {
+  Object.defineProperty(window, "ResizeObserver", {
+    writable: true,
+    value: ResizeObserverStub,
+  });
+  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}

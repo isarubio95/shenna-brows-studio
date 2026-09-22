@@ -18,11 +18,21 @@ import { normalizeHex, parseColorVariants, type ColorVariant } from "@/lib/color
 import { cn } from "@/lib/utils";
 import MediaCropDialog from "@/components/admin/MediaCropDialog";
 import ProductMedia from "@/components/ProductMedia";
+import ProductFeatureVideosField, {
+  FEATURE_VIDEO_ACCEPT,
+} from "@/components/admin/ProductFeatureVideosField";
 import {
   isBannerMediaFile as isProductMediaFile,
+  isVideoFile,
   isVideoMediaUrl,
   PRODUCT_MEDIA_ACCEPT,
 } from "@/lib/media-url";
+import {
+  parseProductFeatureVideos,
+  serializeProductFeatureVideos,
+  PRODUCT_FEATURE_VIDEOS_MAX,
+  type ProductFeatureVideo,
+} from "@/lib/product-feature-videos";
 import { PRODUCT_BUCKET, uploadMedia, uploadVideoMedia } from "@/lib/upload-media";
 import type { Area } from "react-easy-crop";
 
@@ -118,6 +128,7 @@ const buildProductSnapshot = (args: {
   materialItems: string[];
   imageUrls: string[];
   colorVariantRows: ColorVariantFormRow[];
+  featureVideos: ProductFeatureVideo[];
 }) => {
   const colors = args.colorVariantRows
     .map((r) => ({
@@ -142,6 +153,7 @@ const buildProductSnapshot = (args: {
     is_on_sale: Boolean(args.form.is_on_sale),
     sale_price: args.form.is_on_sale ? Number(args.form.sale_price) : null,
     color_variants: colors,
+    feature_videos: serializeProductFeatureVideos(args.featureVideos),
   });
 };
 
@@ -162,6 +174,13 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const [thumbDragIndex, setThumbDragIndex] = useState<number | null>(null);
   const [thumbDragOverIndex, setThumbDragOverIndex] = useState<number | null>(null);
   const [colorVariantRows, setColorVariantRows] = useState<ColorVariantFormRow[]>([]);
+  const [featureVideos, setFeatureVideos] = useState<ProductFeatureVideo[]>([]);
+  /** Id del vídeo que se está subiendo, `"new"` si es uno nuevo; null si no hay ninguno. */
+  const [featureVideoUploadingId, setFeatureVideoUploadingId] = useState<string | null>(null);
+  const [featureVideoProgress, setFeatureVideoProgress] = useState<number | null>(null);
+  const featureVideoInputRef = useRef<HTMLInputElement>(null);
+  /** Vídeo al que reemplaza el archivo elegido; null cuando se añade uno nuevo. */
+  const featureVideoTargetRef = useRef<string | null>(null);
   const descriptionEditorRef = useRef<HTMLDivElement>(null);
   const [slugConflict, setSlugConflict] = useState<SlugConflict | null>(null);
   const [slugChecking, setSlugChecking] = useState(false);
@@ -184,12 +203,14 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       setImageUrls([]);
       setPreviewIndex(0);
       setColorVariantRows([]);
+      setFeatureVideos([]);
       setBaselineSnapshot(
         buildProductSnapshot({
           form: EMPTY_CREATE_FORM,
           materialItems: [""],
           imageUrls: [],
           colorVariantRows: [],
+          featureVideos: [],
         }),
       );
       return;
@@ -217,17 +238,22 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     const nextImages = parseProductImages(currentProduct.image_url);
     const parsed = parseColorVariants(currentProduct.color_variants);
     const nextColors = parsed.map((v) => ({ ...v, hexDraft: null as string | null }));
+    const nextFeatureVideos = parseProductFeatureVideos(
+      (currentProduct as { feature_videos?: unknown }).feature_videos,
+    );
     setMaterialItems(nextMaterials);
     setForm(nextForm);
     setImageUrls(nextImages);
     setPreviewIndex(0);
     setColorVariantRows(nextColors);
+    setFeatureVideos(nextFeatureVideos);
     setBaselineSnapshot(
       buildProductSnapshot({
         form: nextForm,
         materialItems: nextMaterials,
         imageUrls: nextImages,
         colorVariantRows: nextColors,
+        featureVideos: nextFeatureVideos,
       }),
     );
   }, [currentProduct, mode, open]);
@@ -235,9 +261,10 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const isDirty = useMemo(() => {
     if (!baselineSnapshot) return false;
     return (
-      buildProductSnapshot({ form, materialItems, imageUrls, colorVariantRows }) !== baselineSnapshot
+      buildProductSnapshot({ form, materialItems, imageUrls, colorVariantRows, featureVideos }) !==
+      baselineSnapshot
     );
-  }, [baselineSnapshot, form, materialItems, imageUrls, colorVariantRows]);
+  }, [baselineSnapshot, form, materialItems, imageUrls, colorVariantRows, featureVideos]);
 
   const updateField = (field: keyof Product, value: string | number | boolean | null) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -469,6 +496,91 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     [currentProduct, mediaPathPrefix, mode, toast],
   );
 
+  /** Sube un vídeo de la ficha y lo añade al final, o reemplaza el que se indique. */
+  const uploadFeatureVideo = useCallback(
+    async (file: File, targetId: string | null) => {
+      if (mode !== "create" && !currentProduct) return;
+      if (!isVideoFile(file)) {
+        toast({
+          title: "Ese archivo no es un vídeo",
+          description: "Sube un archivo MP4, WebM o MOV.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (targetId === null && featureVideos.length >= PRODUCT_FEATURE_VIDEOS_MAX) {
+        toast({
+          title: `Como máximo ${PRODUCT_FEATURE_VIDEOS_MAX} vídeos`,
+          description: "Quita uno de los que ya hay para añadir otro.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setFeatureVideoUploadingId(targetId ?? "new");
+      try {
+        const result = await uploadMedia(file, {
+          bucket: PRODUCT_BUCKET,
+          pathPrefix: `${mediaPathPrefix()}-video`,
+          variant: "mobile",
+          onProgress: setFeatureVideoProgress,
+        });
+        const aspectRatio = result.width && result.height ? result.width / result.height : null;
+        setFeatureVideos((prev) =>
+          targetId === null
+            ? [
+                ...prev,
+                { id: crypto.randomUUID(), title: "", videoUrl: result.url, aspectRatio },
+              ]
+            : prev.map((v) =>
+                v.id === targetId ? { ...v, videoUrl: result.url, aspectRatio } : v,
+              ),
+        );
+        toast({
+          title: targetId === null ? "Vídeo añadido" : "Vídeo reemplazado",
+          description: "Ponle el título que verá el cliente y guarda los cambios.",
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "No se pudo subir el vídeo.";
+        toast({ title: "Error al subir el vídeo", description: message, variant: "destructive" });
+      } finally {
+        setFeatureVideoProgress(null);
+        setFeatureVideoUploadingId(null);
+      }
+    },
+    [currentProduct, featureVideos.length, mediaPathPrefix, mode, toast],
+  );
+
+  const pickFeatureVideoFile = (targetId: string | null) => {
+    featureVideoTargetRef.current = targetId;
+    featureVideoInputRef.current?.click();
+  };
+
+  const handleFeatureVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const targetId = featureVideoTargetRef.current;
+    featureVideoTargetRef.current = null;
+    e.target.value = "";
+    if (file) void uploadFeatureVideo(file, targetId);
+  };
+
+  const updateFeatureVideoTitle = (id: string, title: string) => {
+    setFeatureVideos((prev) => prev.map((v) => (v.id === id ? { ...v, title } : v)));
+  };
+
+  const removeFeatureVideo = (id: string) => {
+    setFeatureVideos((prev) => prev.filter((v) => v.id !== id));
+  };
+
+  const moveFeatureVideo = (index: number, direction: -1 | 1) => {
+    setFeatureVideos((prev) => {
+      const to = index + direction;
+      if (to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[to]] = [next[to], next[index]];
+      return next;
+    });
+  };
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -561,6 +673,18 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       colorVariantsPayload.push({ id: r.id, name, hex });
     }
 
+    const untitledVideo = featureVideos.find((v) => !v.title.trim());
+    if (untitledVideo) {
+      toast({
+        title: "Falta el título de un vídeo",
+        description:
+          "Cada vídeo de la ficha necesita un título que diga qué se ve en él, o quítalo de la lista.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const featureVideosPayload = serializeProductFeatureVideos(featureVideos);
+
     if (!validateSaleFields()) return;
 
     if (mode === "create") {
@@ -614,6 +738,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           is_pack: Boolean(form.is_pack),
           ...salePayload(),
           color_variants: colorVariantsPayload,
+          feature_videos: featureVideosPayload,
         })
         .select("id");
 
@@ -672,6 +797,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         is_pack: Boolean(form.is_pack),
         ...salePayload(),
         color_variants: colorVariantsPayload,
+        feature_videos: featureVideosPayload,
       })
       .eq("id", currentProduct.id);
 
@@ -1079,6 +1205,25 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 />
               </div>
               <p className="text-xs text-carbon/40 mt-1">Enter crea un párrafo nuevo. Shift+Enter crea salto de línea.</p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <ProductFeatureVideosField
+                videos={featureVideos}
+                uploadingId={featureVideoUploadingId}
+                progress={featureVideoProgress}
+                onPickFile={pickFeatureVideoFile}
+                onTitleChange={updateFeatureVideoTitle}
+                onRemove={removeFeatureVideo}
+                onMove={moveFeatureVideo}
+              />
+              <input
+                ref={featureVideoInputRef}
+                type="file"
+                accept={FEATURE_VIDEO_ACCEPT}
+                className="hidden"
+                onChange={handleFeatureVideoFileSelect}
+              />
             </div>
 
             {/* Materials / Composición section */}

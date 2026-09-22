@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
+import { TikTokIcon } from "@/components/icons/TikTokIcon";
+import { INSTAGRAM_URL, TIKTOK_URL } from "@/lib/social-links";
 import AnnouncementBar from "@/components/AnnouncementBar";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -120,13 +122,23 @@ const Navbar = () => {
 
           <div className="flex items-center gap-3 lg:gap-4 relative z-10">
             <a
-              href="https://www.instagram.com/shennabrows/"
+              href={INSTAGRAM_URL}
               target="_blank"
               rel="noopener noreferrer"
               className={`hidden lg:flex p-1 transition-colors duration-300 ${iconColor}`}
               aria-label="Instagram"
             >
               <InstagramIcon width={21} height={21} className="drop-shadow-sm" />
+            </a>
+
+            <a
+              href={TIKTOK_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`hidden lg:flex p-1 transition-colors duration-300 ${iconColor}`}
+              aria-label="TikTok"
+            >
+              <TikTokIcon width={21} height={21} className="drop-shadow-sm" />
             </a>
 
             {isAdmin && (
@@ -233,13 +245,22 @@ const Navbar = () => {
           <div className="mt-auto pb-6 pt-4 border-t border-gold/10">
             <div className="flex items-center gap-4 px-1 mb-5">
               <a
-                href="https://www.instagram.com/shennabrows/"
+                href={INSTAGRAM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-carbon/70 hover:text-gold transition-colors"
                 aria-label="Instagram"
               >
                 <InstagramIcon width={21} height={21} />
+              </a>
+              <a
+                href={TIKTOK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-carbon/70 hover:text-gold transition-colors"
+                aria-label="TikTok"
+              >
+                <TikTokIcon width={21} height={21} />
               </a>
             </div>
 

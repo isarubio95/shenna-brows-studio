@@ -2,6 +2,8 @@ import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
+import { TikTokIcon } from "@/components/icons/TikTokIcon";
+import { INSTAGRAM_URL, TIKTOK_URL } from "@/lib/social-links";
 import logo from "@/assets/logo-shenna.png";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -132,8 +134,11 @@ const Footer = () => {
           <div>
             <h4 className="font-semibold text-cream text-sm uppercase tracking-widest mb-4">Contacto</h4>
             <div className="flex gap-4 mb-4">
-              <a href="https://www.instagram.com/shennabrows/" className="hover:text-gold transition-colors" aria-label="Instagram" rel="noopener noreferrer" target="_blank">
+              <a href={INSTAGRAM_URL} className="hover:text-gold transition-colors" aria-label="Instagram" rel="noopener noreferrer" target="_blank">
                 <InstagramIcon width={20} height={20} />
+              </a>
+              <a href={TIKTOK_URL} className="hover:text-gold transition-colors" aria-label="TikTok" rel="noopener noreferrer" target="_blank">
+                <TikTokIcon width={20} height={20} />
               </a>
               <a href="mailto:info@shennabrows.com" className="hover:text-gold transition-colors" aria-label="Email">
                 <Mail size={20} />

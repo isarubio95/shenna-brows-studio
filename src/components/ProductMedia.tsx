@@ -11,6 +11,11 @@ interface ProductMediaProps {
   playable?: boolean;
   loading?: "eager" | "lazy";
   fetchPriority?: "high" | "low" | "auto";
+  /**
+   * Fuerza la descarga de metadatos del vídeo. Sirve donde no se puede contar con
+   * el póster (el panel de administración) y hace falta ver el primer fotograma.
+   */
+  preload?: "none" | "metadata";
 }
 
 /**
@@ -24,6 +29,7 @@ const ProductMedia = ({
   playable = false,
   loading = "lazy",
   fetchPriority,
+  preload,
 }: ProductMediaProps) => {
   if (isVideoMediaUrl(src)) {
     const poster = posterUrlForVideoUrl(src);
@@ -33,7 +39,7 @@ const ProductMedia = ({
         poster={poster}
         className={className}
         // Sin `playable` no se descarga el vídeo: basta el póster o el primer fotograma.
-        preload={playable ? "metadata" : "none"}
+        preload={preload ?? (playable ? "metadata" : "none")}
         autoPlay={playable}
         loop={playable}
         muted

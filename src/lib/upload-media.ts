@@ -41,6 +41,9 @@ export interface UploadedMedia {
   posterUrl?: string;
   /** Sólo en vídeo: false cuando el original ya cumplía y se subió sin recomprimir. */
   transcoded?: boolean;
+  /** Sólo en vídeo: dimensiones del archivo subido, para reservar su hueco al pintarlo. */
+  width?: number;
+  height?: number;
   extension: string;
 }
 
@@ -88,6 +91,8 @@ export async function uploadVideoMedia(
     kind: "video",
     posterUrl,
     transcoded: optimized.transcoded,
+    width: optimized.width,
+    height: optimized.height,
     extension: optimized.extension,
   };
 }

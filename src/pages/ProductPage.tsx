@@ -9,6 +9,11 @@ import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import { ShoppingBag, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImageGallery, getProductPosterUrl } from "@/lib/product-images";
 import ProductMedia from "@/components/ProductMedia";
+import {
+  ProductFeatureVideoCarousel,
+  ProductFeatureVideoStack,
+} from "@/components/ProductFeatureVideos";
+import { parseProductFeatureVideos } from "@/lib/product-feature-videos";
 import { getEffectivePrice } from "@/lib/product-pricing";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import { useSiteBadges } from "@/hooks/use-site-badges";
@@ -67,6 +72,11 @@ const ProductPage = () => {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
 
   const colorVariants = useMemo(() => parseColorVariants(product?.color_variants), [product?.color_variants]);
+
+  const featureVideos = useMemo(
+    () => parseProductFeatureVideos(product?.feature_videos),
+    [product?.feature_videos],
+  );
 
   useEffect(() => {
     if (colorVariants.length > 0) {
@@ -269,11 +279,18 @@ const ProductPage = () => {
                   ))}
                 </div>
               )}
+
+              <ProductFeatureVideoStack
+                videos={featureVideos}
+                productName={product.name}
+                className="hidden lg:block mt-8"
+              />
             </div>
           </AnimatedSection>
 
           <AnimatedSection delay={0.15}>
-            <div className="flex flex-col justify-center">
+            {/* Con vídeos la columna izquierda crece mucho: centrar el texto lo descolgaría. */}
+            <div className={featureVideos.length > 0 ? "flex flex-col" : "flex flex-col justify-center"}>
               <p className="text-gold text-xs uppercase tracking-[0.3em] font-medium mb-3">{product.category}</p>
               <h1
                 className="product-page-title font-playfair text-4xl md:text-5xl font-bold mb-3"
@@ -403,6 +420,12 @@ const ProductPage = () => {
                   <h3 className="product-section-title text-sm font-medium tracking-wide mb-3">Envío</h3>
                   <p className="text-carbon/60 text-sm leading-relaxed">{product.shipping_info}</p>
                 </section>
+                {featureVideos.length > 0 && (
+                  <section className="border-b border-gold/10 py-5 lg:hidden">
+                    <h3 className="product-section-title text-sm font-medium tracking-wide mb-3">En vídeo</h3>
+                    <ProductFeatureVideoCarousel videos={featureVideos} productName={product.name} />
+                  </section>
+                )}
               </div>
             </div>
           </AnimatedSection>
