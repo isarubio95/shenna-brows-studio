@@ -3,17 +3,17 @@ import type { Area } from "react-easy-crop";
 export type OptimizeVideoVariant = "desktop" | "mobile";
 
 /**
- * Bitrate del re-encode cuando no queda más remedio (recorte o .mov). El MP4/WebM
- * original se sube tal cual: recomprimir con MediaRecorder era lo que bajaba la calidad.
+ * Bitrate del re-encode cuando hay que volver a codificar la imagen (recorte, HEVC
+ * o un lado por encima de 4K). El MP4/WebM compatible se sube tal cual: recomprimir
+ * con MediaRecorder desfasaba el audio, porque la imagen salía del reloj del canvas
+ * y el sonido del de Web Audio, y esos dos relojes no coinciden.
  */
 const TARGET_BITRATE = 12_000_000;
 
-const TARGET_FPS = 60;
-
-/** Tope del canvas al recortar o convertir .mov; el original no se reescala. */
+/** Tope al recortar o al convertir un códec que el navegador no reproduce. */
 const MAX_TRANSCODE_EDGE = 3840;
 
-/** El re-encode va a velocidad de reproducción: por encima de esto la espera es inasumible. */
+/** Por encima de esto no se recodifica: el archivo resultante no cabe con holgura en memoria. */
 export const MAX_TRANSCODE_SECONDS = 180;
 
 export interface OptimizedVideo {
@@ -46,42 +46,9 @@ export interface OptimizeVideoOptions {
   force?: boolean;
 }
 
-/**
- * Con sonido el MP4 sólo vale si el navegador sabe meter AAC: pedirle un MP4 «a
- * secas» hace que Chrome muxee Opus dentro del MP4, y Safari y iOS ignoran esa
- * pista (se ve el vídeo, pero mudo). Si no hay AAC, mejor un WebM honesto, cuyo
- * Opus sí reproduce todo el que abre el contenedor.
- */
-const MIME_CANDIDATES_WITH_AUDIO = [
-  "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-  "video/webm;codecs=vp9,opus",
-  "video/webm;codecs=vp8,opus",
-  "video/webm",
-];
-
-/** Sin sonido que preservar, el MP4 es lo que reproduce cualquier navegador. */
-const MIME_CANDIDATES_SILENT = [
-  "video/mp4;codecs=avc1.42E01E",
-  "video/mp4",
-  "video/webm;codecs=vp9",
-  "video/webm",
-];
-
-function pickRecorderMimeType(withAudio = false): string | null {
-  if (typeof MediaRecorder === "undefined") return null;
-  const supported = (list: string[]) => list.find((type) => MediaRecorder.isTypeSupported(type));
-  // Sin ningún contenedor con audio se graba mudo antes que no grabar nada.
-  return (withAudio ? supported(MIME_CANDIDATES_WITH_AUDIO) : undefined)
-    ?? supported(MIME_CANDIDATES_SILENT)
-    ?? null;
-}
-
-/** true cuando el navegador puede recortar y recomprimir vídeo por su cuenta. */
+/** true cuando el navegador puede recodificar vídeo con los tiempos del original. */
 export function canTranscodeVideo(): boolean {
-  if (typeof document === "undefined") return false;
-  if (pickRecorderMimeType() === null) return false;
-  const canvas = document.createElement("canvas");
-  return typeof canvas.captureStream === "function";
+  return typeof VideoEncoder !== "undefined" && typeof VideoFrame !== "undefined";
 }
 
 function extensionForMimeType(mimeType: string): "mp4" | "webm" {
@@ -161,299 +128,190 @@ function fitOutputSize(
   return { width: toEven(sourceWidth), height: toEven(sourceHeight) };
 }
 
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Sin gesto del usuario `resume()` no resuelve nunca, así que se corre contra el reloj. */
-const AUDIO_RESUME_TIMEOUT_MS = 1500;
-
-interface CapturedAudio {
-  /** null cuando el navegador no da Web Audio o el contexto no llegó a arrancar. */
-  track: MediaStreamTrack | null;
-  close: () => void;
+export interface VideoTranscodePlan {
+  /** true cuando hay que volver a codificar la imagen. Si no, se copian los paquetes. */
+  reencode: boolean;
+  width?: number;
+  height?: number;
+  crop?: { left: number; top: number; width: number; height: number };
 }
 
 /**
- * Captura el audio del elemento sin sacarlo por los altavoces: el grafo de Web Audio
- * termina en un destino de MediaStream y nunca se conecta a `ctx.destination`.
- *
- * Un `AudioContext` recién creado nace suspendido y, suspendido, no procesa nada:
- * la pista saldría muda. De ahí el `resume()`, que la política de reproducción
- * concede porque el admin viene de pulsar el selector de archivos.
+ * Decide si la imagen se vuelve a codificar. El audio no entra aquí: se copia
+ * con sus tiempos originales para que no se separe de la imagen.
  */
-async function captureAudioTrack(video: HTMLVideoElement): Promise<CapturedAudio> {
-  const AudioCtx =
-    typeof window === "undefined"
-      ? undefined
-      : window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtx) return { track: null, close: () => {} };
+export function planVideoTranscode(args: {
+  crop: Area | null;
+  displayWidth: number;
+  displayHeight: number;
+  codec: string | null;
+}): VideoTranscodePlan {
+  const oversized =
+    args.displayWidth > MAX_TRANSCODE_EDGE || args.displayHeight > MAX_TRANSCODE_EDGE;
+  const reencode = args.crop !== null || oversized || args.codec !== "avc";
+  const plan: VideoTranscodePlan = { reencode };
+  if (!reencode) return plan;
 
-  try {
-    const ctx = new AudioCtx();
-    const source = ctx.createMediaElementSource(video);
-    const destination = ctx.createMediaStreamDestination();
-    source.connect(destination);
-    const close = () => {
-      try {
-        source.disconnect();
-      } catch {
-        /* ya desconectado */
-      }
-      void ctx.close();
+  if (args.crop) {
+    const size = fitOutputSize(args.crop.width, args.crop.height);
+    plan.crop = {
+      left: Math.max(0, args.crop.x),
+      top: Math.max(0, args.crop.y),
+      width: args.crop.width,
+      height: args.crop.height,
     };
-
-    if (ctx.state === "suspended") {
-      await Promise.race([
-        ctx.resume().catch(() => {
-          /* el estado se comprueba abajo */
-        }),
-        wait(AUDIO_RESUME_TIMEOUT_MS),
-      ]);
-    }
-    // Sigue suspendido: grabaríamos silencio, así que mejor un archivo sin pista.
-    if (ctx.state !== "running") {
-      close();
-      return { track: null, close: () => {} };
-    }
-
-    return { track: destination.stream.getAudioTracks()[0] ?? null, close };
-  } catch {
-    return { track: null, close: () => {} };
+    plan.width = size.width;
+    plan.height = size.height;
+    return plan;
   }
+
+  const size = fitOutputSize(args.displayWidth, args.displayHeight);
+  if (oversized || size.width !== args.displayWidth || size.height !== args.displayHeight) {
+    plan.width = size.width;
+    plan.height = size.height;
+  }
+  return plan;
+}
+
+async function sourceBlob(source: VideoSource): Promise<Blob> {
+  if (typeof source !== "string") return source;
+  const response = await fetch(source);
+  if (!response.ok) throw new Error("No se pudo leer el vídeo.");
+  return response.blob();
+}
+
+function transcodeFailureMessage(
+  discarded: { reason: string; track: { isVideoTrack: () => boolean } }[],
+): string {
+  const video = discarded.find((entry) => entry.track.isVideoTrack());
+  if (
+    video?.reason === "no_encodable_target_codec" ||
+    video?.reason === "undecodable_source_codec"
+  ) {
+    return "Este navegador no puede procesar este vídeo. Prueba con Chrome o Edge.";
+  }
+  return "No se pudo procesar el vídeo.";
 }
 
 /**
- * ¿Trae sonido el original? Sólo cuenta la confirmación: ante la duda se graba en
- * MP4 mudo, que es lo que reproduce cualquier navegador, en vez de arriesgar un
- * WebM por un audio que quizá ni exista.
- *
- * `webkitAudioDecodedByteCount` (Chrome) sólo sube cuando ya se ha decodificado
- * audio, de ahí la reproducción de sondeo previa.
+ * Pasa el archivo a MP4. La imagen sólo se vuelve a codificar si hace falta
+ * (recorte, HEVC o un lado enorme); el audio se copia tal cual, con los mismos
+ * tiempos del original. Eso es lo que mantiene el sonido a la par de la imagen.
  */
-function sourceHasAudio(video: HTMLVideoElement): boolean {
-  const probe = video as HTMLVideoElement & {
-    mozHasAudio?: boolean;
-    audioTracks?: { length: number };
-    webkitAudioDecodedByteCount?: number;
-  };
-  if (typeof probe.mozHasAudio === "boolean") return probe.mozHasAudio;
-  if (probe.audioTracks && typeof probe.audioTracks.length === "number") {
-    return probe.audioTracks.length > 0;
-  }
-  return (probe.webkitAudioDecodedByteCount ?? 0) > 0;
-}
-
-/** Hay archivos en los que el salto no confirma nunca, de ahí el tope de espera. */
-const SEEK_TIMEOUT_MS = 1000;
-
-function seekToStart(video: HTMLVideoElement): Promise<void> {
-  if (video.currentTime === 0) return Promise.resolve();
-  const seeked = new Promise<void>((resolve) => {
-    video.onseeked = () => {
-      video.onseeked = null;
-      resolve();
-    };
-    video.currentTime = 0;
-  });
-  return Promise.race([seeked, wait(SEEK_TIMEOUT_MS)]);
-}
-
-/**
- * Espera a que haya fotograma que pintar. Se sondea en vez de escuchar `loadeddata`
- * porque ese evento ya se ha disparado antes del sondeo y no vuelve a repetirse:
- * esperarlo dejaba la subida colgada para siempre.
- */
-async function waitForFrameData(video: HTMLVideoElement): Promise<void> {
-  const deadline = performance.now() + FRAME_DATA_TIMEOUT_MS;
-  while (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA && performance.now() < deadline) {
-    await wait(50);
-  }
-}
-
-const FRAME_DATA_TIMEOUT_MS = 3000;
-
-/** Lo que se reproduce para que el decodificador toque el audio, y su tope de espera. */
-const SNIFF_PLAY_MS = 250;
-const SNIFF_TIMEOUT_MS = 3000;
-
-/**
- * Reproduce un instante para saber si el archivo trae sonido y si la política de
- * reproducción nos deja arrancarlo sin silenciar. No se oye nada: el audio ya va
- * enrutado al grafo de Web Audio.
- */
-async function sniffSource(video: HTMLVideoElement): Promise<{ playable: boolean; hasAudio: boolean }> {
-  let playable = true;
-  try {
-    // El sondeo tampoco puede colgarse: si `play()` no resuelve, se da por perdido.
-    await Promise.race([video.play(), wait(SNIFF_TIMEOUT_MS)]);
-    await wait(SNIFF_PLAY_MS);
-  } catch {
-    playable = false;
-  }
-  const hasAudio = sourceHasAudio(video);
-  video.pause();
-  await seekToStart(video);
-  return { playable, hasAudio };
-}
-
-function drawFrame(
-  ctx: CanvasRenderingContext2D,
-  video: HTMLVideoElement,
-  crop: Area | null,
-  outWidth: number,
-  outHeight: number,
-) {
-  if (crop) {
-    ctx.drawImage(
-      video,
-      crop.x,
-      crop.y,
-      crop.width,
-      crop.height,
-      0,
-      0,
-      outWidth,
-      outHeight,
-    );
-  } else {
-    ctx.drawImage(video, 0, 0, outWidth, outHeight);
-  }
-}
-
 async function transcodeVideo(
   source: VideoSource,
   crop: Area | null,
   onProgress?: (ratio: number) => void,
 ): Promise<OptimizedVideo> {
-  if (!pickRecorderMimeType()) {
-    throw new Error("Este navegador no puede procesar vídeo. Sube un archivo ya optimizado.");
+  if (!canTranscodeVideo()) {
+    throw new Error("Este navegador no puede procesar vídeo. Prueba con Chrome o Edge.");
   }
 
-  return withVideoElement(source, async (video) => {
-    const duration = Number.isFinite(video.duration) ? video.duration : 0;
+  const {
+    ALL_FORMATS,
+    BlobSource,
+    BufferTarget,
+    Conversion,
+    Input,
+    Mp4OutputFormat,
+    Output,
+    Quality,
+  } = await import("mediabunny");
+
+  const input = new Input({
+    source: new BlobSource(await sourceBlob(source)),
+    formats: ALL_FORMATS,
+  });
+
+  try {
+    const videoTrack = await input.getPrimaryVideoTrack();
+    if (!videoTrack) throw new Error("El vídeo no tiene imagen.");
+
+    const duration = await videoTrack.computeDuration();
     if (duration > MAX_TRANSCODE_SECONDS) {
       throw new Error(
         `El vídeo dura ${Math.round(duration)}s y el máximo para procesarlo es ${MAX_TRANSCODE_SECONDS}s.`,
       );
     }
 
-    const sourceWidth = crop ? Math.round(crop.width) : video.videoWidth;
-    const sourceHeight = crop ? Math.round(crop.height) : video.videoHeight;
-    if (sourceWidth < 2 || sourceHeight < 2) {
+    const displayWidth = await videoTrack.getDisplayWidth();
+    const displayHeight = await videoTrack.getDisplayHeight();
+    if (displayWidth < 2 || displayHeight < 2) {
       throw new Error("El vídeo no tiene un tamaño válido.");
     }
 
-    const { width, height } = fitOutputSize(sourceWidth, sourceHeight);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d", { alpha: false });
-    if (!ctx) throw new Error("No se pudo procesar el vídeo.");
-
-    // El grafo de audio se monta antes del sondeo para que éste no se oiga.
-    const audio = await captureAudioTrack(video);
-    const sniff = await sniffSource(video);
-    // Sin poder reproducir sin silenciar no hay sonido que grabar (ni que prometer).
-    const keepAudio = Boolean(audio.track) && sniff.hasAudio && sniff.playable;
-    if (!keepAudio) {
-      // Sin grafo que se quede el audio, silenciar es lo que garantiza que el
-      // re-encode no salga por los altavoces del admin.
-      video.muted = true;
-      audio.close();
-    }
-
-    const mimeType = pickRecorderMimeType(keepAudio)!;
-
-    const stream = canvas.captureStream(TARGET_FPS);
-    if (keepAudio && audio.track) stream.addTrack(audio.track);
-
-    const recorder = new MediaRecorder(stream, {
-      mimeType,
-      videoBitsPerSecond: TARGET_BITRATE,
-      ...(keepAudio ? { audioBitsPerSecond: 192_000 } : {}),
+    const plan = planVideoTranscode({
+      crop,
+      displayWidth,
+      displayHeight,
+      codec: videoTrack.codec,
     });
-    const chunks: Blob[] = [];
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
-    };
+    const primaryAudio = await input.getPrimaryAudioTrack();
 
-    const recorded = new Promise<void>((resolve, reject) => {
-      recorder.onstop = () => resolve();
-      recorder.onerror = () => reject(new Error("Falló la compresión del vídeo."));
+    const target = new BufferTarget();
+    const output = new Output({
+      format: new Mp4OutputFormat({ fastStart: "in-memory" }),
+      target,
     });
 
-    let stopped = false;
-    const stop = () => {
-      if (stopped) return;
-      stopped = true;
-      if (recorder.state !== "inactive") recorder.stop();
-      stream.getTracks().forEach((track) => track.stop());
-    };
+    const video: {
+      codec?: "avc";
+      quality?: InstanceType<typeof Quality>;
+      allowTransformationMetadata?: boolean;
+      crop?: NonNullable<VideoTranscodePlan["crop"]>;
+      width?: number;
+      height?: number;
+      fit?: "fill";
+    } = {};
 
-    // El primer fotograma debe estar en el canvas antes de arrancar la grabación.
-    video.currentTime = 0;
-    await waitForFrameData(video);
-    drawFrame(ctx, video, crop, width, height);
-
-    // El fin de la reproducción cierra la grabación, así que se engancha antes
-    // de arrancarla: un vídeo muy corto podría terminar en cuanto empieza.
-    video.onended = () => {
-      drawFrame(ctx, video, crop, width, height);
-      onProgress?.(1);
-      // Un respiro para que el último fotograma entre en la grabación.
-      setTimeout(stop, 120);
-    };
-
-    recorder.start();
-
-    try {
-      await video.play();
-    } catch {
-      // Sin gesto del usuario la política de reproducción sólo deja arrancar en
-      // mudo. El sondeo ya lo detectó, así que la grabación va sin pista de audio.
-      video.muted = true;
-      await video.play();
-    }
-
-    const supportsFrameCallback = typeof video.requestVideoFrameCallback === "function";
-    const pump = () => {
-      if (video.ended || stopped) return;
-      drawFrame(ctx, video, crop, width, height);
-      if (duration > 0) onProgress?.(Math.min(1, video.currentTime / duration));
-      if (supportsFrameCallback) {
-        video.requestVideoFrameCallback(pump);
-      } else {
-        requestAnimationFrame(pump);
+    if (plan.reencode) {
+      video.codec = "avc";
+      video.quality = new Quality({ bitrate: TARGET_BITRATE, bitrateMode: "variable" });
+      // La rotación queda pintada en los fotogramas: un MP4 con metadatos de
+      // giro se ve mal en varios navegadores.
+      video.allowTransformationMetadata = false;
+      if (plan.width && plan.height) {
+        video.width = plan.width;
+        video.height = plan.height;
+        video.fit = "fill";
       }
-    };
-    pump();
-
-    // Si la reproducción se atasca, se cierra igualmente en vez de dejar el
-    // admin con el indicador de carga para siempre.
-    const watchdog = setTimeout(stop, (duration + 10) * 2000);
-
-    try {
-      await recorded;
-    } finally {
-      clearTimeout(watchdog);
-      if (keepAudio) audio.close();
+      if (plan.crop) video.crop = plan.crop;
     }
 
-    const blob = new Blob(chunks, { type: mimeType });
-    if (blob.size === 0) {
-      throw new Error("No se pudo comprimir el vídeo.");
+    const conversion = await Conversion.init({
+      input,
+      output,
+      tracks: "primary",
+      video,
+      showWarnings: false,
+    });
+
+    const videoKept = conversion.utilizedTracks.some((track) => track.isVideoTrack());
+    if (!conversion.isValid || !videoKept) {
+      throw new Error(transcodeFailureMessage(conversion.discardedTracks));
+    }
+
+    conversion.onProgress = (ratio) => onProgress?.(ratio);
+    await conversion.execute();
+
+    const buffer = target.buffer;
+    if (!buffer || buffer.byteLength === 0) {
+      throw new Error("No se pudo procesar el vídeo.");
     }
 
     return {
-      blob,
-      extension: extensionForMimeType(mimeType),
-      mimeType: baseMimeType(mimeType),
-      width,
-      height,
+      blob: new Blob([buffer], { type: "video/mp4" }),
+      extension: "mp4",
+      mimeType: "video/mp4",
+      width: plan.width ?? Math.round(displayWidth),
+      height: plan.height ?? Math.round(displayHeight),
       transcoded: true,
-      audioDropped: sniff.hasAudio && !keepAudio,
+      audioDropped:
+        Boolean(primaryAudio) && !conversion.utilizedTracks.some((track) => track.isAudioTrack()),
     };
-  });
+  } finally {
+    input.dispose();
+  }
 }
 
 function sourceExtension(file: File): "mp4" | "webm" | "mov" {
@@ -472,9 +330,9 @@ function sourceMimeType(file: File, extension: "mp4" | "webm" | "mov"): string {
 }
 
 /**
- * true cuando hay que recodificar: recorte, .mov (HEVC/QuickTime no se ve en todos
- * los navegadores) o una URL ya subida. El tamaño y la resolución no cuentan:
- * recomprimir era lo que bajaba la calidad.
+ * true cuando hay que pasar el archivo por el conversor: recorte, .mov
+ * (HEVC/QuickTime no se ve en todos los navegadores) o una URL ya subida.
+ * Un MP4 o WebM compatible se sube tal cual.
  */
 export function videoNeedsTranscode(args: {
   force?: boolean;
