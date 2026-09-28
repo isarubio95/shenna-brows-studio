@@ -1,5 +1,6 @@
 import { useAnnouncementBar } from "@/hooks/use-announcement-bar";
 import { DEFAULT_ANNOUNCEMENT_BAR, type AnnouncementBarConfig } from "@/lib/announcement-content";
+import { fontStyle } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 const STRIP_COPIES = 2;
@@ -21,6 +22,7 @@ export function AnnouncementBarView({
   const items = config.items.length > 0 ? config.items : DEFAULT_ANNOUNCEMENT_BAR.items;
   const strip = loopItems(items);
   const label = items.join(". ");
+  const textFont = fontStyle(config.fonts.text);
 
   if (!config.enabled) {
     return preview ? (
@@ -40,7 +42,7 @@ export function AnnouncementBarView({
       role="region"
       aria-label={label}
     >
-      <div className="hidden px-4 py-2 text-center font-sans text-[0.65rem] font-medium uppercase tracking-[0.22em] motion-reduce:block">
+      <div className="hidden px-4 py-2 text-center font-sans text-[0.65rem] font-medium uppercase tracking-[0.22em] motion-reduce:block" style={textFont}>
         {label}
       </div>
       <div className="flex w-max animate-announce-marquee motion-reduce:hidden">
@@ -48,7 +50,7 @@ export function AnnouncementBarView({
           <ul key={copy} className="flex shrink-0 items-center py-2.5" aria-hidden>
             {strip.map((item, index) => (
               <li key={`${copy}-${index}-${item}`} className="flex shrink-0 items-center">
-                <span className="whitespace-nowrap px-5 font-sans text-[0.65rem] font-medium uppercase tracking-[0.22em] sm:px-7">
+                <span className="whitespace-nowrap px-5 font-sans text-[0.65rem] font-medium uppercase tracking-[0.22em] sm:px-7" style={textFont}>
                   {item}
                 </span>
                 <span className="h-1 w-1 shrink-0 rounded-full bg-current opacity-55" aria-hidden />

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Crop, Loader2, Monitor, Play, Plus, RotateCcw, Save, Smartphone, Sparkle, Trash2, Upload } from "lucide-react";
 import {
@@ -18,9 +19,11 @@ import {
 } from "@/lib/marquee-content";
 import {
   DEFAULT_COLLECTION_HEADLINE,
+  ACCENT_SCALE_MAX,
+  ACCENT_SCALE_MIN,
+  clampAccentScale,
   parseCollectionHeadlineConfig,
   serializeCollectionHeadlineConfig,
-  splitHeadlineByAccent,
   type CollectionHeadlineConfig,
 } from "@/lib/collection-headline-content";
 import {
@@ -29,6 +32,7 @@ import {
   serializeCampaignConfig,
   campaignCtaPath,
   type CampaignConfig,
+  type CampaignCtaSize,
 } from "@/lib/campaign-content";
 import {
   DEFAULT_HERO,
@@ -82,6 +86,7 @@ import {
   type AnnouncementBarConfig,
 } from "@/lib/announcement-content";
 import IndexVideoSection from "@/components/IndexVideoSection";
+import CollectionHeadline from "@/components/CollectionHeadline";
 import { AnnouncementBarView } from "@/components/AnnouncementBar";
 import { type OptimizeImageVariant } from "@/lib/optimize-image-upload";
 import {
@@ -124,6 +129,14 @@ import { SaleBadgeChip } from "@/components/ProductSaleBadge";
 import { WhatsAppButtonView } from "@/components/WhatsAppFloatingButton";
 import { cn } from "@/lib/utils";
 import { invalidateAnnouncementBarCache } from "@/hooks/use-announcement-bar";
+import { AdminTextFonts } from "@/components/admin/FontSelect";
+import { fontStyle } from "@/lib/fonts";
+import {
+  isAboutSectionKey,
+  parseAboutSectionContent,
+  serializeAboutSectionContent,
+  type AboutSectionContent,
+} from "@/lib/about-content";
 
 const CAMPAIGN_CTA_TIENDA_VALUE = "__tienda__";
 
@@ -164,8 +177,8 @@ const CONTENT_LABELS: Record<string, string> = {
   index_hero: "Hero — Página de inicio",
   index_welcome_popup: "Popup bienvenida — Overlay global",
   index_marquee: "Marquesina — Debajo del hero",
-  index_video: "Vídeo — Debajo de la marquesina",
-  index_collection_headline: "Titular — Encima de la colección",
+  index_video: "Vídeo — Al final de la página",
+  index_collection_headline: "Titular — Debajo de la colección",
   index_campaign: "Campaña — Después de la colección",
   tienda_hero: "Hero — Página de tienda",
   site_badges: "Badge de oferta — Productos",
@@ -292,23 +305,31 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     background: string;
     /** String para permitir vaciar el input al editar. */
     paddingY: string;
+    fonts: MarqueeConfig["fonts"];
   }>({
     texts: marqueeItemsToText(DEFAULT_MARQUEE_ITEMS),
     background: DEFAULT_MARQUEE_CONFIG.background,
     paddingY: String(DEFAULT_MARQUEE_CONFIG.paddingY),
+    fonts: DEFAULT_MARQUEE_CONFIG.fonts,
   });
   const [headlineDraft, setHeadlineDraft] = useState<{
     text: string;
     accent: string;
     color: string;
     accentColor: string;
+    background: string;
     fontSize: string;
+    accentScale: number;
+    fonts: CollectionHeadlineConfig["fonts"];
   }>({
     text: DEFAULT_COLLECTION_HEADLINE.text,
     accent: DEFAULT_COLLECTION_HEADLINE.accent,
     color: DEFAULT_COLLECTION_HEADLINE.color,
     accentColor: DEFAULT_COLLECTION_HEADLINE.accentColor,
+    background: DEFAULT_COLLECTION_HEADLINE.background,
     fontSize: String(DEFAULT_COLLECTION_HEADLINE.fontSize),
+    accentScale: DEFAULT_COLLECTION_HEADLINE.accentScale,
+    fonts: DEFAULT_COLLECTION_HEADLINE.fonts,
   });
   const [campaignDraft, setCampaignDraft] = useState<CampaignConfig>({ ...DEFAULT_CAMPAIGN });
   const [campaignProducts, setCampaignProducts] = useState<CampaignProductOption[]>([]);
@@ -357,11 +378,13 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     texts: string;
     background: string;
     textColor: string;
+    fonts: AnnouncementBarConfig["fonts"];
   }>({
     enabled: DEFAULT_ANNOUNCEMENT_BAR.enabled,
     texts: announcementItemsToText(DEFAULT_ANNOUNCEMENT_ITEMS),
     background: DEFAULT_ANNOUNCEMENT_BAR.background,
     textColor: DEFAULT_ANNOUNCEMENT_BAR.textColor,
+    fonts: DEFAULT_ANNOUNCEMENT_BAR.fonts,
   });
   const [videoUploading, setVideoUploading] = useState(false);
   const [videoCropOpen, setVideoCropOpen] = useState(false);
@@ -398,6 +421,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       items: marqueeTextToItems(marqueeDraft.texts),
       background,
       paddingY: parsePaddingY(marqueeDraft.paddingY),
+      fonts: marqueeDraft.fonts,
     };
     return {
       title: "Marquesina del inicio",
@@ -413,12 +437,18 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     const accentColor = isHex(headlineDraft.accentColor)
       ? headlineDraft.accentColor.trim()
       : DEFAULT_COLLECTION_HEADLINE.accentColor;
+    const background = isHex(headlineDraft.background)
+      ? headlineDraft.background.trim()
+      : DEFAULT_COLLECTION_HEADLINE.background;
     const config: CollectionHeadlineConfig = {
       text: headlineDraft.text.trim() || DEFAULT_COLLECTION_HEADLINE.text,
       accent: headlineDraft.accent.trim(),
       color,
       accentColor,
+      background,
       fontSize: parseFontSize(headlineDraft.fontSize),
+      accentScale: clampAccentScale(headlineDraft.accentScale),
+      fonts: headlineDraft.fonts,
     };
     return {
       title: "Titular de colección",
@@ -452,7 +482,17 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       ctaTextColor: isHex(campaignDraft.ctaTextColor)
         ? campaignDraft.ctaTextColor.trim()
         : DEFAULT_CAMPAIGN.ctaTextColor,
+      ctaBorderColor: isHex(campaignDraft.ctaBorderColor)
+        ? campaignDraft.ctaBorderColor.trim()
+        : DEFAULT_CAMPAIGN.ctaBorderColor,
+      ctaFill: campaignDraft.ctaFill,
+      ctaSize: campaignDraft.ctaSize,
+      ctaPosX: campaignDraft.ctaPosX,
+      ctaPosY: campaignDraft.ctaPosY,
+      ctaPosMobileX: campaignDraft.ctaPosMobileX,
+      ctaPosMobileY: campaignDraft.ctaPosMobileY,
       alt: campaignDraft.alt.trim() || DEFAULT_CAMPAIGN.alt,
+      fonts: campaignDraft.fonts,
     };
     return {
       title: "Campaña publicitaria",
@@ -514,6 +554,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
           textColor: isHex(badgesDraft.sale.textColor)
             ? badgesDraft.sale.textColor.trim()
             : DEFAULT_SALE_BADGE.textColor,
+          font: badgesDraft.sale.font,
         },
       }),
     );
@@ -535,6 +576,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         textColor: isHex(announcementDraft.textColor)
           ? announcementDraft.textColor.trim()
           : DEFAULT_ANNOUNCEMENT_BAR.textColor,
+        fonts: announcementDraft.fonts,
       }),
     );
     return {
@@ -572,6 +614,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         accent: videoDraft.accent.trim(),
         videoUrl: videoDraft.videoUrl.trim() || DEFAULT_INDEX_VIDEO.videoUrl,
         posterUrl: videoDraft.posterUrl.trim(),
+        fonts: videoDraft.fonts,
       }),
     );
     return {
@@ -606,6 +649,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       textPosY: heroDraft.textPosY,
       textPosMobileX: heroDraft.textPosMobileX,
       textPosMobileY: heroDraft.textPosMobileY,
+      fonts: heroDraft.fonts,
     };
     return {
       title: "Hero del inicio",
@@ -639,6 +683,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         ? Math.min(15000, Math.max(0, Math.round(delayRaw)))
         : DEFAULT_WELCOME_POPUP.delayMs,
       alt: welcomePopupDraft.alt.trim() || DEFAULT_WELCOME_POPUP.alt,
+      fonts: welcomePopupDraft.fonts,
     };
     return {
       title: "Popup de bienvenida",
@@ -1097,6 +1142,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
           items: [...DEFAULT_MARQUEE_ITEMS],
           background: DEFAULT_MARQUEE_CONFIG.background,
           paddingY: DEFAULT_MARQUEE_CONFIG.paddingY,
+          fonts: DEFAULT_MARQUEE_CONFIG.fonts,
         };
         const { data: inserted } = await (supabase as any)
           .from("site_content")
@@ -1239,6 +1285,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
           texts: marqueeItemsToText(cfg.items),
           background: cfg.background,
           paddingY: String(cfg.paddingY),
+          fonts: cfg.fonts,
         });
         marqueeRow.title = "Marquesina del inicio";
         marqueeRow.content = serializeMarqueeConfig(cfg);
@@ -1252,7 +1299,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
           accent: cfg.accent,
           color: cfg.color,
           accentColor: cfg.accentColor,
+          background: cfg.background,
           fontSize: String(cfg.fontSize),
+          accentScale: cfg.accentScale,
+          fonts: cfg.fonts,
         });
         headlineRow.title = "Titular de colección";
         headlineRow.content = serializeCollectionHeadlineConfig(cfg);
@@ -1306,6 +1356,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
           texts: announcementItemsToText(cfg.items),
           background: cfg.background,
           textColor: cfg.textColor,
+          fonts: cfg.fonts,
         });
         announcementRow.title = "Barra superior";
         announcementRow.content = serializeAnnouncementBarConfig(cfg);
@@ -1323,6 +1374,11 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     setBlocks((prev) =>
       prev.map((b) => (b.key === key ? { ...b, [field]: value } : b))
     );
+  };
+
+  /** "Sobre mí": texto y fuentes viajan juntos en la columna `content`. */
+  const updateAboutContent = (key: string, content: AboutSectionContent) => {
+    updateField(key, "content", serializeAboutSectionContent(content));
   };
 
   const isBlockDirty = (block: ContentBlock): boolean => {
@@ -1408,6 +1464,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         background: config.background,
         paddingY: String(config.paddingY),
         texts: marqueeItemsToText(config.items),
+        fonts: config.fonts,
       });
       setBlocks((prev) =>
         prev.map((b) =>
@@ -1424,7 +1481,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         accent: config.accent,
         color: config.color,
         accentColor: config.accentColor,
+        background: config.background,
         fontSize: String(config.fontSize),
+        accentScale: config.accentScale,
+        fonts: config.fonts,
       });
       setBlocks((prev) =>
         prev.map((b) =>
@@ -1498,6 +1558,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         texts: announcementItemsToText(config.items),
         background: config.background,
         textColor: config.textColor,
+        fonts: config.fonts,
       });
       setBlocks((prev) =>
         prev.map((b) =>
@@ -1555,8 +1616,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       return aPos - bPos || a.key.localeCompare(b.key);
     });
 
-  const headlinePreviewParts = splitHeadlineByAccent(headlineDraft.text, headlineDraft.accent);
-  const headlinePreviewSize = parseFontSize(headlineDraft.fontSize);
+  const headlinePreviewConfig = buildHeadlinePayload().config;
   const heroPreviewConfig = buildHeroPayload().config;
   const campaignPreviewConfig = buildCampaignPayload().config;
   const tiendaHeroPreviewConfig = buildTiendaHeroPayload().config;
@@ -1583,6 +1643,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         const isWhatsApp = block.key === "whatsapp_button";
         const isVideo = block.key === "index_video";
         const isAnnouncement = block.key === ANNOUNCEMENT_CONTENT_KEY;
+        const aboutContent = isAboutSectionKey(block.key)
+          ? parseAboutSectionContent(block.content)
+          : null;
         const dirty = isBlockDirty(block);
 
         return (
@@ -1760,10 +1823,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         setHeadlineDraft((prev) => ({ ...prev, accent: e.target.value }))
                       }
                       className="mt-1 border-gold/20 focus-visible:ring-gold/30"
-                      placeholder="tus cejas"
+                      placeholder="cejas, pestañas"
                     />
                     <p className="text-xs text-carbon/30 mt-1">
-                      Debe coincidir con un fragmento del texto de arriba.
+                      Fragmentos del texto de arriba, separados por comas. Se muestran más grandes y en el color de acento.
                     </p>
                   </div>
 
@@ -1880,7 +1943,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           }
                           className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
                           aria-label="Restaurar tamaño original"
-                          title="Restaurar tamaño original (24px)"
+                          title={`Restaurar tamaño original (${DEFAULT_COLLECTION_HEADLINE.fontSize}px)`}
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
@@ -1889,40 +1952,81 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     </div>
                   </div>
 
-                  <div
-                    className="rounded-lg border border-carbon/10 px-4 py-6 text-center"
-                    style={{ backgroundColor: "#F8F3EB" }}
-                  >
-                    <p
-                      className="font-cormorant leading-snug"
-                      style={{
-                        color: isHex(headlineDraft.color)
-                          ? headlineDraft.color
-                          : DEFAULT_COLLECTION_HEADLINE.color,
-                        fontSize: `${Math.min(headlinePreviewSize, 28)}px`,
-                      }}
-                    >
-                      {headlinePreviewParts ? (
-                        <>
-                          {headlinePreviewParts.before}
-                          <span
-                            className="italic"
-                            style={{
-                              color: isHex(headlineDraft.accentColor)
-                                ? headlineDraft.accentColor
-                                : DEFAULT_COLLECTION_HEADLINE.accentColor,
-                            }}
-                          >
-                            {headlinePreviewParts.accent}
-                          </span>
-                          {headlinePreviewParts.after}
-                        </>
-                      ) : (
-                        headlineDraft.text || "…"
-                      )}
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Tamaño de las palabras en acento
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm tabular-nums text-carbon/70">
+                          {headlineDraft.accentScale}%
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            headlineDraft.accentScale === DEFAULT_COLLECTION_HEADLINE.accentScale
+                          }
+                          onClick={() =>
+                            setHeadlineDraft((prev) => ({
+                              ...prev,
+                              accentScale: DEFAULT_COLLECTION_HEADLINE.accentScale,
+                            }))
+                          }
+                          className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-8"
+                          aria-label="Restaurar tamaño de las palabras en acento"
+                          title={`Restaurar tamaño original (${DEFAULT_COLLECTION_HEADLINE.accentScale}%)`}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    <Slider
+                      value={[headlineDraft.accentScale]}
+                      min={ACCENT_SCALE_MIN}
+                      max={ACCENT_SCALE_MAX}
+                      step={1}
+                      onValueChange={([v]) =>
+                        setHeadlineDraft((prev) => ({ ...prev, accentScale: v }))
+                      }
+                      className="mt-3"
+                      aria-label="Tamaño de las palabras en acento"
+                    />
+                    <p className="text-xs text-carbon/30 mt-2">
+                      Respecto al resto del titular: 100% es el mismo tamaño, 200% el doble.
                     </p>
-                    <p className="text-xs text-carbon/30 mt-3">
-                      Vista previa (tamaño web: {headlinePreviewSize}px)
+                  </div>
+
+                  <AdminColorField
+                    label="Color de fondo"
+                    value={headlineDraft.background}
+                    fallback={DEFAULT_COLLECTION_HEADLINE.background}
+                    onChange={(hex) =>
+                      setHeadlineDraft((prev) => ({ ...prev, background: hex }))
+                    }
+                    ariaLabel="Color de fondo del titular"
+                  />
+
+                  <AdminTextFonts
+                    fields={[
+                      { slot: "text", label: "Texto" },
+                      { slot: "accent", label: "Palabras en acento" },
+                    ]}
+                    value={headlineDraft.fonts}
+                    onChange={(fonts) => setHeadlineDraft((prev) => ({ ...prev, fonts }))}
+                  />
+
+                  <div
+                    className="rounded-lg border border-carbon/10 px-4 py-8"
+                    style={{ backgroundColor: headlinePreviewConfig.background }}
+                  >
+                    <CollectionHeadline
+                      config={headlinePreviewConfig}
+                      fontSize={`${Math.min(headlinePreviewConfig.fontSize, 40)}px`}
+                    />
+                    <p className="text-xs text-carbon/40 text-center mt-4">
+                      Vista previa (tamaño web: {headlinePreviewConfig.fontSize}px)
                     </p>
                   </div>
                 </>
@@ -1974,6 +2078,14 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     />
                   </div>
 
+                  <AdminTextFonts
+                    fields={[{ slot: "sale", label: "Texto del badge" }]}
+                    value={{ sale: badgesDraft.sale.font }}
+                    onChange={({ sale }) =>
+                      setBadgesDraft((prev) => ({ ...prev, sale: { ...prev.sale, font: sale } }))
+                    }
+                  />
+
                   <div className="rounded-lg border border-carbon/10 p-4" style={{ backgroundColor: "#F8F3EB" }}>
                     <p className="text-xs uppercase tracking-wider text-carbon/40 mb-3">
                       Vista previa
@@ -1992,6 +2104,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                             ? badgesDraft.sale.textColor
                             : DEFAULT_SALE_BADGE.textColor
                         }
+                        font={badgesDraft.sale.font}
                         className="absolute left-3 top-3 z-10"
                       />
                     </div>
@@ -2134,6 +2247,15 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     </div>
                   </div>
 
+                  <AdminTextFonts
+                    fields={[
+                      { slot: "title", label: "Título" },
+                      { slot: "accent", label: "Texto en dorado cursiva" },
+                    ]}
+                    value={videoDraft.fonts}
+                    onChange={(fonts) => setVideoDraft((prev) => ({ ...prev, fonts }))}
+                  />
+
                   <IndexVideoSection config={buildVideoPayload().config} preview />
                 </>
               )}
@@ -2193,6 +2315,12 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     />
                   </div>
 
+                  <AdminTextFonts
+                    fields={[{ slot: "text", label: "Mensajes" }]}
+                    value={announcementDraft.fonts}
+                    onChange={(fonts) => setAnnouncementDraft((prev) => ({ ...prev, fonts }))}
+                  />
+
                   <div>
                     <p className="text-xs uppercase tracking-wider text-carbon/40 mb-2">
                       Vista previa
@@ -2208,6 +2336,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         textColor: isHex(announcementDraft.textColor)
                           ? announcementDraft.textColor
                           : DEFAULT_ANNOUNCEMENT_BAR.textColor,
+                        fonts: announcementDraft.fonts,
                       }}
                     />
                   </div>
@@ -2766,6 +2895,16 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     />
                   </div>
 
+                  <AdminTextFonts
+                    fields={[
+                      { slot: "headline", label: "Titular" },
+                      { slot: "accent", label: "Fragmento en cursiva" },
+                      { slot: "cta", label: "Botón CTA" },
+                    ]}
+                    value={heroDraft.fonts}
+                    onChange={(fonts) => setHeroDraft((prev) => ({ ...prev, fonts }))}
+                  />
+
                   <div>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
@@ -3173,6 +3312,22 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     </div>
                   </div>
 
+                  <AdminTextFonts
+                    fields={[
+                      { slot: "eyebrow", label: "Antetítulo" },
+                      { slot: "offer", label: "Cifra de la oferta" },
+                      { slot: "offerSuffix", label: "Texto tras la cifra" },
+                      { slot: "badge", label: "Distintivo" },
+                      { slot: "primaryCta", label: "Botón principal" },
+                      { slot: "secondaryCta", label: "Botón secundario" },
+                      { slot: "emailTitle", label: "Título del paso email" },
+                      { slot: "emailDescription", label: "Descripción del paso email" },
+                      { slot: "emailCta", label: "Botón del paso email" },
+                    ]}
+                    value={welcomePopupDraft.fonts}
+                    onChange={(fonts) => setWelcomePopupDraft((prev) => ({ ...prev, fonts }))}
+                  />
+
                   <div className="flex flex-wrap items-start justify-center gap-4">
                     <div
                       className="w-full max-w-[220px] overflow-hidden rounded-2xl border border-gold/15 shadow-sm"
@@ -3186,7 +3341,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                       }}
                     >
                       <div className="bg-gradient-to-b from-white/70 via-white/30 to-black/20 px-4 py-6 text-center min-h-[280px] flex flex-col items-center">
-                        <p className="font-sans text-[0.55rem] font-semibold uppercase tracking-[0.22em] text-carbon/80">
+                        <p className="font-sans text-[0.55rem] font-semibold uppercase tracking-[0.22em] text-carbon/80" style={fontStyle(welcomePopupDraft.fonts.eyebrow)}>
                           {welcomePopupDraft.eyebrow || DEFAULT_WELCOME_POPUP.eyebrow}
                         </p>
                         <p
@@ -3196,11 +3351,12 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                             WebkitBackgroundClip: "text",
                             backgroundClip: "text",
                             color: "transparent",
+                            ...fontStyle(welcomePopupDraft.fonts.offer),
                           }}
                         >
                           {welcomePopupDraft.offerAmount || DEFAULT_WELCOME_POPUP.offerAmount}
                         </p>
-                        <p className="mt-1 font-playfair text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-carbon/85">
+                        <p className="mt-1 font-playfair text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(welcomePopupDraft.fonts.offerSuffix)}>
                           {welcomePopupDraft.offerSuffix || DEFAULT_WELCOME_POPUP.offerSuffix}
                         </p>
                         <div className="my-2.5 flex w-full max-w-[7rem] items-center gap-1.5">
@@ -3226,7 +3382,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                             }}
                           />
                         </div>
-                        <p className="font-playfair text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-carbon/85">
+                        <p className="font-playfair text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(welcomePopupDraft.fonts.badge)}>
                           {welcomePopupDraft.badgeText || DEFAULT_WELCOME_POPUP.badgeText}
                         </p>
                         <div className="mt-auto w-full space-y-1.5 pt-8">
@@ -3234,6 +3390,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                             className="flex items-center justify-center gap-1 rounded-full border border-white/70 py-2 text-[0.6rem] font-bold uppercase tracking-wider text-white shadow-sm"
                             style={{
                               background: `linear-gradient(90deg, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 0%, #F0A0AB 50%, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 100%)`,
+                              ...fontStyle(welcomePopupDraft.fonts.primaryCta),
                             }}
                           >
                             <Sparkle className="h-2.5 w-2.5" fill="currentColor" />
@@ -3245,6 +3402,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                             style={{
                               borderColor: `${welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold}99`,
                               backgroundColor: "rgba(249,247,242,0.55)",
+                              ...fontStyle(welcomePopupDraft.fonts.secondaryCta),
                             }}
                           >
                             {welcomePopupDraft.secondaryCta || DEFAULT_WELCOME_POPUP.secondaryCta}
@@ -3265,10 +3423,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                       }}
                     >
                       <div className="flex min-h-[280px] flex-col bg-gradient-to-b from-white/70 via-white/30 to-black/20 px-4 py-6">
-                        <p className="text-center font-playfair text-base font-bold text-carbon">
+                        <p className="text-center font-playfair text-base font-bold text-carbon" style={fontStyle(welcomePopupDraft.fonts.emailTitle)}>
                           {welcomePopupDraft.emailTitle || DEFAULT_WELCOME_POPUP.emailTitle}
                         </p>
-                        <p className="mt-1.5 text-center text-[0.65rem] leading-snug text-carbon/70">
+                        <p className="mt-1.5 text-center text-[0.65rem] leading-snug text-carbon/70" style={fontStyle(welcomePopupDraft.fonts.emailDescription)}>
                           {welcomePopupDraft.emailDescription ||
                             DEFAULT_WELCOME_POPUP.emailDescription}
                         </p>
@@ -3289,6 +3447,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                             className="rounded-full border border-white/70 py-2 text-center text-[0.6rem] font-bold uppercase tracking-wider text-white shadow-sm"
                             style={{
                               background: `linear-gradient(90deg, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 0%, #F0A0AB 50%, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 100%)`,
+                              ...fontStyle(welcomePopupDraft.fonts.emailCta),
                             }}
                           >
                             {welcomePopupDraft.emailCta || DEFAULT_WELCOME_POPUP.emailCta}
@@ -3856,6 +4015,91 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Relleno del CTA
+                      </Label>
+                      <Select
+                        value={campaignDraft.ctaFill}
+                        onValueChange={(value) =>
+                          setCampaignDraft((prev) => ({
+                            ...prev,
+                            ctaFill: value === "solid" ? "solid" : "gradient",
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="mt-1 border-gold/20 bg-white focus:ring-gold/30">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gradient">Degradado</SelectItem>
+                          <SelectItem value="solid">Color liso</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Tamaño del CTA
+                      </Label>
+                      <Select
+                        value={campaignDraft.ctaSize}
+                        onValueChange={(value) =>
+                          setCampaignDraft((prev) => ({
+                            ...prev,
+                            ctaSize: value as CampaignCtaSize,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="mt-1 border-gold/20 bg-white focus:ring-gold/30">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sm">Pequeño</SelectItem>
+                          <SelectItem value="md">Mediano</SelectItem>
+                          <SelectItem value="lg">Grande</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Borde del CTA
+                      </Label>
+                      <div className="mt-1 flex items-center gap-2">
+                        <HexColorField
+                          value={campaignDraft.ctaBorderColor}
+                          onChange={(hex) =>
+                            setCampaignDraft((prev) => ({ ...prev, ctaBorderColor: hex }))
+                          }
+                          fallback={DEFAULT_CAMPAIGN.ctaBorderColor}
+                          aria-label="Color del borde del CTA de campaña"
+                          className="flex-1 min-w-0"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            toPickerColor(campaignDraft.ctaBorderColor) ===
+                            toPickerColor(DEFAULT_CAMPAIGN.ctaBorderColor)
+                          }
+                          onClick={() =>
+                            setCampaignDraft((prev) => ({
+                              ...prev,
+                              ctaBorderColor: DEFAULT_CAMPAIGN.ctaBorderColor,
+                            }))
+                          }
+                          className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
+                          aria-label="Restaurar color del borde del CTA"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <Label className="text-carbon/60 text-xs uppercase tracking-wider">
                       Texto alternativo (accesibilidad)
@@ -3869,11 +4113,23 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     />
                   </div>
 
+                  <AdminTextFonts
+                    fields={[
+                      { slot: "headline", label: "Titular" },
+                      { slot: "subheadline", label: "Subtítulo" },
+                      { slot: "subheadlineAccent", label: "Acento del subtítulo" },
+                      { slot: "cta", label: "Botón CTA" },
+                    ]}
+                    value={campaignDraft.fonts}
+                    onChange={(fonts) => setCampaignDraft((prev) => ({ ...prev, fonts }))}
+                  />
+
                   <div>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
                         Vista previa (escala real)
                       </Label>
+                      <div className="flex flex-wrap items-center gap-2">
                       <div className="flex rounded-md border border-gold/20 overflow-hidden">
                         <Button
                           type="button"
@@ -3906,6 +4162,38 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           Móvil
                         </Button>
                       </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          campaignPreviewDevice === "mobile"
+                            ? campaignDraft.ctaPosMobileX === DEFAULT_CAMPAIGN.ctaPosMobileX &&
+                              campaignDraft.ctaPosMobileY === DEFAULT_CAMPAIGN.ctaPosMobileY
+                            : campaignDraft.ctaPosX === DEFAULT_CAMPAIGN.ctaPosX &&
+                              campaignDraft.ctaPosY === DEFAULT_CAMPAIGN.ctaPosY
+                        }
+                        onClick={() =>
+                          setCampaignDraft((prev) =>
+                            campaignPreviewDevice === "mobile"
+                              ? {
+                                  ...prev,
+                                  ctaPosMobileX: DEFAULT_CAMPAIGN.ctaPosMobileX,
+                                  ctaPosMobileY: DEFAULT_CAMPAIGN.ctaPosMobileY,
+                                }
+                              : {
+                                  ...prev,
+                                  ctaPosX: DEFAULT_CAMPAIGN.ctaPosX,
+                                  ctaPosY: DEFAULT_CAMPAIGN.ctaPosY,
+                                },
+                          )
+                        }
+                        className="border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-8"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                        Restablecer posición
+                      </Button>
+                      </div>
                     </div>
                     <div className="-mx-6 border-y border-carbon/10 overflow-hidden">
                       <CampaignPreviewFrame device={campaignPreviewDevice}>
@@ -3913,6 +4201,13 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                           config={campaignPreviewConfig}
                           preview
                           previewDevice={campaignPreviewDevice}
+                          onCtaPositionChange={(pos) =>
+                            setCampaignDraft((prev) =>
+                              campaignPreviewDevice === "mobile"
+                                ? { ...prev, ctaPosMobileX: pos.x, ctaPosMobileY: pos.y }
+                                : { ...prev, ctaPosX: pos.x, ctaPosY: pos.y },
+                            )
+                          }
                         />
                       </CampaignPreviewFrame>
                     </div>
@@ -3923,7 +4218,8 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         : `escritorio (${CAMPAIGN_PREVIEW_VIEWPORT.desktop.width}px, ratio 21:9 · máx. 720px de alto)`}
                       : misma tipografía, imagen y proporción que en la web. Con vídeo de fondo el
                       banner toma la proporción del propio archivo, para que se vea entero y sin
-                      recortes. El texto y el botón van siempre debajo de la imagen o el vídeo.
+                      recortes. Arrastra el botón para colocarlo sobre la imagen o el vídeo; su
+                      posición se guarda aparte para escritorio y para móvil. El texto va debajo.
                     </p>
                   </div>
                 </>
@@ -4405,6 +4701,18 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     />
                   </div>
 
+                  <AdminTextFonts
+                    fields={[
+                      { slot: "eyebrow", label: "Antetítulo" },
+                      { slot: "headline", label: "Titular" },
+                      { slot: "description", label: "Descripción" },
+                      { slot: "features", label: "Ventajas" },
+                      { slot: "cta", label: "Botón CTA" },
+                    ]}
+                    value={tiendaHeroDraft.fonts}
+                    onChange={(fonts) => setTiendaHeroDraft((prev) => ({ ...prev, fonts }))}
+                  />
+
                   <div>
                     <Label className="text-carbon/60 text-xs uppercase tracking-wider">
                       Intensidad del overlay (%)
@@ -4569,10 +4877,18 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     {isMarquee ? "Textos (uno por línea)" : "Contenido"}
                   </Label>
                   <Textarea
-                    value={isMarquee ? marqueeDraft.texts : block.content}
+                    value={
+                      isMarquee
+                        ? marqueeDraft.texts
+                        : aboutContent
+                          ? aboutContent.text
+                          : block.content
+                    }
                     onChange={(e) => {
                       if (isMarquee) {
                         setMarqueeDraft((prev) => ({ ...prev, texts: e.target.value }));
+                      } else if (aboutContent) {
+                        updateAboutContent(block.key, { ...aboutContent, text: e.target.value });
                       } else {
                         updateField(block.key, "content", e.target.value);
                       }
@@ -4589,6 +4905,25 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
               )}
 
               {isMarquee && (
+                <AdminTextFonts
+                  fields={[{ slot: "items", label: "Textos de la marquesina" }]}
+                  value={marqueeDraft.fonts}
+                  onChange={(fonts) => setMarqueeDraft((prev) => ({ ...prev, fonts }))}
+                />
+              )}
+
+              {aboutContent && (
+                <AdminTextFonts
+                  fields={[
+                    { slot: "title", label: "Título" },
+                    { slot: "text", label: "Contenido" },
+                  ]}
+                  value={aboutContent.fonts}
+                  onChange={(fonts) => updateAboutContent(block.key, { ...aboutContent, fonts })}
+                />
+              )}
+
+              {isMarquee && (
                 <div
                   className="rounded-lg border border-carbon/10 overflow-hidden"
                   style={{
@@ -4597,7 +4932,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     paddingBottom: parsePaddingY(marqueeDraft.paddingY),
                   }}
                 >
-                  <p className="px-4 text-center font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em] text-carbon/70">
+                  <p
+                    className="px-4 text-center font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em] text-carbon/70"
+                    style={fontStyle(marqueeDraft.fonts.items)}
+                  >
                     Vista previa · {marqueeTextToItems(marqueeDraft.texts)[0] || "…"}
                   </p>
                 </div>
@@ -4704,6 +5042,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         texts: announcementItemsToText(DEFAULT_ANNOUNCEMENT_ITEMS),
                         background: DEFAULT_ANNOUNCEMENT_BAR.background,
                         textColor: DEFAULT_ANNOUNCEMENT_BAR.textColor,
+                        fonts: DEFAULT_ANNOUNCEMENT_BAR.fonts,
                       });
                       toast({
                         title: "Diseño restablecido",

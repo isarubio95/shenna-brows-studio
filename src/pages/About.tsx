@@ -4,8 +4,10 @@ import InstagramPostEmbed from "@/components/InstagramPostEmbed";
 import { useSiteContent } from "@/hooks/use-site-content";
 import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
 import { Loader2 } from "lucide-react";
+import { ABOUT_SECTION_KEYS, parseAboutSectionContent } from "@/lib/about-content";
+import { fontStyle } from "@/lib/fonts";
 
-const ABOUT_KEYS = ["about_section_1", "about_section_2", "about_section_3", "about_section_4"];
+const ABOUT_KEYS = [...ABOUT_SECTION_KEYS];
 
 const VIDEO_POSTER_TIME = 2;
 
@@ -24,10 +26,14 @@ const About = () => {
   // El hueco lo marca el propio archivo, para no recortarlo por arriba y por abajo.
   const videoAspect = useVideoAspectRatio(ABOUT_VIDEO_SRC);
 
-  const sections = ABOUT_KEYS.map((key, i) => ({
-    title: siteContent[key]?.title || FALLBACK_SECTIONS[i].title,
-    text: siteContent[key]?.content || FALLBACK_SECTIONS[i].text,
-  }));
+  const sections = ABOUT_KEYS.map((key, i) => {
+    const content = parseAboutSectionContent(siteContent[key]?.content);
+    return {
+      title: siteContent[key]?.title || FALLBACK_SECTIONS[i].title,
+      text: content.text || FALLBACK_SECTIONS[i].text,
+      fonts: content.fonts,
+    };
+  });
 
   useEffect(() => {
     const video = document.createElement("video");
@@ -103,10 +109,10 @@ const About = () => {
               sections.map((s, i) => (
                 <AnimatedSection key={i} delay={i * 0.06}>
                   <article>
-                    <h2 className="font-playfair text-2xl md:text-3xl font-semibold mb-4 leading-snug" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
+                    <h2 className="font-playfair text-2xl md:text-3xl font-semibold mb-4 leading-snug" style={{ color: "var(--theme-color-h2, #1A1A1A)", ...fontStyle(s.fonts.title) }}>
                       {s.title}
                     </h2>
-                    <p className="text-lg leading-relaxed" style={{ color: "var(--theme-color-paragraph, #1A1A1A)", opacity: 0.6 }}>{s.text}</p>
+                    <p className="text-lg leading-relaxed" style={{ color: "var(--theme-color-paragraph, #1A1A1A)", opacity: 0.6, ...fontStyle(s.fonts.text) }}>{s.text}</p>
                   </article>
                 </AnimatedSection>
               ))

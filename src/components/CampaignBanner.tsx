@@ -1,12 +1,27 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
 import BannerBackgroundMedia from "@/components/BannerBackgroundMedia";
 import BackgroundSoundButton from "@/components/BackgroundSoundButton";
-import { campaignCtaPath, DEFAULT_CAMPAIGN, type CampaignConfig } from "@/lib/campaign-content";
+import {
+  campaignCtaPath,
+  clampCampaignCtaPos,
+  DEFAULT_CAMPAIGN,
+  type CampaignConfig,
+  type CampaignCtaSize,
+} from "@/lib/campaign-content";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
+import { fontStyle } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 export type CampaignPreviewDevice = "desktop" | "mobile";
@@ -19,6 +34,24 @@ export const CAMPAIGN_PREVIEW_VIEWPORT: Record<CampaignPreviewDevice, { width: n
 
 const CAMPAIGN_PREVIEW_MAX_HEIGHT = 640;
 
+const CTA_SIZE_CLASS: Record<CampaignCtaSize, { site: string; desktop: string; mobile: string }> = {
+  sm: {
+    site: "px-4 py-2 text-[0.65rem] sm:px-5 sm:text-xs",
+    desktop: "px-5 py-2 text-xs",
+    mobile: "px-4 py-2 text-[0.65rem]",
+  },
+  md: {
+    site: "px-6 py-3 text-xs sm:px-7 sm:text-sm",
+    desktop: "px-7 py-3 text-sm",
+    mobile: "px-6 py-3 text-xs",
+  },
+  lg: {
+    site: "px-7 py-3.5 text-sm sm:px-9 sm:py-4 sm:text-base",
+    desktop: "px-9 py-4 text-base",
+    mobile: "px-7 py-3.5 text-sm",
+  },
+};
+
 interface CampaignBannerProps {
   config: CampaignConfig;
   /** Vista previa en admin: sin animación y con estado vacío si falta imagen. */
@@ -26,6 +59,8 @@ interface CampaignBannerProps {
   /** En preview, fuerza tipografía, ratio e imagen de ese dispositivo. */
   previewDevice?: CampaignPreviewDevice;
   className?: string;
+  /** Solo en preview: arrastrar el botón y devolver su nueva posición (%). */
+  onCtaPositionChange?: (pos: { x: number; y: number }) => void;
 }
 
 const CampaignBanner = ({
@@ -33,8 +68,17 @@ const CampaignBanner = ({
   preview = false,
   previewDevice = "desktop",
   className,
+  onCtaPositionChange,
 }: CampaignBannerProps) => {
   const mediaRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
+  const [dragging, setDragging] = useState(false);
   const isMobileViewport = useIsMobile();
 
   const previewMobile = preview && previewDevice === "mobile";
@@ -47,26 +91,119 @@ const CampaignBanner = ({
   const activeSrc = preview ? previewSrc : isMobileViewport ? mobileSrc : desktopSrc;
   const videoAspect = useVideoAspectRatio(activeSrc);
   const subParts = splitHeadlineByAccent(config.subheadline, config.subheadlineAccent);
+  const canDrag = Boolean(preview && onCtaPositionChange);
+  const ctaPosX = previewMobile ? config.ctaPosMobileX : config.ctaPosX;
+  const ctaPosY = previewMobile ? config.ctaPosMobileY : config.ctaPosY;
+
+  const handlePointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!canDrag) return;
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      dragRef.current = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        originX: ctaPosX,
+        originY: ctaPosY,
+      };
+      setDragging(true);
+    },
+    [canDrag, ctaPosX, ctaPosY],
+  );
+
+  const handlePointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!canDrag || !onCtaPositionChange || !dragRef.current) return;
+      if (dragRef.current.pointerId !== e.pointerId) return;
+      const media = mediaRef.current;
+      if (!media) return;
+      const rect = media.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const dxPct = ((e.clientX - dragRef.current.startX) / rect.width) * 100;
+      const dyPct = ((e.clientY - dragRef.current.startY) / rect.height) * 100;
+      onCtaPositionChange(
+        clampCampaignCtaPos(dragRef.current.originX + dxPct, dragRef.current.originY + dyPct),
+      );
+    },
+    [canDrag, onCtaPositionChange],
+  );
+
+  const endDrag = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    dragRef.current = null;
+    setDragging(false);
+  }, []);
 
   if (!preview && !config.desktopImageUrl.trim()) return null;
 
   const pink = config.ctaBg || DEFAULT_CAMPAIGN.ctaBg;
   const ctaLabel = config.ctaText.trim() || DEFAULT_CAMPAIGN.ctaText;
 
-  const ctaButton = (
-    <button
-      type="button"
+  const ctaSize = CTA_SIZE_CLASS[config.ctaSize] ?? CTA_SIZE_CLASS.md;
+  const ctaClassName = cn(
+    "inline-flex items-center justify-center whitespace-nowrap rounded-full border font-sans font-bold uppercase tracking-[0.18em] shadow-md transition hover:brightness-105",
+    preview ? (previewMobile ? ctaSize.mobile : ctaSize.desktop) : ctaSize.site,
+  );
+  const ctaStyle: CSSProperties = {
+    background:
+      config.ctaFill === "solid"
+        ? pink
+        : `linear-gradient(90deg, ${pink} 0%, #F0A0AB 50%, ${pink} 100%)`,
+    borderColor: config.ctaBorderColor || DEFAULT_CAMPAIGN.ctaBorderColor,
+    color: config.ctaTextColor || DEFAULT_CAMPAIGN.ctaTextColor,
+    ...fontStyle(config.fonts.cta),
+  };
+
+  // Va sobre la foto o el vídeo, con su propia posición en escritorio y en móvil.
+  // El desplazamiento propio es proporcional a la posición (0 % → pegado al borde
+  // izquierdo, 50 % → centrado, 100 % → pegado al derecho), así nunca se sale.
+  const ctaOverlay = (
+    <div
       className={cn(
-        "mt-6 inline-flex items-center justify-center rounded-full border border-white/70 px-6 py-3 font-sans text-xs font-bold uppercase tracking-[0.18em] shadow-md transition hover:brightness-105 sm:px-7 sm:text-sm",
-        preview && (previewMobile ? "px-5 py-2.5 text-[0.7rem]" : "px-7 py-3"),
+        "absolute z-3 left-(--cta-ax) top-(--cta-ay)",
+        !preview && [
+          // Posición vía CSS vars + breakpoint: evita el parpadeo de useIsMobile.
+          "[--cta-ax:var(--cta-x)] [--cta-ay:var(--cta-y)]",
+          "max-md:[--cta-ax:var(--cta-x-m)] max-md:[--cta-ay:var(--cta-y-m)]",
+        ],
+        canDrag && "cursor-grab touch-none select-none rounded-full ring-2 ring-white/80 ring-offset-2 ring-offset-transparent",
+        dragging && "cursor-grabbing",
       )}
-      style={{
-        background: `linear-gradient(90deg, ${pink} 0%, #F0A0AB 50%, ${pink} 100%)`,
-        color: config.ctaTextColor || DEFAULT_CAMPAIGN.ctaTextColor,
-      }}
+      style={
+        {
+          "--cta-x": `${config.ctaPosX}%`,
+          "--cta-y": `${config.ctaPosY}%`,
+          "--cta-x-m": `${config.ctaPosMobileX}%`,
+          "--cta-y-m": `${config.ctaPosMobileY}%`,
+          ...(preview ? { "--cta-ax": `${ctaPosX}%`, "--cta-ay": `${ctaPosY}%` } : {}),
+          transform: "translate(calc(var(--cta-ax) * -1), calc(var(--cta-ay) * -1))",
+        } as CSSProperties
+      }
+      onPointerDown={canDrag ? handlePointerDown : undefined}
+      onPointerMove={canDrag ? handlePointerMove : undefined}
+      onPointerUp={canDrag ? endDrag : undefined}
+      onPointerCancel={canDrag ? endDrag : undefined}
+      role={canDrag ? "group" : undefined}
+      aria-label={canDrag ? "Arrastra para colocar el botón de la campaña" : undefined}
     >
-      {ctaLabel}
-    </button>
+      {preview ? (
+        <span className={cn(ctaClassName, "pointer-events-none")} style={ctaStyle}>
+          {ctaLabel}
+        </span>
+      ) : (
+        <AnimatedSection>
+          <Link to={campaignCtaPath(config)} className={ctaClassName} style={ctaStyle}>
+            {ctaLabel}
+          </Link>
+        </AnimatedSection>
+      )}
+    </div>
   );
 
   const textInner = (
@@ -80,7 +217,7 @@ const CampaignBanner = ({
               : "text-[2.15rem]"
             : "text-[1.35rem] sm:text-2xl md:text-3xl lg:text-[2.15rem]",
         )}
-        style={{ color: config.headlineColor }}
+        style={{ color: config.headlineColor, ...fontStyle(config.fonts.headline) }}
       >
         {config.headline}
       </h2>
@@ -113,12 +250,18 @@ const CampaignBanner = ({
               : "text-xl"
             : "text-base sm:text-lg md:text-xl",
         )}
-        style={{ color: config.subheadlineColor }}
+        style={{ color: config.subheadlineColor, ...fontStyle(config.fonts.subheadline) }}
       >
         {subParts ? (
           <>
             {subParts.before}
-            <span className="italic" style={{ color: config.subheadlineAccentColor }}>
+            <span
+              className="italic"
+              style={{
+                color: config.subheadlineAccentColor,
+                ...fontStyle(config.fonts.subheadlineAccent),
+              }}
+            >
               {subParts.accent}
             </span>
             {subParts.after}
@@ -127,12 +270,6 @@ const CampaignBanner = ({
           config.subheadline
         )}
       </p>
-
-      {preview ? (
-        <div className="pointer-events-none">{ctaButton}</div>
-      ) : (
-        <Link to={campaignCtaPath(config)}>{ctaButton}</Link>
-      )}
     </>
   );
 
@@ -164,6 +301,8 @@ const CampaignBanner = ({
         ) : (
           <div className="absolute inset-0 bg-[#E8DFD0]" aria-hidden />
         )}
+
+        {ctaOverlay}
 
         {hasMedia ? <BackgroundSoundButton containerRef={mediaRef} className="z-2" /> : null}
 

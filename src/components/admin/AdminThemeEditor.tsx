@@ -4,13 +4,37 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, RotateCcw } from "lucide-react";
-import { ThemeConfig, DEFAULT_THEME, applyTheme } from "@/hooks/use-theme-config";
+import {
+  ThemeConfig,
+  DEFAULT_THEME,
+  applyTheme,
+  mergeThemeConfig,
+  type ThemeColorKey,
+  type ThemeFontKey,
+} from "@/hooks/use-theme-config";
 import { HexColorField } from "@/components/admin/HexColorField";
+import { FontSelect } from "@/components/admin/FontSelect";
+import { getFontOption } from "@/lib/fonts";
 
 interface ColorField {
-  key: keyof ThemeConfig;
+  key: ThemeColorKey;
   label: string;
 }
+
+const FONT_FIELDS: { key: ThemeFontKey; label: string; hint: string; sample: string }[] = [
+  {
+    key: "fontHeadings",
+    label: "Títulos",
+    hint: "Titulares, nombres de producto y cabeceras de sección.",
+    sample: "La precisión que te define",
+  },
+  {
+    key: "fontBody",
+    label: "Texto general",
+    hint: "Párrafos, menú, botones, precios y formularios.",
+    sample: "Acero inoxidable italiano, pensado para durar años.",
+  },
+];
 
 const SECTION_COLORS: ColorField[] = [
   { key: "sectionProductsBg", label: "Productos (Inicio)" },
@@ -54,7 +78,7 @@ const AdminThemeEditor = () => {
         if (data) {
           setRowId(data.id);
           try {
-            const merged = { ...DEFAULT_THEME, ...JSON.parse(data.content) };
+            const merged = mergeThemeConfig(JSON.parse(data.content));
             setTheme(merged);
             setSavedTheme(merged);
           } catch {
@@ -136,8 +160,41 @@ const AdminThemeEditor = () => {
     </div>
   );
 
+  const renderFonts = () => (
+    <div className="space-y-3">
+      <h4 className="font-playfair text-sm font-semibold text-foreground uppercase tracking-wider">
+        Tipografías
+      </h4>
+      <p className="text-xs text-muted-foreground">
+        Fuentes de toda la web. Cada texto del apartado Contenido puede usar además una fuente
+        propia; si no, hereda estas.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {FONT_FIELDS.map((f) => (
+          <div key={f.key} className="space-y-2">
+            <Label className="text-foreground text-sm">{f.label}</Label>
+            <FontSelect
+              value={theme[f.key]}
+              onChange={(v) => updateColor(f.key, v || DEFAULT_THEME[f.key])}
+              inheritLabel={`Por defecto (${getFontOption(DEFAULT_THEME[f.key])?.label})`}
+              aria-label={`Tipografía: ${f.label}`}
+            />
+            <p className="text-xs text-muted-foreground">{f.hint}</p>
+            <p
+              className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-lg text-foreground truncate"
+              style={{ fontFamily: getFontOption(theme[f.key])?.stack }}
+            >
+              {f.sample}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="bg-card rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6 space-y-8">
+      {renderFonts()}
       {renderGroup("Fondos de sección", SECTION_COLORS)}
       {renderGroup("Footer", FOOTER_COLORS)}
       {renderGroup("Tipografía y acento", TYPOGRAPHY_COLORS)}

@@ -20,6 +20,7 @@ import {
   parseWelcomePopupConfig,
   type WelcomePopupConfig,
 } from "@/lib/welcome-popup-content";
+import { fontStyle } from "@/lib/fonts";
 import "animate.css";
 
 const STORAGE_KEY = "sb_welcome_promo_seen";
@@ -65,6 +66,7 @@ export const WelcomePromoDialogView = ({
   const bgIsVideo = isVideoMediaUrl(bgImage);
   const pink = config.pink || DEFAULT_WELCOME_POPUP.pink;
   const gold = config.gold || DEFAULT_WELCOME_POPUP.gold;
+  const fonts = config.fonts;
 
   useEffect(() => {
     if (open) {
@@ -198,7 +200,7 @@ export const WelcomePromoDialogView = ({
                 </DialogDescription>
 
                 <div className="flex flex-1 flex-col items-center text-center">
-                  <p className="font-sans text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-carbon/80">
+                  <p className="font-sans text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-carbon/80" style={fontStyle(fonts.eyebrow)}>
                     {config.eyebrow}
                   </p>
                   <p
@@ -209,11 +211,12 @@ export const WelcomePromoDialogView = ({
                       backgroundClip: "text",
                       color: "transparent",
                       textShadow: "0 1px 0 rgba(255,255,255,0.35)",
+                      ...fontStyle(fonts.offer),
                     }}
                   >
                     {config.offerAmount}
                   </p>
-                  <p className="mt-1 font-playfair text-lg font-semibold uppercase tracking-[0.12em] text-carbon/85">
+                  <p className="mt-1 font-playfair text-lg font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(fonts.offerSuffix)}>
                     {config.offerSuffix}
                   </p>
 
@@ -223,7 +226,7 @@ export const WelcomePromoDialogView = ({
                     <span className="h-px flex-1" style={{ backgroundColor: gold }} />
                   </div>
 
-                  <p className="font-playfair text-sm font-semibold uppercase tracking-[0.12em] text-carbon/85">
+                  <p className="font-playfair text-sm font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(fonts.badge)}>
                     {config.badgeText}
                   </p>
 
@@ -234,6 +237,7 @@ export const WelcomePromoDialogView = ({
                       className="flex w-full items-center justify-center gap-2 rounded-full border border-white/70 px-4 py-3.5 font-sans text-sm font-bold uppercase tracking-[0.18em] text-white shadow-md transition hover:brightness-105"
                       style={{
                         background: `linear-gradient(90deg, ${pink} 0%, #F0A0AB 50%, ${pink} 100%)`,
+                        ...fontStyle(fonts.primaryCta),
                       }}
                     >
                       <Sparkle className="h-3.5 w-3.5" fill="currentColor" />
@@ -247,6 +251,7 @@ export const WelcomePromoDialogView = ({
                       style={{
                         borderColor: `${gold}99`,
                         backgroundColor: "rgba(249,247,242,0.55)",
+                        ...fontStyle(fonts.secondaryCta),
                       }}
                     >
                       {config.secondaryCta}
@@ -256,10 +261,10 @@ export const WelcomePromoDialogView = ({
               </>
             ) : (
               <form onSubmit={handleSubscribe} className="flex flex-1 flex-col">
-                <DialogTitle className="text-center font-playfair text-2xl font-bold text-carbon">
+                <DialogTitle className="text-center font-playfair text-2xl font-bold text-carbon" style={fontStyle(fonts.emailTitle)}>
                   {config.emailTitle}
                 </DialogTitle>
-                <DialogDescription className="mt-2 text-center text-sm text-carbon/70">
+                <DialogDescription className="mt-2 text-center text-sm text-carbon/70" style={fontStyle(fonts.emailDescription)}>
                   {config.emailDescription}
                 </DialogDescription>
 
@@ -300,6 +305,7 @@ export const WelcomePromoDialogView = ({
                     className="flex w-full items-center justify-center gap-2 rounded-full border border-white/70 px-4 py-3.5 font-sans text-sm font-bold uppercase tracking-[0.18em] text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
                     style={{
                       background: `linear-gradient(90deg, ${pink} 0%, #F0A0AB 50%, ${pink} 100%)`,
+                      ...fontStyle(fonts.emailCta),
                     }}
                   >
                     {submitting ? "Enviando..." : config.emailCta}
@@ -311,6 +317,7 @@ export const WelcomePromoDialogView = ({
                     style={{
                       borderColor: `${gold}99`,
                       backgroundColor: "rgba(249,247,242,0.55)",
+                      ...fontStyle(fonts.secondaryCta),
                     }}
                   >
                     Volver

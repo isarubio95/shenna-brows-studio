@@ -45,6 +45,7 @@ import {
 } from "@/lib/faq-content";
 import { invalidateFaqPageVisibleCache } from "@/hooks/use-faq-page-visible";
 import { cn } from "@/lib/utils";
+import { AdminTextFonts } from "@/components/admin/FontSelect";
 
 type ContentRow = {
   id: string;
@@ -273,6 +274,15 @@ const AdminFaqEditor = () => {
             onChange={(e) => updatePage("intro", e.target.value)}
           />
         </div>
+        <AdminTextFonts
+          fields={[
+            { slot: "eyebrow", label: "Antetítulo" },
+            { slot: "title", label: "Título" },
+            { slot: "intro", label: "Introducción" },
+          ]}
+          value={draft.fonts}
+          onChange={(fonts) => updatePage("fonts", fonts)}
+        />
       </section>
 
       <section className="bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-5 md:p-6 space-y-5">
@@ -318,6 +328,16 @@ const AdminFaqEditor = () => {
             />
           </div>
         </div>
+        <AdminTextFonts
+          fields={[
+            { slot: "helpSubtitle", label: "Subtítulo" },
+            { slot: "helpTitle", label: "Título" },
+            { slot: "helpBody", label: "Texto" },
+            { slot: "helpCta", label: "Botón" },
+          ]}
+          value={draft.fonts}
+          onChange={(fonts) => updatePage("fonts", fonts)}
+        />
       </section>
 
       <div className="flex items-center justify-between gap-3">
@@ -336,6 +356,17 @@ const AdminFaqEditor = () => {
           Añadir sección
         </Button>
       </div>
+
+      <AdminTextFonts
+        className="bg-white"
+        fields={[
+          { slot: "sectionTitle", label: "Títulos de sección" },
+          { slot: "question", label: "Preguntas" },
+          { slot: "answer", label: "Respuestas" },
+        ]}
+        value={draft.fonts}
+        onChange={(fonts) => updatePage("fonts", fonts)}
+      />
 
       <div className="space-y-4">
         {draft.sections.map((section, sectionIndex) => {

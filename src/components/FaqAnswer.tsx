@@ -1,19 +1,20 @@
-import { Fragment } from "react";
+import { Fragment, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { parseFaqAnswerParts } from "@/lib/faq-content";
 
 type FaqAnswerProps = {
   answer: string;
   className?: string;
+  style?: CSSProperties;
 };
 
-const FaqAnswer = ({ answer, className }: FaqAnswerProps) => {
+const FaqAnswer = ({ answer, className, style }: FaqAnswerProps) => {
   const paragraphs = answer.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
 
   if (paragraphs.length === 0) return null;
 
   return (
-    <div className={className}>
+    <div className={className} style={style}>
       {paragraphs.map((paragraph, paragraphIndex) => (
         <p key={paragraphIndex} className={paragraphIndex > 0 ? "mt-3" : undefined}>
           {parseFaqAnswerParts(paragraph).map((part, partIndex) => {

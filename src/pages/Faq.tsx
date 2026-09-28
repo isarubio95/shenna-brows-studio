@@ -10,6 +10,7 @@ import {
   isPendingFaqAnswer,
   parseFaqConfig,
 } from "@/lib/faq-content";
+import { fontStyle } from "@/lib/fonts";
 import NotFound from "@/pages/NotFound";
 import {
   Accordion,
@@ -114,6 +115,7 @@ const Faq = () => {
     };
   }, [ready, isPublic, sections]);
 
+  const fonts = faq.fonts;
   const isExternalCta = /^https?:\/\//i.test(faq.helpCtaHref) || faq.helpCtaHref.startsWith("mailto:");
 
   if (!ready) {
@@ -139,14 +141,14 @@ const Faq = () => {
           </p>
         ) : null}
         <AnimatedSection>
-          <p className="text-gold text-sm uppercase tracking-[0.3em] font-medium text-center mb-4">
+          <p className="text-gold text-sm uppercase tracking-[0.3em] font-medium text-center mb-4" style={fontStyle(fonts.eyebrow)}>
             {faq.eyebrow}
           </p>
-          <h1 className="font-playfair text-4xl md:text-5xl font-bold text-carbon text-center leading-tight mb-4">
+          <h1 className="font-playfair text-4xl md:text-5xl font-bold text-carbon text-center leading-tight mb-4" style={fontStyle(fonts.title)}>
             {faq.title}
           </h1>
           {faq.intro ? (
-            <p className="text-carbon/55 text-base md:text-lg text-center leading-relaxed mb-10">
+            <p className="text-carbon/55 text-base md:text-lg text-center leading-relaxed mb-10" style={fontStyle(fonts.intro)}>
               {faq.intro}
             </p>
           ) : (
@@ -164,6 +166,7 @@ const Faq = () => {
                 key={section.id}
                 href={`#faq-${section.id}`}
                 className="inline-flex items-center rounded-full border border-gold/20 bg-white px-4 py-2 text-sm text-carbon/70 hover:border-gold/40 hover:text-carbon transition-colors"
+                style={fontStyle(fonts.sectionTitle)}
               >
                 {section.title}
               </a>
@@ -175,7 +178,7 @@ const Faq = () => {
           {sections.map((section, sectionIndex) => (
             <AnimatedSection key={section.id} delay={sectionIndex * 0.04}>
               <section id={`faq-${section.id}`} className="scroll-mt-28">
-                <h2 className="font-playfair text-2xl md:text-3xl font-semibold text-carbon mb-5">
+                <h2 className="font-playfair text-2xl md:text-3xl font-semibold text-carbon mb-5" style={fontStyle(fonts.sectionTitle)}>
                   {section.title}
                 </h2>
                 <Accordion type="single" collapsible className="bg-white rounded-2xl border border-gold/10 px-4 md:px-6">
@@ -185,13 +188,14 @@ const Faq = () => {
                       value={faqItem.id}
                       className="border-gold/10 last:border-b-0"
                     >
-                      <AccordionTrigger className="text-left font-medium text-carbon hover:no-underline hover:text-gold py-5">
+                      <AccordionTrigger className="text-left font-medium text-carbon hover:no-underline hover:text-gold py-5" style={fontStyle(fonts.question)}>
                         {faqItem.question}
                       </AccordionTrigger>
                       <AccordionContent>
                         <FaqAnswer
                           answer={faqItem.answer}
                           className="text-carbon/60 leading-relaxed text-sm md:text-base pb-2"
+                          style={fontStyle(fonts.answer)}
                         />
                       </AccordionContent>
                     </AccordionItem>
@@ -204,14 +208,14 @@ const Faq = () => {
 
         <AnimatedSection delay={0.08}>
           <section className="mt-20 rounded-2xl border border-gold/15 bg-white px-6 py-10 md:px-10 text-center">
-            <p className="text-gold text-sm uppercase tracking-[0.28em] font-medium mb-3">
+            <p className="text-gold text-sm uppercase tracking-[0.28em] font-medium mb-3" style={fontStyle(fonts.helpSubtitle)}>
               {faq.helpSubtitle}
             </p>
-            <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon mb-4">
+            <h2 className="font-playfair text-3xl md:text-4xl font-bold text-carbon mb-4" style={fontStyle(fonts.helpTitle)}>
               {faq.helpTitle}
             </h2>
             {faq.helpBody ? (
-              <p className="text-carbon/60 leading-relaxed max-w-xl mx-auto mb-8">
+              <p className="text-carbon/60 leading-relaxed max-w-xl mx-auto mb-8" style={fontStyle(fonts.helpBody)}>
                 {faq.helpBody}
               </p>
             ) : null}
@@ -219,6 +223,7 @@ const Faq = () => {
               <a
                 href={faq.helpCtaHref}
                 className="inline-flex items-center justify-center rounded-md bg-gold px-6 py-3 text-sm font-medium text-white hover:bg-gold/90 transition-colors"
+                style={fontStyle(fonts.helpCta)}
               >
                 {faq.helpCtaLabel}
               </a>
@@ -226,6 +231,7 @@ const Faq = () => {
               <Link
                 to={faq.helpCtaHref || "/tienda"}
                 className="inline-flex items-center justify-center rounded-md bg-gold px-6 py-3 text-sm font-medium text-white hover:bg-gold/90 transition-colors"
+                style={fontStyle(fonts.helpCta)}
               >
                 {faq.helpCtaLabel}
               </Link>

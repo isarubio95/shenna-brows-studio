@@ -1,9 +1,17 @@
+import { emptyTextFonts, parseTextFonts, serializeTextFonts, type TextFonts } from "@/lib/fonts";
+
+/** Textos del bloque con fuente elegible en el panel. */
+export const INDEX_VIDEO_FONT_SLOTS = ["title", "accent"] as const;
+export type IndexVideoFontSlot = (typeof INDEX_VIDEO_FONT_SLOTS)[number];
+
 export interface IndexVideoConfig {
   title: string;
   /** Fragmento del título que se pinta en dorado cursiva. */
   accent: string;
   videoUrl: string;
   posterUrl: string;
+  /** Fuente propia de cada texto; "" hereda la del tema. */
+  fonts: TextFonts<IndexVideoFontSlot>;
 }
 
 export const INDEX_VIDEO_PATH = "/videos/cejas-tratamiento.mp4";
@@ -15,6 +23,7 @@ export const DEFAULT_INDEX_VIDEO: IndexVideoConfig = {
   accent: "tratamiento de cejas profesional",
   videoUrl: INDEX_VIDEO_PATH,
   posterUrl: INDEX_VIDEO_POSTER_PATH,
+  fonts: emptyTextFonts(INDEX_VIDEO_FONT_SLOTS),
 };
 
 const asString = (value: unknown, fallback: string) =>
@@ -60,6 +69,7 @@ export function parseIndexVideoConfig(raw?: string | null): IndexVideoConfig {
           : resolveIndexVideoUrl(parsed.videoUrl) === INDEX_VIDEO_PATH
             ? DEFAULT_INDEX_VIDEO.posterUrl
             : "",
+      fonts: parseTextFonts(parsed.fonts, INDEX_VIDEO_FONT_SLOTS),
     };
   } catch {
     return { ...DEFAULT_INDEX_VIDEO };
@@ -72,5 +82,6 @@ export function serializeIndexVideoConfig(config: IndexVideoConfig): string {
     accent: config.accent.trim(),
     videoUrl: config.videoUrl.trim() || DEFAULT_INDEX_VIDEO.videoUrl,
     posterUrl: config.posterUrl.trim(),
+    fonts: serializeTextFonts(config.fonts),
   });
 }

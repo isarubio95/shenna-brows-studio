@@ -63,9 +63,10 @@ export default {
         carbon: "#1A1A1A",
       },
       fontFamily: {
-        playfair: ["Playfair Display", "serif"],
+        // Títulos y texto general salen del tema (admin → Tema → Tipografías).
+        playfair: ["var(--theme-font-headings)"],
         cormorant: ["Cormorant Garamond", "serif"],
-        sans: ["Lato", "sans-serif"],
+        sans: ["var(--theme-font-body)"],
         inter: ["Inter", "sans-serif"],
       },
       borderRadius: {

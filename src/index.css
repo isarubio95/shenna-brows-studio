@@ -59,6 +59,10 @@
     --theme-color-accent: #C5A059;
     --theme-primary-hsl: 40 48% 55%;
     --brand-gold: #C5A059;
+
+    /* Fuera de la web pública (panel) siempre las fuentes de marca. */
+    --theme-font-headings: "Playfair Display", serif;
+    --theme-font-body: "Lato", sans-serif;
   }
 
   .dark {
@@ -130,6 +134,8 @@
   El footer tiene sus propios colores y se excluye.
 */
 .site-theme {
+  --theme-font-headings: var(--site-font-headings, "Playfair Display", serif);
+  --theme-font-body: var(--site-font-body, "Lato", sans-serif);
   --brand-gold: var(--theme-color-accent, #C5A059);
   --primary: var(--theme-primary-hsl, 40 48% 55%);
   --ring: var(--theme-primary-hsl, 40 48% 55%);

@@ -23,10 +23,9 @@ import CampaignBanner from "@/components/CampaignBanner";
 import HeroSection from "@/components/HeroSection";
 import { useSiteContent } from "@/hooks/use-site-content";
 import { parseMarqueeConfig } from "@/lib/marquee-content";
-import {
-  parseCollectionHeadlineConfig,
-  splitHeadlineByAccent,
-} from "@/lib/collection-headline-content";
+import { fontStyle } from "@/lib/fonts";
+import { parseCollectionHeadlineConfig } from "@/lib/collection-headline-content";
+import CollectionHeadline from "@/components/CollectionHeadline";
 import { parseCampaignConfig } from "@/lib/campaign-content";
 import { parseHeroConfig } from "@/lib/hero-content";
 import { parseIndexVideoConfig } from "@/lib/video-content";
@@ -68,11 +67,6 @@ const Index = () => {
     [siteContent.index_campaign?.content],
   );
 
-  const headlineParts = useMemo(
-    () => splitHeadlineByAccent(collectionHeadline.text, collectionHeadline.accent),
-    [collectionHeadline.text, collectionHeadline.accent],
-  );
-
   const productsAutoplay = useMemo(
     () => Autoplay({ delay: 4000, stopOnInteraction: true }),
     [],
@@ -86,7 +80,7 @@ const Index = () => {
   }, []);
 
   const scrollToNextSection = () => {
-    document.getElementById("video")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("coleccion")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -118,7 +112,9 @@ const Index = () => {
                   key={`${copy}-${i}-${item}`}
                   className="flex shrink-0 items-center gap-8 sm:gap-12"
                 >
-                  <span className="whitespace-nowrap font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em] text-carbon/70 sm:text-xs">
+                  <span className="whitespace-nowrap font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em] text-carbon/70 sm:text-xs"
+                    style={fontStyle(marquee.fonts.items)}
+                  >
                     {item}
                   </span>
                   <span className="h-1 w-1 shrink-0 rounded-full bg-gold/80" aria-hidden />
@@ -129,8 +125,6 @@ const Index = () => {
         </div>
       </div>
 
-      <IndexVideoSection config={indexVideo} />
-
       {/* Products Grid */}
       <section
         id="coleccion"
@@ -139,25 +133,6 @@ const Index = () => {
       >
         <div className="container mx-auto px-6">
           <AnimatedSection>
-            <p
-              className="font-cormorant text-center leading-snug mb-10 md:mb-14"
-              style={{
-                color: collectionHeadline.color,
-                fontSize: `clamp(1.35rem, 2.5vw + 0.75rem, ${collectionHeadline.fontSize}px)`,
-              }}
-            >
-              {headlineParts ? (
-                <>
-                  {headlineParts.before}
-                  <span className="italic" style={{ color: collectionHeadline.accentColor }}>
-                    {headlineParts.accent}
-                  </span>
-                  {headlineParts.after}
-                </>
-              ) : (
-                collectionHeadline.text
-              )}
-            </p>
             <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center mb-4" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
               Nuestra colección
             </h2>
@@ -231,11 +206,28 @@ const Index = () => {
         </div>
       </section>
 
+      <section
+        aria-label="Titular de la colección"
+        className="py-16 md:py-24"
+        style={{ backgroundColor: collectionHeadline.background }}
+      >
+        <div className="container mx-auto px-6">
+          <AnimatedSection>
+            <CollectionHeadline
+              config={collectionHeadline}
+              fontSize={`clamp(2.25rem, 7vw, ${collectionHeadline.fontSize}px)`}
+            />
+          </AnimatedSection>
+        </div>
+      </section>
+
       <CampaignBanner config={campaign} />
+
+      <TestimonialsCarousel />
 
       <CeoSection />
 
-      <TestimonialsCarousel />
+      <IndexVideoSection config={indexVideo} />
     </main>
   );
 };

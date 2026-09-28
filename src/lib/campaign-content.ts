@@ -1,3 +1,9 @@
+import { emptyTextFonts, parseTextFonts, serializeTextFonts, type TextFonts } from "@/lib/fonts";
+
+/** Textos del bloque con fuente elegible en el panel. */
+export const CAMPAIGN_FONT_SLOTS = ["headline", "subheadline", "subheadlineAccent", "cta"] as const;
+export type CampaignFontSlot = (typeof CAMPAIGN_FONT_SLOTS)[number];
+
 export interface CampaignConfig {
   /** Foto o vídeo de fondo (escritorio). */
   desktopImageUrl: string;
@@ -16,8 +22,26 @@ export interface CampaignConfig {
   /** Color rosa del botón (mismo default que el popup de bienvenida). */
   ctaBg: string;
   ctaTextColor: string;
+  /** Color del borde del botón (admite alfa, p. ej. #FFFFFFB3). */
+  ctaBorderColor: string;
+  /** Relleno del botón: degradado sobre `ctaBg` o color liso. */
+  ctaFill: CampaignCtaFill;
+  ctaSize: CampaignCtaSize;
+  /** Centro del botón sobre la imagen/vídeo en escritorio (0–100 %). */
+  ctaPosX: number;
+  ctaPosY: number;
+  /** Centro del botón sobre la imagen/vídeo en móvil (0–100 %). */
+  ctaPosMobileX: number;
+  ctaPosMobileY: number;
   alt: string;
+  /** Fuente propia de cada texto; "" hereda la del tema. */
+  fonts: TextFonts<CampaignFontSlot>;
 }
+
+export type CampaignCtaFill = "gradient" | "solid";
+export type CampaignCtaSize = "sm" | "md" | "lg";
+
+export const CAMPAIGN_CTA_SIZES: CampaignCtaSize[] = ["sm", "md", "lg"];
 
 export const DEFAULT_CAMPAIGN: CampaignConfig = {
   desktopImageUrl: "",
@@ -33,7 +57,15 @@ export const DEFAULT_CAMPAIGN: CampaignConfig = {
   ctaProductSlug: "",
   ctaBg: "#E9808E",
   ctaTextColor: "#FFFFFF",
+  ctaBorderColor: "#FFFFFFB3",
+  ctaFill: "gradient",
+  ctaSize: "md",
+  ctaPosX: 50,
+  ctaPosY: 85,
+  ctaPosMobileX: 50,
+  ctaPosMobileY: 85,
   alt: "Campaña publicitaria",
+  fonts: emptyTextFonts(CAMPAIGN_FONT_SLOTS),
 };
 
 const isHexColor = (value: unknown): value is string =>
@@ -42,6 +74,22 @@ const isHexColor = (value: unknown): value is string =>
 
 const asString = (value: unknown, fallback: string) =>
   typeof value === "string" ? value : fallback;
+
+const clampPos = (n: number, min: number, max: number) =>
+  Math.round(Math.min(max, Math.max(min, n)) * 10) / 10;
+
+/** 0–100 %: el banner ancla el botón en proporción, así que nunca se sale. */
+export function clampCampaignCtaPos(x: number, y: number): { x: number; y: number } {
+  return {
+    x: clampPos(x, 0, 100),
+    y: clampPos(y, 0, 100),
+  };
+}
+
+const parsePos = (value: unknown, fallback: number) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return clampPos(value, 0, 100);
+};
 
 /** Ruta del CTA: ficha de producto o tienda si no hay slug. */
 export function campaignCtaPath(config: Pick<CampaignConfig, "ctaProductSlug">): string {
@@ -72,6 +120,15 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
     const parsed = JSON.parse(trimmed) as Partial<CampaignConfig> & { ctaHref?: string };
     const fromSlug = asString(parsed.ctaProductSlug, "").trim().replace(/^\/+|\/+$/g, "");
     const ctaProductSlug = fromSlug || slugFromLegacyHref(parsed.ctaHref);
+    const desktopPos = clampCampaignCtaPos(
+      parsePos(parsed.ctaPosX, DEFAULT_CAMPAIGN.ctaPosX),
+      parsePos(parsed.ctaPosY, DEFAULT_CAMPAIGN.ctaPosY),
+    );
+    // Si aún no hay posición móvil guardada, hereda la de escritorio.
+    const mobilePos = clampCampaignCtaPos(
+      parsePos(parsed.ctaPosMobileX, desktopPos.x),
+      parsePos(parsed.ctaPosMobileY, desktopPos.y),
+    );
     return {
       desktopImageUrl: asString(parsed.desktopImageUrl, DEFAULT_CAMPAIGN.desktopImageUrl).trim(),
       mobileImageUrl: asString(parsed.mobileImageUrl, DEFAULT_CAMPAIGN.mobileImageUrl).trim(),
@@ -102,7 +159,19 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
       ctaTextColor: isHexColor(parsed.ctaTextColor)
         ? parsed.ctaTextColor.trim()
         : DEFAULT_CAMPAIGN.ctaTextColor,
+      ctaBorderColor: isHexColor(parsed.ctaBorderColor)
+        ? parsed.ctaBorderColor.trim()
+        : DEFAULT_CAMPAIGN.ctaBorderColor,
+      ctaFill: parsed.ctaFill === "solid" ? "solid" : "gradient",
+      ctaSize: CAMPAIGN_CTA_SIZES.includes(parsed.ctaSize as CampaignCtaSize)
+        ? (parsed.ctaSize as CampaignCtaSize)
+        : DEFAULT_CAMPAIGN.ctaSize,
+      ctaPosX: desktopPos.x,
+      ctaPosY: desktopPos.y,
+      ctaPosMobileX: mobilePos.x,
+      ctaPosMobileY: mobilePos.y,
       alt: asString(parsed.alt, DEFAULT_CAMPAIGN.alt).trim() || DEFAULT_CAMPAIGN.alt,
+      fonts: parseTextFonts(parsed.fonts, CAMPAIGN_FONT_SLOTS),
     };
   } catch {
     return { ...DEFAULT_CAMPAIGN };
@@ -110,6 +179,8 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
 }
 
 export function serializeCampaignConfig(config: CampaignConfig): string {
+  const desktopPos = clampCampaignCtaPos(config.ctaPosX, config.ctaPosY);
+  const mobilePos = clampCampaignCtaPos(config.ctaPosMobileX, config.ctaPosMobileY);
   return JSON.stringify({
     desktopImageUrl: config.desktopImageUrl,
     mobileImageUrl: config.mobileImageUrl,
@@ -124,6 +195,14 @@ export function serializeCampaignConfig(config: CampaignConfig): string {
     ctaProductSlug: config.ctaProductSlug.trim().replace(/^\/+|\/+$/g, ""),
     ctaBg: config.ctaBg,
     ctaTextColor: config.ctaTextColor,
+    ctaBorderColor: config.ctaBorderColor,
+    ctaFill: config.ctaFill,
+    ctaSize: config.ctaSize,
+    ctaPosX: desktopPos.x,
+    ctaPosY: desktopPos.y,
+    ctaPosMobileX: mobilePos.x,
+    ctaPosMobileY: mobilePos.y,
     alt: config.alt,
+    fonts: serializeTextFonts(config.fonts),
   });
 }

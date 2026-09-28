@@ -24,6 +24,7 @@ import { isVideoMediaUrl, posterUrlForVideoUrl } from "@/lib/media-url";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
+import { fontStyle } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import {
   clampTiendaHeroContentPos,
@@ -179,7 +180,7 @@ const TiendaHero = ({
 
   const ctaClassName =
     "mt-6 md:mt-8 rounded-full px-8 py-6 text-sm tracking-[0.15em] uppercase shadow-[0_10px_30px_rgba(197,160,89,0.35)] hover:opacity-90";
-  const ctaStyle = { backgroundColor: ctaBg, color: ctaTextColor };
+  const ctaStyle = { backgroundColor: ctaBg, color: ctaTextColor, ...fontStyle(config.fonts.cta) };
 
   const ctaButton = preview ? (
     <Button type="button" className={ctaClassName} style={ctaStyle}>
@@ -202,13 +203,14 @@ const TiendaHero = ({
         style={{
           color: TIENDA_HERO_EYEBROW_COLOR,
           textShadow: "0 1px 0 rgba(255,255,255,0.85)",
+          ...fontStyle(config.fonts.eyebrow),
         }}
       >
         {config.eyebrow}
       </p>
       <h1
         className="font-playfair text-[1.75rem] sm:text-3xl md:text-[2.35rem] lg:text-[2.65rem] leading-[1.15] max-w-3xl mx-auto text-balance"
-        style={{ color: headlineColor }}
+        style={{ color: headlineColor, ...fontStyle(config.fonts.headline) }}
       >
         {config.headline}
       </h1>
@@ -221,7 +223,7 @@ const TiendaHero = ({
               <li
                 key={`${index}-${feature.icon}`}
                 className="inline-flex items-center gap-2 md:gap-2.5"
-                style={{ color: featureColor }}
+                style={{ color: featureColor, ...fontStyle(config.fonts.features) }}
               >
                 <Icon size={17} className="shrink-0" style={{ color: accent }} aria-hidden />
                 {feature.label}
@@ -238,7 +240,7 @@ const TiendaHero = ({
       {contentInner}
       <p
         className="max-w-2xl mx-auto mt-5 text-sm md:text-lg leading-relaxed text-center"
-        style={{ color: descriptionColor }}
+        style={{ color: descriptionColor, ...fontStyle(config.fonts.description) }}
       >
         {config.description}
       </p>

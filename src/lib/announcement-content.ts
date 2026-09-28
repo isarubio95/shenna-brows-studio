@@ -1,11 +1,19 @@
+import { emptyTextFonts, parseTextFonts, serializeTextFonts, type TextFonts } from "@/lib/fonts";
+
 export const ANNOUNCEMENT_CONTENT_KEY = "announcement_bar";
 export const ANNOUNCEMENT_BAR_HEIGHT_PX = 36;
+
+/** Textos del bloque con fuente elegible en el panel. */
+export const ANNOUNCEMENT_FONT_SLOTS = ["text"] as const;
+export type AnnouncementFontSlot = (typeof ANNOUNCEMENT_FONT_SLOTS)[number];
 
 export interface AnnouncementBarConfig {
   enabled: boolean;
   items: string[];
   background: string;
   textColor: string;
+  /** Fuente propia de cada texto; "" hereda la del tema. */
+  fonts: TextFonts<AnnouncementFontSlot>;
 }
 
 export const DEFAULT_ANNOUNCEMENT_ITEMS = [
@@ -17,6 +25,7 @@ export const DEFAULT_ANNOUNCEMENT_BAR: AnnouncementBarConfig = {
   items: [...DEFAULT_ANNOUNCEMENT_ITEMS],
   background: "#000000",
   textColor: "#FFFFFF",
+  fonts: emptyTextFonts(ANNOUNCEMENT_FONT_SLOTS),
 };
 
 const HEX_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
@@ -63,6 +72,7 @@ export function parseAnnouncementBarConfig(raw?: string | null): AnnouncementBar
       textColor: isHexColor(parsed.textColor)
         ? parsed.textColor.trim()
         : DEFAULT_ANNOUNCEMENT_BAR.textColor,
+      fonts: parseTextFonts(parsed.fonts, ANNOUNCEMENT_FONT_SLOTS),
     };
   } catch {
     return { ...DEFAULT_ANNOUNCEMENT_BAR, items: [...DEFAULT_ANNOUNCEMENT_ITEMS] };
@@ -76,6 +86,7 @@ export function serializeAnnouncementBarConfig(config: AnnouncementBarConfig): s
     items: items.length > 0 ? items : [...DEFAULT_ANNOUNCEMENT_ITEMS],
     background: config.background,
     textColor: config.textColor,
+    fonts: serializeTextFonts(config.fonts),
   });
 }
 

@@ -3,7 +3,7 @@ import { parseCampaignConfig, serializeCampaignConfig } from "./campaign-content
 import { parseHeroConfig, serializeHeroConfig } from "./hero-content";
 import { serializeProductFeatureVideos } from "./product-feature-videos";
 import { serializeProductImages } from "./product-images";
-import { serializeIndexVideoConfig } from "./video-content";
+import { parseIndexVideoConfig, serializeIndexVideoConfig } from "./video-content";
 import { parseWelcomePopupConfig, serializeWelcomePopupConfig } from "./welcome-popup-content";
 import {
   collectUsedStorageRefs,
@@ -96,6 +96,7 @@ describe("collectUsedStorageRefs", () => {
         {
           key: "index_video",
           content: serializeIndexVideoConfig({
+            ...parseIndexVideoConfig(null),
             title: "T",
             accent: "",
             videoUrl: `${BASE}/campaign-images/index-video-4.mp4`,

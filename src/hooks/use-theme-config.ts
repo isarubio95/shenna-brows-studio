@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fontFamily, isFontId } from "@/lib/fonts";
 
 export interface ThemeConfig {
   // Section backgrounds
@@ -21,7 +22,13 @@ export interface ThemeConfig {
   colorParagraph: string;
   // Accent
   colorAccent: string;
+  // Fuentes globales (ids de `FONT_OPTIONS`)
+  fontHeadings: string;
+  fontBody: string;
 }
+
+export type ThemeFontKey = "fontHeadings" | "fontBody";
+export type ThemeColorKey = Exclude<keyof ThemeConfig, ThemeFontKey>;
 
 export const DEFAULT_THEME: ThemeConfig = {
   sectionProductsBg: "#F9F7F2",
@@ -39,9 +46,11 @@ export const DEFAULT_THEME: ThemeConfig = {
   colorH6: "#1A1A1A",
   colorParagraph: "#1A1A1A",
   colorAccent: "#C5A059",
+  fontHeadings: "playfair",
+  fontBody: "lato",
 };
 
-export const THEME_CSS_VAR_MAP: Record<keyof ThemeConfig, string> = {
+export const THEME_CSS_VAR_MAP: Record<ThemeColorKey, string> = {
   sectionProductsBg: "--theme-section-products-bg",
   sectionVideoBg: "--theme-section-video-bg",
   sectionBrandStoryBg: "--theme-section-brand-story-bg",
@@ -58,6 +67,21 @@ export const THEME_CSS_VAR_MAP: Record<keyof ThemeConfig, string> = {
   colorParagraph: "--theme-color-paragraph",
   colorAccent: "--theme-color-accent",
 };
+
+/** Leídas por `.site-theme` en index.css (y por `font-playfair` / `font-sans`). */
+export const THEME_FONT_VAR_MAP: Record<ThemeFontKey, string> = {
+  fontHeadings: "--site-font-headings",
+  fontBody: "--site-font-body",
+};
+
+/** Mezcla lo guardado con los valores por defecto, descartando fuentes desconocidas. */
+export function mergeThemeConfig(parsed: Partial<ThemeConfig> | null | undefined): ThemeConfig {
+  const merged = { ...DEFAULT_THEME, ...parsed };
+  for (const key of Object.keys(THEME_FONT_VAR_MAP) as ThemeFontKey[]) {
+    if (!isFontId(merged[key])) merged[key] = DEFAULT_THEME[key];
+  }
+  return merged;
+}
 
 /** Convierte #RGB / #RRGGBB / #RRGGBBAA a componentes HSL para tokens shadcn (`--primary`). */
 export function hexToHslComponents(hex: string, fallback = "40 48% 55%"): string {
@@ -103,8 +127,13 @@ export function hexToHslComponents(hex: string, fallback = "40 48% 55%"): string
 export function applyTheme(theme: ThemeConfig) {
   const root = document.documentElement;
   for (const [key, cssVar] of Object.entries(THEME_CSS_VAR_MAP)) {
-    const value = theme[key as keyof ThemeConfig] || DEFAULT_THEME[key as keyof ThemeConfig];
+    const value = theme[key as ThemeColorKey] || DEFAULT_THEME[key as ThemeColorKey];
     root.style.setProperty(cssVar, value);
+  }
+  for (const [key, cssVar] of Object.entries(THEME_FONT_VAR_MAP)) {
+    const stack =
+      fontFamily(theme[key as ThemeFontKey]) ?? fontFamily(DEFAULT_THEME[key as ThemeFontKey]);
+    if (stack) root.style.setProperty(cssVar, stack);
   }
   root.style.setProperty(
     "--theme-primary-hsl",
@@ -125,8 +154,7 @@ export function useThemeConfig() {
       .then(({ data }: any) => {
         if (data?.content) {
           try {
-            const parsed = JSON.parse(data.content);
-            const merged = { ...DEFAULT_THEME, ...parsed };
+            const merged = mergeThemeConfig(JSON.parse(data.content));
             setTheme(merged);
             applyTheme(merged);
           } catch {

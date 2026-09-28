@@ -10,6 +10,7 @@ import {
 } from "@/lib/hero-content";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
 import { ANNOUNCEMENT_BAR_HEIGHT_PX } from "@/lib/announcement-content";
+import { fontStyle } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 const HERO_CTA_BASE =
@@ -124,6 +125,7 @@ const HeroSection = ({
     backgroundColor: config.ctaBg,
     borderColor: config.ctaBg,
     color: config.ctaTextColor,
+    ...fontStyle(config.fonts.cta),
   };
 
   const headline = (
@@ -136,14 +138,17 @@ const HeroSection = ({
             : "text-[3rem]"
           : "text-[1.7rem] md:text-[2.1rem] lg:text-[3rem]",
       )}
-      style={{ color: config.headlineColor }}
+      style={{ color: config.headlineColor, ...fontStyle(config.fonts.headline) }}
     >
       <span className="block">{config.line1}</span>
       <span className="block">
         {line2Parts ? (
           <>
             {line2Parts.before}
-            <span className="italic" style={{ color: config.headlineAccentColor }}>
+            <span
+              className="italic"
+              style={{ color: config.headlineAccentColor, ...fontStyle(config.fonts.accent) }}
+            >
               {line2Parts.accent}
             </span>
             {line2Parts.after}

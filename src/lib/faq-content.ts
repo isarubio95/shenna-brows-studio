@@ -1,3 +1,5 @@
+import { emptyTextFonts, parseTextFonts, serializeTextFonts, type TextFonts } from "@/lib/fonts";
+
 export const FAQ_CONTENT_KEY = "faq";
 export const FAQ_PAGE_PATH = "/preguntas-frecuentes";
 
@@ -18,6 +20,21 @@ export interface FaqSection {
   items: FaqItem[];
 }
 
+/** Textos de la página con fuente elegible (preguntas y respuestas comparten una). */
+export const FAQ_FONT_SLOTS = [
+  "eyebrow",
+  "title",
+  "intro",
+  "sectionTitle",
+  "question",
+  "answer",
+  "helpSubtitle",
+  "helpTitle",
+  "helpBody",
+  "helpCta",
+] as const;
+export type FaqFontSlot = (typeof FAQ_FONT_SLOTS)[number];
+
 export interface FaqPageConfig {
   pageVisible: boolean;
   eyebrow: string;
@@ -29,6 +46,8 @@ export interface FaqPageConfig {
   helpCtaLabel: string;
   helpCtaHref: string;
   sections: FaqSection[];
+  /** Fuente propia de cada texto; "" hereda la del tema. */
+  fonts: TextFonts<FaqFontSlot>;
 }
 
 const item = (id: string, question: string, answer = FAQ_PLACEHOLDER_ANSWER): FaqItem => ({
@@ -250,6 +269,7 @@ export const DEFAULT_FAQ: FaqPageConfig = {
       ],
     },
   ],
+  fonts: emptyTextFonts(FAQ_FONT_SLOTS),
 };
 
 const asString = (value: unknown, fallback: string) =>
@@ -327,6 +347,7 @@ export function parseFaqConfig(raw?: string | null): FaqPageConfig {
       helpCtaLabel: asString(parsed.helpCtaLabel, DEFAULT_FAQ.helpCtaLabel).trim() || DEFAULT_FAQ.helpCtaLabel,
       helpCtaHref: asString(parsed.helpCtaHref, DEFAULT_FAQ.helpCtaHref).trim() || DEFAULT_FAQ.helpCtaHref,
       sections: sections.length > 0 ? sections : cloneFaqConfig(DEFAULT_FAQ).sections,
+      fonts: parseTextFonts(parsed.fonts, FAQ_FONT_SLOTS),
     };
   } catch {
     return cloneFaqConfig(DEFAULT_FAQ);
@@ -355,6 +376,7 @@ export function serializeFaqConfig(config: FaqPageConfig): string {
         visible: Boolean(faqItem.visible),
       })),
     })),
+    fonts: serializeTextFonts(config.fonts),
   });
 }
 

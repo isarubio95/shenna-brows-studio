@@ -1,8 +1,16 @@
+import { emptyTextFonts, parseTextFonts, serializeTextFonts, type TextFonts } from "@/lib/fonts";
+
+/** Textos del bloque con fuente elegible en el panel. */
+export const MARQUEE_FONT_SLOTS = ["items"] as const;
+export type MarqueeFontSlot = (typeof MARQUEE_FONT_SLOTS)[number];
+
 export interface MarqueeConfig {
   items: string[];
   background: string;
   /** Padding vertical en píxeles (arriba y abajo). */
   paddingY: number;
+  /** Fuente propia de cada texto; "" hereda la del tema. */
+  fonts: TextFonts<MarqueeFontSlot>;
 }
 
 export const DEFAULT_MARQUEE_ITEMS = [
@@ -18,6 +26,7 @@ export const DEFAULT_MARQUEE_CONFIG: MarqueeConfig = {
   items: DEFAULT_MARQUEE_ITEMS,
   background: "#F8F3EB",
   paddingY: 26,
+  fonts: emptyTextFonts(MARQUEE_FONT_SLOTS),
 };
 
 const isHexColor = (value: unknown): value is string =>
@@ -53,6 +62,7 @@ export function parseMarqueeConfig(raw?: string | null): MarqueeConfig {
           ? parsed.background.trim()
           : DEFAULT_MARQUEE_CONFIG.background,
         paddingY,
+        fonts: parseTextFonts(parsed.fonts, MARQUEE_FONT_SLOTS),
       };
     } catch {
       /* fallback a líneas */
@@ -63,6 +73,7 @@ export function parseMarqueeConfig(raw?: string | null): MarqueeConfig {
     items: parseItemsFromLines(trimmed),
     background: DEFAULT_MARQUEE_CONFIG.background,
     paddingY: DEFAULT_MARQUEE_CONFIG.paddingY,
+    fonts: DEFAULT_MARQUEE_CONFIG.fonts,
   };
 }
 
@@ -71,6 +82,7 @@ export function serializeMarqueeConfig(config: MarqueeConfig): string {
     items: config.items,
     background: config.background,
     paddingY: config.paddingY,
+    fonts: serializeTextFonts(config.fonts),
   });
 }
 

@@ -1,3 +1,5 @@
+import { isFontId } from "@/lib/fonts";
+
 /** Mismo rosa que el CTA de la campaña publicitaria (`DEFAULT_CAMPAIGN.ctaBg`). */
 export const SALE_BADGE_PINK = "#E9808E";
 
@@ -5,6 +7,8 @@ export interface BadgeAppearance {
   text: string;
   background: string;
   textColor: string;
+  /** Id de `FONT_OPTIONS`; "" hereda la del tema. */
+  font: string;
 }
 
 export interface SiteBadgesConfig {
@@ -15,6 +19,7 @@ export const DEFAULT_SALE_BADGE: BadgeAppearance = {
   text: "Oferta",
   background: SALE_BADGE_PINK,
   textColor: "#FFFFFF",
+  font: "",
 };
 
 export const DEFAULT_SITE_BADGES: SiteBadgesConfig = {
@@ -36,6 +41,7 @@ const parseAppearance = (raw: unknown, fallback: BadgeAppearance): BadgeAppearan
     text: asString(row.text, fallback.text).trim() || fallback.text,
     background: isHexColor(row.background) ? row.background.trim() : fallback.background,
     textColor: isHexColor(row.textColor) ? row.textColor.trim() : fallback.textColor,
+    font: isFontId(row.font) ? row.font : fallback.font,
   };
 };
 
@@ -66,6 +72,7 @@ export function serializeSiteBadgesConfig(config: SiteBadgesConfig): string {
       text: config.sale.text.trim() || DEFAULT_SALE_BADGE.text,
       background: config.sale.background,
       textColor: config.sale.textColor,
+      ...(isFontId(config.sale.font) ? { font: config.sale.font } : {}),
     },
   });
 }

@@ -1,3 +1,5 @@
+import { emptyTextFonts, parseTextFonts, serializeTextFonts, type TextFonts } from "@/lib/fonts";
+
 export const TIENDA_HERO_ICON_IDS = [
   "shield-check",
   "truck",
@@ -31,6 +33,10 @@ export interface TiendaHeroFeature {
   label: string;
 }
 
+/** Textos del bloque con fuente elegible en el panel. */
+export const TIENDA_HERO_FONT_SLOTS = ["eyebrow", "headline", "description", "features", "cta"] as const;
+export type TiendaHeroFontSlot = (typeof TIENDA_HERO_FONT_SLOTS)[number];
+
 export interface TiendaHeroConfig {
   desktopImageUrl: string;
   mobileImageUrl: string;
@@ -56,6 +62,8 @@ export interface TiendaHeroConfig {
   /** Posición del bloque de contenido en móvil (0–100 %). */
   contentPosMobileX: number;
   contentPosMobileY: number;
+  /** Fuente propia de cada texto; "" hereda la del tema. */
+  fonts: TextFonts<TiendaHeroFontSlot>;
 }
 
 export const TIENDA_HERO_IMAGE_PATH = "/tienda/tienda-hero.jpg";
@@ -106,6 +114,7 @@ export const DEFAULT_TIENDA_HERO: TiendaHeroConfig = {
   contentPosY: 52,
   contentPosMobileX: 50,
   contentPosMobileY: 46,
+  fonts: emptyTextFonts(TIENDA_HERO_FONT_SLOTS),
 };
 
 const HEX_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
@@ -234,6 +243,7 @@ export function parseTiendaHeroConfig(raw?: string | null): TiendaHeroConfig {
       contentPosY: desktopPos.y,
       contentPosMobileX: mobilePos.x,
       contentPosMobileY: mobilePos.y,
+      fonts: parseTextFonts(parsed.fonts, TIENDA_HERO_FONT_SLOTS),
     };
   } catch {
     return {
@@ -273,6 +283,7 @@ export function serializeTiendaHeroConfig(config: TiendaHeroConfig): string {
     contentPosY: desktopPos.y,
     contentPosMobileX: mobilePos.x,
     contentPosMobileY: mobilePos.y,
+    fonts: serializeTextFonts(config.fonts),
   });
 }
 

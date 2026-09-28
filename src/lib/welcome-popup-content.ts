@@ -1,3 +1,9 @@
+import { emptyTextFonts, parseTextFonts, serializeTextFonts, type TextFonts } from "@/lib/fonts";
+
+/** Textos del bloque con fuente elegible en el panel. */
+export const WELCOME_POPUP_FONT_SLOTS = ["eyebrow", "offer", "offerSuffix", "badge", "primaryCta", "secondaryCta", "emailTitle", "emailDescription", "emailCta"] as const;
+export type WelcomePopupFontSlot = (typeof WELCOME_POPUP_FONT_SLOTS)[number];
+
 export interface WelcomePopupConfig {
   enabled: boolean;
   imageUrl: string;
@@ -14,6 +20,8 @@ export interface WelcomePopupConfig {
   gold: string;
   delayMs: number;
   alt: string;
+  /** Fuente propia de cada texto; "" hereda la del tema. */
+  fonts: TextFonts<WelcomePopupFontSlot>;
 }
 
 export const DEFAULT_WELCOME_POPUP: WelcomePopupConfig = {
@@ -33,6 +41,7 @@ export const DEFAULT_WELCOME_POPUP: WelcomePopupConfig = {
   gold: "#C5A059",
   delayMs: 1300,
   alt: "Oferta de bienvenida Shenna Brows",
+  fonts: emptyTextFonts(WELCOME_POPUP_FONT_SLOTS),
 };
 
 const isHexColor = (value: unknown): value is string =>
@@ -95,6 +104,7 @@ export function parseWelcomePopupConfig(raw?: string | null): WelcomePopupConfig
       gold: isHexColor(parsed.gold) ? parsed.gold.trim() : DEFAULT_WELCOME_POPUP.gold,
       delayMs: clampDelay(delayRaw),
       alt: asString(parsed.alt, DEFAULT_WELCOME_POPUP.alt).trim() || DEFAULT_WELCOME_POPUP.alt,
+      fonts: parseTextFonts(parsed.fonts, WELCOME_POPUP_FONT_SLOTS),
     };
   } catch {
     return { ...DEFAULT_WELCOME_POPUP };
@@ -119,5 +129,6 @@ export function serializeWelcomePopupConfig(config: WelcomePopupConfig): string 
     gold: isHexColor(config.gold) ? config.gold.trim() : DEFAULT_WELCOME_POPUP.gold,
     delayMs: clampDelay(config.delayMs),
     alt: config.alt.trim() || DEFAULT_WELCOME_POPUP.alt,
+    fonts: serializeTextFonts(config.fonts),
   });
 }

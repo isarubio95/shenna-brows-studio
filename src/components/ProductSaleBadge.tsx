@@ -1,6 +1,7 @@
 import { Tag } from "lucide-react";
 import { isProductOnSale, type ProductPricingFields } from "@/lib/product-pricing";
 import { cn } from "@/lib/utils";
+import { fontStyle } from "@/lib/fonts";
 import { useSiteBadges } from "@/hooks/use-site-badges";
 import { DEFAULT_SALE_BADGE, type BadgeAppearance } from "@/lib/badges-content";
 
@@ -13,6 +14,7 @@ export const SaleBadgeChip = ({
   text,
   background,
   textColor,
+  font,
   className,
 }: SaleBadgeChipProps) => (
   <span
@@ -20,7 +22,7 @@ export const SaleBadgeChip = ({
       "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider shadow-md",
       className,
     )}
-    style={{ backgroundColor: background, color: textColor }}
+    style={{ backgroundColor: background, color: textColor, ...fontStyle(font) }}
     aria-label={text}
   >
     <Tag size={12} aria-hidden className="-rotate-12" />
@@ -43,6 +45,7 @@ export const ProductSaleBadge = ({ product, className }: ProductSaleBadgeProps) 
       text={sale.text || DEFAULT_SALE_BADGE.text}
       background={sale.background || DEFAULT_SALE_BADGE.background}
       textColor={sale.textColor || DEFAULT_SALE_BADGE.textColor}
+      font={sale.font}
       className={cn("absolute left-3 top-3 z-10", className)}
     />
   );

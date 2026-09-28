@@ -1,6 +1,7 @@
 import AnimatedSection from "@/components/AnimatedSection";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
 import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
+import { fontStyle } from "@/lib/fonts";
 import {
   resolveIndexVideoPosterSrc,
   resolveIndexVideoUrl,
@@ -26,7 +27,9 @@ const IndexVideoSection = ({ config, preview = false }: IndexVideoSectionProps) 
       {titleParts ? (
         <>
           {titleParts.before}
-          <span className="italic text-gold">{titleParts.accent}</span>
+          <span className="italic text-gold" style={fontStyle(config.fonts.accent)}>
+            {titleParts.accent}
+          </span>
           {titleParts.after}
         </>
       ) : (
@@ -62,7 +65,10 @@ const IndexVideoSection = ({ config, preview = false }: IndexVideoSectionProps) 
         style={{ backgroundColor: "var(--theme-section-video-bg, #F9F7F2)" }}
       >
         {heading ? (
-          <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center leading-tight mb-6 max-w-4xl mx-auto">
+          <h2
+            className="font-playfair text-3xl md:text-4xl font-bold text-center leading-tight mb-6 max-w-4xl mx-auto"
+            style={fontStyle(config.fonts.title)}
+          >
             {heading}
           </h2>
         ) : null}
@@ -80,7 +86,10 @@ const IndexVideoSection = ({ config, preview = false }: IndexVideoSectionProps) 
       <div className="container mx-auto px-6">
         <AnimatedSection>
           {heading ? (
-            <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center leading-tight mb-8 md:mb-10 max-w-4xl mx-auto">
+            <h2
+              className="font-playfair text-3xl md:text-4xl font-bold text-center leading-tight mb-8 md:mb-10 max-w-4xl mx-auto"
+              style={fontStyle(config.fonts.title)}
+            >
               {heading}
             </h2>
           ) : null}

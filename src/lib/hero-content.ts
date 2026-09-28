@@ -1,4 +1,9 @@
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
+import { emptyTextFonts, parseTextFonts, serializeTextFonts, type TextFonts } from "@/lib/fonts";
+
+/** Textos del bloque con fuente elegible en el panel. */
+export const HERO_FONT_SLOTS = ["headline", "accent", "cta"] as const;
+export type HeroFontSlot = (typeof HERO_FONT_SLOTS)[number];
 
 export interface HeroConfig {
   /** Foto o vídeo de fondo (escritorio). */
@@ -24,6 +29,8 @@ export interface HeroConfig {
   /** Posición del bloque de texto en móvil (0–100 %). */
   textPosMobileX: number;
   textPosMobileY: number;
+  /** Fuente propia de cada texto; "" hereda la del tema. */
+  fonts: TextFonts<HeroFontSlot>;
 }
 
 /** Contenido actual del hero (assets en /public/hero). */
@@ -44,6 +51,7 @@ export const DEFAULT_HERO: HeroConfig = {
   textPosY: 42,
   textPosMobileX: 5,
   textPosMobileY: 42,
+  fonts: emptyTextFonts(HERO_FONT_SLOTS),
 };
 
 const isHexColor = (value: unknown): value is string =>
@@ -117,6 +125,7 @@ export function parseHeroConfig(raw?: string | null): HeroConfig {
       textPosY: desktopPos.y,
       textPosMobileX: mobilePos.x,
       textPosMobileY: mobilePos.y,
+      fonts: parseTextFonts(parsed.fonts, HERO_FONT_SLOTS),
     };
   } catch {
     return { ...DEFAULT_HERO };
@@ -143,5 +152,6 @@ export function serializeHeroConfig(config: HeroConfig): string {
     textPosY: desktopPos.y,
     textPosMobileX: mobilePos.x,
     textPosMobileY: mobilePos.y,
+    fonts: serializeTextFonts(config.fonts),
   });
 }

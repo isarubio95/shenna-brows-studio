@@ -1,20 +1,35 @@
+import { emptyTextFonts, parseTextFonts, serializeTextFonts, type TextFonts } from "@/lib/fonts";
+
+/** Textos del bloque con fuente elegible en el panel. */
+export const COLLECTION_HEADLINE_FONT_SLOTS = ["text", "accent"] as const;
+export type CollectionHeadlineFontSlot = (typeof COLLECTION_HEADLINE_FONT_SLOTS)[number];
+
 export interface CollectionHeadlineConfig {
   /** Texto completo del titular. */
   text: string;
-  /** Fragmento dentro de `text` que se pinta con `accentColor`. */
+  /** Fragmentos dentro de `text` (separados por comas) que se pintan con `accentColor`. */
   accent: string;
   color: string;
   accentColor: string;
+  /** Color de fondo de la franja del titular. */
+  background: string;
   /** Tamaño de fuente en píxeles (desktop). */
   fontSize: number;
+  /** Tamaño de los acentos respecto al resto del texto, en % (100 = igual). */
+  accentScale: number;
+  /** Fuente propia de cada texto; "" hereda la del tema. */
+  fonts: TextFonts<CollectionHeadlineFontSlot>;
 }
 
 export const DEFAULT_COLLECTION_HEADLINE: CollectionHeadlineConfig = {
-  text: "Todo lo que tus cejas necesitan",
-  accent: "tus cejas",
-  color: "#1A1A1A",
-  accentColor: "#C5A059",
-  fontSize: 24,
+  text: "todo lo que tus cejas y pestañas necesitan",
+  accent: "cejas, pestañas",
+  color: "#FFFFFF",
+  accentColor: "#EC7C97",
+  background: "#DCC4B1",
+  fontSize: 96,
+  accentScale: 127,
+  fonts: emptyTextFonts(COLLECTION_HEADLINE_FONT_SLOTS),
 };
 
 const isHexColor = (value: unknown): value is string =>
@@ -22,6 +37,12 @@ const isHexColor = (value: unknown): value is string =>
   /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(value.trim());
 
 const clampFontSize = (n: number) => Math.max(14, Math.min(96, Math.round(n)));
+
+export const ACCENT_SCALE_MIN = 100;
+export const ACCENT_SCALE_MAX = 200;
+
+export const clampAccentScale = (n: number) =>
+  Math.max(ACCENT_SCALE_MIN, Math.min(ACCENT_SCALE_MAX, Math.round(n)));
 
 export function parseCollectionHeadlineConfig(raw?: string | null): CollectionHeadlineConfig {
   if (!raw?.trim()) {
@@ -51,7 +72,15 @@ export function parseCollectionHeadlineConfig(raw?: string | null): CollectionHe
         accentColor: isHexColor(parsed.accentColor)
           ? parsed.accentColor.trim()
           : DEFAULT_COLLECTION_HEADLINE.accentColor,
+        background: isHexColor(parsed.background)
+          ? parsed.background.trim()
+          : DEFAULT_COLLECTION_HEADLINE.background,
         fontSize,
+        accentScale:
+          typeof parsed.accentScale === "number" && Number.isFinite(parsed.accentScale)
+            ? clampAccentScale(parsed.accentScale)
+            : DEFAULT_COLLECTION_HEADLINE.accentScale,
+        fonts: parseTextFonts(parsed.fonts, COLLECTION_HEADLINE_FONT_SLOTS),
       };
     } catch {
       /* plain text fallback */
@@ -70,7 +99,10 @@ export function serializeCollectionHeadlineConfig(config: CollectionHeadlineConf
     accent: config.accent,
     color: config.color,
     accentColor: config.accentColor,
+    background: config.background,
     fontSize: config.fontSize,
+    accentScale: config.accentScale,
+    fonts: serializeTextFonts(config.fonts),
   });
 }
 
@@ -87,4 +119,41 @@ export function splitHeadlineByAccent(
     accent: text.slice(idx, idx + accent.length),
     after: text.slice(idx + accent.length),
   };
+}
+
+/**
+ * Trocea el titular marcando cada aparición de los acentos (lista separada por
+ * comas). Sin acentos que coincidan devuelve un único segmento sin marcar.
+ */
+export function splitHeadlineByAccents(
+  text: string,
+  accents: string,
+): { text: string; accent: boolean }[] {
+  const needles = accents
+    .split(",")
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean);
+  const lower = text.toLowerCase();
+  const segments: { text: string; accent: boolean }[] = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    let bestIdx = -1;
+    let bestLen = 0;
+    for (const needle of needles) {
+      const idx = lower.indexOf(needle, cursor);
+      if (idx === -1) continue;
+      if (bestIdx === -1 || idx < bestIdx || (idx === bestIdx && needle.length > bestLen)) {
+        bestIdx = idx;
+        bestLen = needle.length;
+      }
+    }
+    if (bestIdx === -1) break;
+    if (bestIdx > cursor) segments.push({ text: text.slice(cursor, bestIdx), accent: false });
+    segments.push({ text: text.slice(bestIdx, bestIdx + bestLen), accent: true });
+    cursor = bestIdx + bestLen;
+  }
+
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), accent: false });
+  return segments;
 }
