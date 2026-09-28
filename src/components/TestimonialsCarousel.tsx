@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AnimatedSection from "@/components/AnimatedSection";
 import paperTexture from "@/assets/paper-texture.avif";
@@ -8,30 +8,127 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from "@/components/ui/carousel";
 import { Quote } from "lucide-react";
 import Autoplay from "embla-carousel-autoplay";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+const PAGE_SIZE = 8;
+
+type FeaturedTestimonial = {
+  author_name: string;
+  content: string | null;
+  created_at: string | null;
+};
+
+type TestimonialsPage = {
+  items: FeaturedTestimonial[];
+  total: number | null;
+};
 
 const TestimonialsCarousel = () => {
   const autoplayPlugin = useMemo(
     () => Autoplay({ delay: 5000, stopOnInteraction: false }),
     [],
   );
+  const [api, setApi] = useState<CarouselApi>();
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const { data: testimonials = [] } = useQuery({
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+  } = useInfiniteQuery({
     queryKey: ["featured-testimonials"],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }): Promise<TestimonialsPage> => {
+      const from = pageParam * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      const { data: rows, error, count } = await supabase
         .from("profiles_public_view")
-        .select("*")
+        .select("full_name, content, created_at", { count: "exact" })
         .eq("is_featured", true)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .range(from, to);
       if (error) throw error;
-      return (data || []).map((t) => ({ ...t, author_name: t.full_name || "Cliente Shenna" }));
+      return {
+        items: (rows ?? []).map((row) => ({
+          author_name: row.full_name || "Cliente Shenna",
+          content: row.content,
+          created_at: row.created_at,
+        })),
+        total: count,
+      };
+    },
+    getNextPageParam: (lastPage, _pages, lastPageParam) => {
+      if (lastPage.items.length < PAGE_SIZE) return undefined;
+      const loaded = (lastPageParam + 1) * PAGE_SIZE;
+      if (typeof lastPage.total === "number" && loaded >= lastPage.total) return undefined;
+      return lastPageParam + 1;
     },
   });
+
+  const testimonials = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
+  );
+  const reportedTotal = data?.pages[0]?.total;
+  const total = typeof reportedTotal === "number" ? reportedTotal : testimonials.length;
+
+  const canLoop = testimonials.length > 1;
+  const carouselOpts = useMemo(
+    () => ({
+      loop: canLoop,
+      align: "center" as const,
+    }),
+    [canLoop],
+  );
+
+  useEffect(() => {
+    if (!api) return;
+
+    const onSelect = () => {
+      setSelectedIndex(api.selectedScrollSnap());
+    };
+
+    onSelect();
+    api.on("select", onSelect);
+    api.on("reInit", onSelect);
+
+    return () => {
+      api.off("select", onSelect);
+      api.off("reInit", onSelect);
+    };
+  }, [api]);
+
+  const loadedCount = useRef(0);
+  useEffect(() => {
+    if (!api) return;
+    if (loadedCount.current === testimonials.length) return;
+    const isInitialLoad = loadedCount.current === 0;
+    loadedCount.current = testimonials.length;
+    if (isInitialLoad) return;
+    api.reInit();
+  }, [api, testimonials.length]);
+
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage || isFetchNextPageError || testimonials.length === 0) {
+      return;
+    }
+    if (selectedIndex + PAGE_SIZE >= testimonials.length) {
+      void fetchNextPage();
+    }
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetchNextPageError,
+    isFetchingNextPage,
+    selectedIndex,
+    testimonials.length,
+  ]);
 
   if (testimonials.length === 0) return null;
 
@@ -60,14 +157,14 @@ const TestimonialsCarousel = () => {
 
         <AnimatedSection delay={0.1}>
           <Carousel
+            setApi={setApi}
             plugins={[autoplayPlugin]}
-            opts={{ loop: true, align: "center" }}
+            opts={carouselOpts}
             className="w-full"
           >
             <CarouselContent>
-              {testimonials.map((t: any, index: number) => {
-                const name = t.author_name;
-                const testimonialKey = t.id ? `testimonial-${t.id}` : `testimonial-fallback-${index}`;
+              {testimonials.map((t, index) => {
+                const testimonialKey = `${t.created_at ?? "sin-fecha"}-${index}`;
                 return (
                   <CarouselItem key={testimonialKey}>
                     <div className="flex flex-col items-center text-center px-4 md:px-12 py-8">
@@ -82,7 +179,7 @@ const TestimonialsCarousel = () => {
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-px bg-gold/60" />
                         <span className="text-gold text-sm tracking-[0.15em] uppercase font-medium">
-                          {name}
+                          {t.author_name}
                         </span>
                         <div className="w-8 h-px bg-gold/60" />
                       </div>
@@ -94,6 +191,11 @@ const TestimonialsCarousel = () => {
             <CarouselPrevious className="hidden md:flex -left-4 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-transparent" />
             <CarouselNext className="hidden md:flex -right-4 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-transparent" />
           </Carousel>
+          {total > 1 && (
+            <p className="mt-8 text-center text-[11px] uppercase tracking-[0.28em] text-carbon/45">
+              {selectedIndex + 1} de {total}
+            </p>
+          )}
         </AnimatedSection>
       </div>
     </section>
