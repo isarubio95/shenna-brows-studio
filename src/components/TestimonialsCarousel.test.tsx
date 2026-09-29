@@ -58,7 +58,7 @@ describe("TestimonialsCarousel", () => {
     renderCarousel();
 
     expect(await screen.findByText(/Reseña número 1/)).toBeInTheDocument();
-    expect(screen.getByText("1 de 10")).toBeInTheDocument();
+    expect(screen.queryByText(/de 10/)).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText(/Reseña número 10/)).toBeInTheDocument();

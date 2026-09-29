@@ -75,8 +75,6 @@ const TestimonialsCarousel = () => {
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],
   );
-  const reportedTotal = data?.pages[0]?.total;
-  const total = typeof reportedTotal === "number" ? reportedTotal : testimonials.length;
 
   const canLoop = testimonials.length > 1;
   const carouselOpts = useMemo(
@@ -191,11 +189,6 @@ const TestimonialsCarousel = () => {
             <CarouselPrevious className="hidden md:flex -left-4 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-transparent" />
             <CarouselNext className="hidden md:flex -right-4 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-transparent" />
           </Carousel>
-          {total > 1 && (
-            <p className="mt-8 text-center text-[11px] uppercase tracking-[0.28em] text-carbon/45">
-              {selectedIndex + 1} de {total}
-            </p>
-          )}
         </AnimatedSection>
       </div>
     </section>
