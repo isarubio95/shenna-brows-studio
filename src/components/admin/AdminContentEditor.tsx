@@ -86,6 +86,14 @@ import {
   serializeAnnouncementBarConfig,
   type AnnouncementBarConfig,
 } from "@/lib/announcement-content";
+import {
+  DEFAULT_TESTIMONIALS_BANNER,
+  TESTIMONIALS_BANNER_CONTENT_KEY,
+  parseTestimonialsBannerConfig,
+  serializeTestimonialsBannerConfig,
+  type TestimonialsBannerConfig,
+} from "@/lib/testimonials-banner-content";
+import AdminTestimonialsBannerFields from "@/components/admin/AdminTestimonialsBannerFields";
 import IndexVideoSection from "@/components/IndexVideoSection";
 import CollectionHeadline from "@/components/CollectionHeadline";
 import { AnnouncementBarView } from "@/components/AnnouncementBar";
@@ -104,7 +112,7 @@ import {
   uploadVideoMedia,
   videoUploadNotes,
 } from "@/lib/upload-media";
-import { HexColorField, toPickerColor } from "@/components/admin/HexColorField";
+import { AdminColorField, HexColorField, toPickerColor } from "@/components/admin/HexColorField";
 import MediaCropDialog from "@/components/admin/MediaCropDialog";
 import CampaignBanner, {
   CampaignPreviewFrame,
@@ -181,6 +189,7 @@ const CONTENT_LABELS: Record<string, string> = {
   index_video: "Vídeo — Al final de la página",
   index_collection_headline: "Titular — Debajo de la colección",
   index_campaign: "Campaña — Después de la colección",
+  [TESTIMONIALS_BANNER_CONTENT_KEY]: "Testimonios — Después de la campaña",
   tienda_hero: "Hero — Página de tienda",
   site_badges: "Badge de oferta — Productos",
   whatsapp_button: "Botón de WhatsApp — Flotante",
@@ -201,6 +210,7 @@ const KEY_ORDER = [
   "index_video",
   "index_collection_headline",
   "index_campaign",
+  TESTIMONIALS_BANNER_CONTENT_KEY,
   "tienda_hero",
   "site_badges",
   "whatsapp_button",
@@ -220,44 +230,6 @@ const snapshotFromBlocks = (rows: ContentBlock[]): SavedSnapshot => {
 
 const isHex = (value: string) =>
   /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(value.trim());
-
-const AdminColorField = ({
-  label,
-  value,
-  fallback,
-  onChange,
-  ariaLabel,
-}: {
-  label: string;
-  value: string;
-  fallback: string;
-  onChange: (hex: string) => void;
-  ariaLabel: string;
-}) => (
-  <div>
-    <Label className="text-carbon/60 text-xs uppercase tracking-wider">{label}</Label>
-    <div className="mt-1 flex items-center gap-2">
-      <HexColorField
-        value={value}
-        onChange={onChange}
-        fallback={fallback}
-        aria-label={ariaLabel}
-        className="flex-1 min-w-0"
-      />
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={toPickerColor(value) === toPickerColor(fallback)}
-        onClick={() => onChange(fallback)}
-        className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
-        aria-label={`Restaurar ${label.toLowerCase()}`}
-      >
-        <RotateCcw className="h-3.5 w-3.5" />
-      </Button>
-    </div>
-  </div>
-);
 
 function AdminDropzonePreview({ src, alt }: { src: string; alt: string }) {
   if (isVideoMediaUrl(src)) {
@@ -374,6 +346,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     ...DEFAULT_WHATSAPP_BUTTON,
   });
   const [videoDraft, setVideoDraft] = useState<IndexVideoConfig>({ ...DEFAULT_INDEX_VIDEO });
+  const [testimonialsDraft, setTestimonialsDraft] = useState<TestimonialsBannerConfig>({
+    ...DEFAULT_TESTIMONIALS_BANNER,
+  });
   const [announcementDraft, setAnnouncementDraft] = useState<{
     enabled: boolean;
     texts: string;
@@ -621,6 +596,18 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     return {
       title: "Vídeo del inicio",
       content: serializeIndexVideoConfig(config),
+      config,
+    };
+  };
+
+  const buildTestimonialsPayload = () => {
+    // Pasar por el parser aplica los mismos valores por defecto y límites que la web.
+    const config = parseTestimonialsBannerConfig(
+      serializeTestimonialsBannerConfig(testimonialsDraft),
+    );
+    return {
+      title: "Testimonios del inicio",
+      content: serializeTestimonialsBannerConfig(config),
       config,
     };
   };
@@ -1188,6 +1175,21 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         if (inserted) rows = [...rows, inserted];
       }
 
+      const hasTestimonials = rows.some((b) => b.key === TESTIMONIALS_BANNER_CONTENT_KEY);
+      if (!hasTestimonials) {
+        const { data: inserted } = await (supabase as any)
+          .from("site_content")
+          .insert({
+            key: TESTIMONIALS_BANNER_CONTENT_KEY,
+            title: "Testimonios del inicio",
+            content: serializeTestimonialsBannerConfig(DEFAULT_TESTIMONIALS_BANNER),
+          })
+          .select("*")
+          .single();
+
+        if (inserted) rows = [...rows, inserted];
+      }
+
       const hasTiendaHero = rows.some((b) => b.key === "tienda_hero");
       if (!hasTiendaHero) {
         const { data: inserted } = await (supabase as any)
@@ -1317,6 +1319,14 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         campaignRow.content = serializeCampaignConfig(cfg);
       }
 
+      const testimonialsRow = rows.find((b) => b.key === TESTIMONIALS_BANNER_CONTENT_KEY);
+      if (testimonialsRow) {
+        const cfg = parseTestimonialsBannerConfig(testimonialsRow.content);
+        setTestimonialsDraft(cfg);
+        testimonialsRow.title = "Testimonios del inicio";
+        testimonialsRow.content = serializeTestimonialsBannerConfig(cfg);
+      }
+
       const tiendaHeroRow = rows.find((b) => b.key === "tienda_hero");
       if (tiendaHeroRow) {
         const cfg = parseTiendaHeroConfig(tiendaHeroRow.content);
@@ -1403,6 +1413,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
     if (block.key === "index_campaign") {
       const payload = buildCampaignPayload();
+      return payload.title !== baseline.title || payload.content !== baseline.content;
+    }
+    if (block.key === TESTIMONIALS_BANNER_CONTENT_KEY) {
+      const payload = buildTestimonialsPayload();
       return payload.title !== baseline.title || payload.content !== baseline.content;
     }
     if (block.key === "tienda_hero") {
@@ -1503,6 +1517,19 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       setBlocks((prev) =>
         prev.map((b) =>
           b.key === "index_campaign" ? { ...b, title: payload.title, content: payload.content } : b
+        )
+      );
+    }
+
+    if (block.key === TESTIMONIALS_BANNER_CONTENT_KEY) {
+      const { title, content, config } = buildTestimonialsPayload();
+      payload = { title, content };
+      setTestimonialsDraft(config);
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.key === TESTIMONIALS_BANNER_CONTENT_KEY
+            ? { ...b, title: payload.title, content: payload.content }
+            : b
         )
       );
     }
@@ -1639,6 +1666,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         const isMarquee = block.key === "index_marquee";
         const isHeadline = block.key === "index_collection_headline";
         const isCampaign = block.key === "index_campaign";
+        const isTestimonials = block.key === TESTIMONIALS_BANNER_CONTENT_KEY;
         const isTiendaHero = block.key === "tienda_hero";
         const isBadges = block.key === "site_badges";
         const isWhatsApp = block.key === "whatsapp_button";
@@ -1654,7 +1682,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
             key={block.key}
             className={cn(
               "bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6",
-              (isHero || isCampaign || isWelcomePopup || isTiendaHero || isBadges || isWhatsApp || isVideo || isAnnouncement) && "ring-1 ring-gold/20",
+              (isHero || isCampaign || isTestimonials || isWelcomePopup || isTiendaHero || isBadges || isWhatsApp || isVideo || isAnnouncement) && "ring-1 ring-gold/20",
             )}
           >
             <h3 className="font-playfair text-base font-semibold text-carbon mb-4">
@@ -1663,6 +1691,12 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
             {isHero && (
               <p className="text-xs text-carbon/40 -mt-2 mb-4">
                 Banner principal a pantalla completa. Imágenes, textos, CTA y posición arrastrable.
+              </p>
+            )}
+            {isTestimonials && (
+              <p className="text-xs text-carbon/40 -mt-2 mb-4">
+                Sección de reseñas de la home: fotos (escritorio y móvil), textos, botón, colores,
+                fuentes y posición del texto.
               </p>
             )}
             {isWelcomePopup && (
@@ -1701,7 +1735,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
             )}
 
             <div className="space-y-4">
-              {!isMarquee && !isHeadline && !isCampaign && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
+              {!isMarquee && !isHeadline && !isCampaign && !isTestimonials && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">Título</Label>
                   <Input
@@ -3456,6 +3490,13 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                 </>
               )}
 
+              {isTestimonials && (
+                <AdminTestimonialsBannerFields
+                  value={testimonialsDraft}
+                  onChange={setTestimonialsDraft}
+                />
+              )}
+
               {isCampaign && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4859,7 +4900,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                 </>
               )}
 
-              {!isHeadline && !isCampaign && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
+              {!isHeadline && !isCampaign && !isTestimonials && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">
                     {isMarquee ? "Textos (uno por línea)" : "Contenido"}

@@ -1,5 +1,8 @@
 import { HexAlphaColorPicker, HexColorInput } from "react-colorful";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 /** #RGB, #RRGGBB o #RRGGBBAA */
@@ -108,3 +111,42 @@ export function HexColorField({
     </div>
   );
 }
+
+/** Campo de color del panel con su rótulo y botón para volver al valor por defecto. */
+export const AdminColorField = ({
+  label,
+  value,
+  fallback,
+  onChange,
+  ariaLabel,
+}: {
+  label: string;
+  value: string;
+  fallback: string;
+  onChange: (hex: string) => void;
+  ariaLabel: string;
+}) => (
+  <div>
+    <Label className="text-carbon/60 text-xs uppercase tracking-wider">{label}</Label>
+    <div className="mt-1 flex items-center gap-2">
+      <HexColorField
+        value={value}
+        onChange={onChange}
+        fallback={fallback}
+        aria-label={ariaLabel}
+        className="flex-1 min-w-0"
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={toPickerColor(value) === toPickerColor(fallback)}
+        onClick={() => onChange(fallback)}
+        className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
+        aria-label={`Restaurar ${label.toLowerCase()}`}
+      >
+        <RotateCcw className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  </div>
+);

@@ -3,6 +3,10 @@ import { parseHeroConfig } from "@/lib/hero-content";
 import { isVideoMediaUrl, posterPathForVideoPath, posterUrlForVideoUrl } from "@/lib/media-url";
 import { parseProductFeatureVideos } from "@/lib/product-feature-videos";
 import { parseProductImages } from "@/lib/product-images";
+import {
+  TESTIMONIALS_BANNER_CONTENT_KEY,
+  parseTestimonialsBannerConfig,
+} from "@/lib/testimonials-banner-content";
 import { parseTiendaHeroConfig } from "@/lib/tienda-hero-content";
 import { parseIndexVideoConfig } from "@/lib/video-content";
 import { parseWelcomePopupConfig } from "@/lib/welcome-popup-content";
@@ -15,6 +19,7 @@ export const MEDIA_SITE_CONTENT_KEYS = [
   "tienda_hero",
   "index_welcome_popup",
   "index_video",
+  TESTIMONIALS_BANNER_CONTENT_KEY,
 ] as const;
 
 const PUBLIC_OBJECT_RE = /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/;
@@ -121,6 +126,12 @@ export function collectUsedStorageRefs(input: {
         const cfg = parseIndexVideoConfig(row.content);
         pushRef(out, cfg.videoUrl, "Vídeo inicio");
         pushRef(out, cfg.posterUrl, "Póster vídeo inicio");
+        break;
+      }
+      case TESTIMONIALS_BANNER_CONTENT_KEY: {
+        const cfg = parseTestimonialsBannerConfig(row.content);
+        pushRef(out, cfg.desktopImageUrl, "Testimonios escritorio");
+        pushRef(out, cfg.mobileImageUrl, "Testimonios móvil");
         break;
       }
       default:

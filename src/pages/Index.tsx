@@ -30,6 +30,10 @@ import { parseCampaignConfig } from "@/lib/campaign-content";
 import { parseHeroConfig } from "@/lib/hero-content";
 import { parseIndexVideoConfig } from "@/lib/video-content";
 import IndexVideoSection from "@/components/IndexVideoSection";
+import {
+  TESTIMONIALS_BANNER_CONTENT_KEY,
+  parseTestimonialsBannerConfig,
+} from "@/lib/testimonials-banner-content";
 
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -40,6 +44,7 @@ const Index = () => {
     "index_video",
     "index_collection_headline",
     "index_campaign",
+    TESTIMONIALS_BANNER_CONTENT_KEY,
   ]);
 
   const hero = useMemo(
@@ -69,6 +74,15 @@ const Index = () => {
     () => parseCampaignConfig(siteContent.index_campaign?.content),
     [siteContent.index_campaign?.content],
   );
+
+  const testimonialsContent = siteContent[TESTIMONIALS_BANNER_CONTENT_KEY]?.content;
+  const testimonialsBanner = useMemo(
+    () => parseTestimonialsBannerConfig(testimonialsContent),
+    [testimonialsContent],
+  );
+  // Igual que el hero: sin caché no se pinta la versión por defecto mientras
+  // llega la de la base de datos.
+  const testimonialsReady = Boolean(testimonialsContent) || !siteContentLoading;
 
   const productsAutoplay = useMemo(
     () => Autoplay({ delay: 4000, stopOnInteraction: true }),
@@ -226,7 +240,7 @@ const Index = () => {
 
       <CampaignBanner config={campaign} />
 
-      <TestimonialsBanner />
+      {testimonialsReady ? <TestimonialsBanner config={testimonialsBanner} /> : null}
 
       <CeoSection />
 
