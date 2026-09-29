@@ -16,12 +16,13 @@ import {
   clampCampaignCtaPos,
   DEFAULT_CAMPAIGN,
   type CampaignConfig,
-  type CampaignCtaSize,
 } from "@/lib/campaign-content";
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { fontStyle } from "@/lib/fonts";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { cn } from "@/lib/utils";
 
 export type CampaignPreviewDevice = "desktop" | "mobile";
@@ -33,24 +34,6 @@ export const CAMPAIGN_PREVIEW_VIEWPORT: Record<CampaignPreviewDevice, { width: n
 };
 
 const CAMPAIGN_PREVIEW_MAX_HEIGHT = 640;
-
-const CTA_SIZE_CLASS: Record<CampaignCtaSize, { site: string; desktop: string; mobile: string }> = {
-  sm: {
-    site: "px-4 py-2 text-[0.65rem] sm:px-5 sm:text-xs",
-    desktop: "px-5 py-2 text-xs",
-    mobile: "px-4 py-2 text-[0.65rem]",
-  },
-  md: {
-    site: "px-6 py-3 text-xs sm:px-7 sm:text-sm",
-    desktop: "px-7 py-3 text-sm",
-    mobile: "px-6 py-3 text-xs",
-  },
-  lg: {
-    site: "px-7 py-3.5 text-sm sm:px-9 sm:py-4 sm:text-base",
-    desktop: "px-9 py-4 text-base",
-    mobile: "px-7 py-3.5 text-sm",
-  },
-};
 
 interface CampaignBannerProps {
   config: CampaignConfig;
@@ -80,6 +63,7 @@ const CampaignBanner = ({
   } | null>(null);
   const [dragging, setDragging] = useState(false);
   const isMobileViewport = useIsMobile();
+  const heroCtaStyle = useHeroCtaStyle();
 
   const previewMobile = preview && previewDevice === "mobile";
   const mobileSrc = config.mobileImageUrl.trim() || config.desktopImageUrl;
@@ -142,21 +126,9 @@ const CampaignBanner = ({
 
   if (!preview && !config.desktopImageUrl.trim()) return null;
 
-  const pink = config.ctaBg || DEFAULT_CAMPAIGN.ctaBg;
   const ctaLabel = config.ctaText.trim() || DEFAULT_CAMPAIGN.ctaText;
-
-  const ctaSize = CTA_SIZE_CLASS[config.ctaSize] ?? CTA_SIZE_CLASS.md;
-  const ctaClassName = cn(
-    "inline-flex items-center justify-center whitespace-nowrap rounded-full border font-sans font-bold uppercase tracking-[0.18em] shadow-md transition hover:brightness-105",
-    preview ? (previewMobile ? ctaSize.mobile : ctaSize.desktop) : ctaSize.site,
-  );
   const ctaStyle: CSSProperties = {
-    background:
-      config.ctaFill === "solid"
-        ? pink
-        : `linear-gradient(90deg, ${pink} 0%, #F0A0AB 50%, ${pink} 100%)`,
-    borderColor: config.ctaBorderColor || DEFAULT_CAMPAIGN.ctaBorderColor,
-    color: config.ctaTextColor || DEFAULT_CAMPAIGN.ctaTextColor,
+    ...heroCtaStyle,
     ...fontStyle(config.fonts.cta),
   };
 
@@ -172,7 +144,7 @@ const CampaignBanner = ({
           "[--cta-ax:var(--cta-x)] [--cta-ay:var(--cta-y)]",
           "max-md:[--cta-ax:var(--cta-x-m)] max-md:[--cta-ay:var(--cta-y-m)]",
         ],
-        canDrag && "cursor-grab touch-none select-none rounded-full ring-2 ring-white/80 ring-offset-2 ring-offset-transparent",
+        canDrag && "cursor-grab touch-none select-none ring-2 ring-white/80 ring-offset-2 ring-offset-transparent",
         dragging && "cursor-grabbing",
       )}
       style={
@@ -193,12 +165,12 @@ const CampaignBanner = ({
       aria-label={canDrag ? "Arrastra para colocar el botón de la campaña" : undefined}
     >
       {preview ? (
-        <span className={cn(ctaClassName, "pointer-events-none")} style={ctaStyle}>
+        <span className={cn(SITE_CTA_CLASS, "pointer-events-none")} style={ctaStyle}>
           {ctaLabel}
         </span>
       ) : (
         <AnimatedSection>
-          <Link to={campaignCtaPath(config)} className={ctaClassName} style={ctaStyle}>
+          <Link to={campaignCtaPath(config)} className={SITE_CTA_CLASS} style={ctaStyle}>
             {ctaLabel}
           </Link>
         </AnimatedSection>

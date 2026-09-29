@@ -17,7 +17,9 @@ import {
 import { parseProductFeatureVideos } from "@/lib/product-feature-videos";
 import { getEffectivePrice } from "@/lib/product-pricing";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { useSiteBadges } from "@/hooks/use-site-badges";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { DEFAULT_SALE_BADGE } from "@/lib/badges-content";
 import { motion } from "framer-motion";
 
@@ -63,6 +65,7 @@ const RELATED_CAROUSEL_GAP_PX = 12;
 const ProductPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { addItem, isAddToCartDisabled } = useCart();
+  const heroCtaStyle = useHeroCtaStyle();
   const { sale } = useSiteBadges();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -336,11 +339,8 @@ const ProductPage = () => {
               <Button
                 onClick={handleAdd}
                 disabled={isAddToCartDisabled || outOfStock}
-                className={
-                  outOfStock && !isAddToCartDisabled
-                    ? "border-carbon/20 bg-carbon/5 text-carbon/50 hover:bg-carbon/5 px-8 py-6 text-base tracking-wide rounded-full w-full sm:w-auto mb-10"
-                    : "bg-gold hover:bg-gold/90 text-white px-8 py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)] hover:shadow-[0_12px_40px_rgba(197,160,89,0.4)] transition-all duration-300 w-full sm:w-auto mb-10"
-                }
+                className={`${SITE_CTA_CLASS} w-full sm:w-auto mb-10`}
+                style={heroCtaStyle}
                 variant={outOfStock && !isAddToCartDisabled ? "outline" : "default"}
               >
                 {isAddToCartDisabled ? (

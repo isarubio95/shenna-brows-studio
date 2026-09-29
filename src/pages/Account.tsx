@@ -13,7 +13,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Eye, RotateCcw, Package, MessageSquareQuote, CheckCircle2, X, Ban } from "lucide-react";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { useToast } from "@/hooks/use-toast";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import {
   RETURN_REASON_LABELS,
   canRequestReturn,
@@ -71,6 +73,7 @@ type OrderWithItems = {
 const Account = () => {
   const { user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const heroCtaStyle = useHeroCtaStyle();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -334,7 +337,8 @@ const Account = () => {
                     variant="outline"
                     onClick={() => testimonialMutation.mutate(testimonialText)}
                     disabled={testimonialText.trim().length < 10 || testimonialMutation.isPending || testimonialCooldownActive}
-                    className="border-primary/30 text-primary hover:bg-primary/5"
+                    className={SITE_CTA_CLASS}
+                    style={heroCtaStyle}
                   >
                     {testimonialMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Enviar Opinión
@@ -628,7 +632,8 @@ const Account = () => {
             <Button
               onClick={() => returnMutation.mutate()}
               disabled={returnMutation.isPending}
-              className="bg-primary text-primary-foreground mb-3"
+              className={`${SITE_CTA_CLASS} mb-3`}
+              style={heroCtaStyle}
             >
               {returnMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Enviar solicitud

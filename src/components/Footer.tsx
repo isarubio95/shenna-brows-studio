@@ -8,7 +8,9 @@ import logo from "@/assets/logo-shenna.png";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { useToast } from "@/hooks/use-toast";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { useFaqPageVisible } from "@/hooks/use-faq-page-visible";
 import { FAQ_PAGE_PATH } from "@/lib/faq-content";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +21,7 @@ const NEWSLETTER_ENDPOINT = `${SUPABASE_URL}/functions/v1/newsletter-subscribe`;
 
 const Footer = () => {
   const { toast } = useToast();
+  const heroCtaStyle = useHeroCtaStyle();
   const faqPageVisible = useFaqPageVisible();
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -172,7 +175,8 @@ const Footer = () => {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-gold hover:bg-gold/90 text-white"
+                  className={`${SITE_CTA_CLASS} w-full`}
+                  style={heroCtaStyle}
                 >
                   {isSubmitting ? "Suscribiendo..." : "Suscribirme"}
                 </Button>

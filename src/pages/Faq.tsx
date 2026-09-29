@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
 import FaqAnswer from "@/components/FaqAnswer";
 import { useAuth } from "@/context/AuthContext";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { useSiteContent } from "@/hooks/use-site-content";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import {
   FAQ_PAGE_PATH,
   getVisibleFaqSections,
@@ -52,6 +54,7 @@ const setCanonical = (href: string) => {
 const Faq = () => {
   const { data: siteContent, loading } = useSiteContent(["faq"]);
   const { isAdmin, loading: authLoading } = useAuth();
+  const heroCtaStyle = useHeroCtaStyle();
   const faq = useMemo(
     () => parseFaqConfig(siteContent.faq?.content),
     [siteContent.faq?.content],
@@ -222,16 +225,16 @@ const Faq = () => {
             {isExternalCta ? (
               <a
                 href={faq.helpCtaHref}
-                className="inline-flex items-center justify-center rounded-md bg-gold px-6 py-3 text-sm font-medium text-white hover:bg-gold/90 transition-colors"
-                style={fontStyle(fonts.helpCta)}
+                className={SITE_CTA_CLASS}
+                style={{ ...heroCtaStyle, ...fontStyle(fonts.helpCta) }}
               >
                 {faq.helpCtaLabel}
               </a>
             ) : (
               <Link
                 to={faq.helpCtaHref || "/tienda"}
-                className="inline-flex items-center justify-center rounded-md bg-gold px-6 py-3 text-sm font-medium text-white hover:bg-gold/90 transition-colors"
-                style={fontStyle(fonts.helpCta)}
+                className={SITE_CTA_CLASS}
+                style={{ ...heroCtaStyle, ...fontStyle(fonts.helpCta) }}
               >
                 {faq.helpCtaLabel}
               </Link>

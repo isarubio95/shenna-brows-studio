@@ -4,9 +4,12 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { CheckCircle } from "lucide-react";
 import { useEffect } from "react";
 import { useCart } from "@/context/CartContext";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 
 const PaymentSuccess = () => {
   const { clearCart } = useCart();
+  const heroCtaStyle = useHeroCtaStyle();
 
   useEffect(() => {
     clearCart();
@@ -24,7 +27,7 @@ const PaymentSuccess = () => {
             Tu pedido ha sido procesado correctamente. Recibirás un email de confirmación en breve.
           </p>
           <Link to="/">
-            <Button className="bg-gold hover:bg-gold/90 text-white px-8 py-6 rounded-full">
+            <Button className={SITE_CTA_CLASS} style={heroCtaStyle}>
               Volver al inicio
             </Button>
           </Link>

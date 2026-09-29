@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
+import { SITE_CTA_CLASS, siteCtaStyle } from "@/lib/site-cta";
 import { Crop, Loader2, Monitor, Play, Plus, RotateCcw, Save, Smartphone, Sparkle, Trash2, Upload } from "lucide-react";
 import {
   DEFAULT_MARQUEE_CONFIG,
@@ -3387,23 +3388,16 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         </p>
                         <div className="mt-auto w-full space-y-1.5 pt-8">
                           <div
-                            className="flex items-center justify-center gap-1 rounded-full border border-white/70 py-2 text-[0.6rem] font-bold uppercase tracking-wider text-white shadow-sm"
-                            style={{
-                              background: `linear-gradient(90deg, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 0%, #F0A0AB 50%, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 100%)`,
-                              ...fontStyle(welcomePopupDraft.fonts.primaryCta),
-                            }}
+                            className={SITE_CTA_CLASS}
+                            style={{ ...siteCtaStyle(), ...fontStyle(welcomePopupDraft.fonts.primaryCta) }}
                           >
                             <Sparkle className="h-2.5 w-2.5" fill="currentColor" />
                             {welcomePopupDraft.primaryCta || DEFAULT_WELCOME_POPUP.primaryCta}
                             <Sparkle className="h-2.5 w-2.5" fill="currentColor" />
                           </div>
                           <div
-                            className="rounded-full border py-1.5 text-[0.55rem] font-semibold uppercase tracking-wider text-carbon/80"
-                            style={{
-                              borderColor: `${welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold}99`,
-                              backgroundColor: "rgba(249,247,242,0.55)",
-                              ...fontStyle(welcomePopupDraft.fonts.secondaryCta),
-                            }}
+                            className={SITE_CTA_CLASS}
+                            style={{ ...siteCtaStyle(), ...fontStyle(welcomePopupDraft.fonts.secondaryCta) }}
                           >
                             {welcomePopupDraft.secondaryCta || DEFAULT_WELCOME_POPUP.secondaryCta}
                           </div>
@@ -3444,20 +3438,14 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         </div>
                         <div className="mt-auto w-full space-y-1.5 pt-6">
                           <div
-                            className="rounded-full border border-white/70 py-2 text-center text-[0.6rem] font-bold uppercase tracking-wider text-white shadow-sm"
-                            style={{
-                              background: `linear-gradient(90deg, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 0%, #F0A0AB 50%, ${welcomePopupDraft.pink || DEFAULT_WELCOME_POPUP.pink} 100%)`,
-                              ...fontStyle(welcomePopupDraft.fonts.emailCta),
-                            }}
+                            className={SITE_CTA_CLASS}
+                            style={{ ...siteCtaStyle(), ...fontStyle(welcomePopupDraft.fonts.emailCta) }}
                           >
                             {welcomePopupDraft.emailCta || DEFAULT_WELCOME_POPUP.emailCta}
                           </div>
                           <div
-                            className="rounded-full border py-1.5 text-center text-[0.55rem] font-semibold uppercase tracking-wider text-carbon/80"
-                            style={{
-                              borderColor: `${welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold}99`,
-                              backgroundColor: "rgba(249,247,242,0.55)",
-                            }}
+                            className={SITE_CTA_CLASS}
+                            style={siteCtaStyle()}
                           >
                             Volver
                           </div>

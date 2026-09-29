@@ -11,10 +11,8 @@ import {
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
 import { ANNOUNCEMENT_BAR_HEIGHT_PX } from "@/lib/announcement-content";
 import { fontStyle } from "@/lib/fonts";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { cn } from "@/lib/utils";
-
-const HERO_CTA_BASE =
-  "text-[0.65rem] tracking-[0.22em] uppercase py-3 transition-all duration-300 active:scale-95 font-sans border";
 
 export type HeroPreviewDevice = "desktop" | "mobile";
 
@@ -39,8 +37,8 @@ interface HeroSectionProps {
   /** En preview, fuerza tipografía e imagen de ese dispositivo. */
   previewDevice?: HeroPreviewDevice;
   /**
-   * Cuando es false (p. ej. CMS aún cargando), oculta texto/CTA para no pintar
-   * la posición por defecto y luego saltar a la personalizada del admin.
+   * Cuando es false (CMS aún sin el hero guardado), no pinta foto ni texto:
+   * si no, se ve un instante el hero por defecto y luego el de la admin.
    */
   ready?: boolean;
   className?: string;
@@ -164,8 +162,8 @@ const HeroSection = ({
     <button
       type="button"
       className={cn(
-        HERO_CTA_BASE,
-        preview ? (previewMobile ? "px-6" : "px-7") : "px-6 sm:px-7",
+        SITE_CTA_CLASS,
+        preview ? (previewMobile ? "px-6" : "px-7") : undefined,
       )}
       style={ctaStyle}
     >
@@ -219,25 +217,28 @@ const HeroSection = ({
       )}
       aria-label={config.alt}
     >
-      <BannerBackgroundMedia
-        desktopSrc={desktopSrc}
-        mobileSrc={mobileSrc}
-        alt={config.alt}
-        preview={preview}
-        previewMobile={previewMobile}
-        eager
-        fetchPriority="high"
-        preloadVideo="auto"
-        width={2640}
-        height={1470}
-        mediaClassName={
-          preview
-            ? previewMobile
-              ? "object-[center_calc(50%+4rem)]"
-              : "object-[55%_35%]"
-            : "max-lg:object-[center_calc(50%+4rem)] lg:object-[55%_35%]"
-        }
-      />
+      <div className="absolute inset-0 z-0 bg-background" aria-hidden />
+      {ready ? (
+        <BannerBackgroundMedia
+          desktopSrc={desktopSrc}
+          mobileSrc={mobileSrc}
+          alt={config.alt}
+          preview={preview}
+          previewMobile={previewMobile}
+          eager
+          fetchPriority="high"
+          preloadVideo="auto"
+          width={2640}
+          height={1470}
+          mediaClassName={
+            preview
+              ? previewMobile
+                ? "object-[center_calc(50%+4rem)]"
+                : "object-[55%_35%]"
+              : "max-lg:object-[center_calc(50%+4rem)] lg:object-[55%_35%]"
+          }
+        />
+      ) : null}
 
       <div
         className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35)_0%,rgba(0,0,0,0.18)_10%,transparent_25%,transparent_70%,rgba(0,0,0,0.18)_100%)] z-1 pointer-events-none"

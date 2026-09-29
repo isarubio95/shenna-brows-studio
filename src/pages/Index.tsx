@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
-import TestimonialsCarousel from "@/components/TestimonialsCarousel";
+import TestimonialsBanner from "@/components/TestimonialsBanner";
 import Autoplay from "embla-carousel-autoplay";
 import { motion } from "framer-motion";
 
@@ -46,6 +46,9 @@ const Index = () => {
     () => parseHeroConfig(siteContent.index_hero?.content),
     [siteContent.index_hero?.content],
   );
+  // Con caché, el hero de la admin está en el primer render. Sin ella, no se
+  // pinta el de por defecto mientras llega el de la base de datos.
+  const heroReady = Boolean(siteContent.index_hero?.content) || !siteContentLoading;
 
   const marquee = useMemo(
     () => parseMarqueeConfig(siteContent.index_marquee?.content),
@@ -87,7 +90,7 @@ const Index = () => {
     <main>
       <HeroSection
         config={hero}
-        ready={!siteContentLoading}
+        ready={heroReady}
         onScrollNext={scrollToNextSection}
       />
 
@@ -223,7 +226,7 @@ const Index = () => {
 
       <CampaignBanner config={campaign} />
 
-      <TestimonialsCarousel />
+      <TestimonialsBanner />
 
       <CeoSection />
 

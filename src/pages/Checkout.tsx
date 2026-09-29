@@ -1,4 +1,6 @@
 import { useCart } from "@/context/CartContext";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -49,6 +51,7 @@ function isValidCustomerTaxId(value: string): boolean {
 
 const Checkout = () => {
   const { items, totalPrice } = useCart();
+  const heroCtaStyle = useHeroCtaStyle();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [shipping, setShipping] = useState(emptyShipping);
@@ -473,7 +476,8 @@ const Checkout = () => {
                 <Button
                   type="submit"
                   disabled={loading || isCooldownActive || !canQuoteShipping}
-                  className="w-full bg-gold hover:bg-gold/90 text-white py-6 text-base tracking-wide rounded-full shadow-[0_8px_30px_rgba(197,160,89,0.3)]"
+                  className={`${SITE_CTA_CLASS} w-full`}
+                  style={heroCtaStyle}
                 >
                   {loading ? (
                     <>
@@ -491,7 +495,8 @@ const Checkout = () => {
                   variant="outline"
                   disabled={loading || isCooldownActive || !canQuoteShipping}
                   onClick={handleBizumPayment}
-                  className="w-full border-gold/30 text-carbon hover:bg-gold/5 py-5 text-sm tracking-wide rounded-full"
+                  className={`${SITE_CTA_CLASS} w-full`}
+                  style={heroCtaStyle}
                 >
                   Pagar con Bizum
                 </Button>
@@ -550,7 +555,8 @@ const Checkout = () => {
                       variant="outline"
                       disabled={discountLoading || loading}
                       onClick={() => void applyDiscountCode()}
-                      className="shrink-0 border-gold/30 text-carbon hover:bg-gold/5"
+                      className={`${SITE_CTA_CLASS} shrink-0`}
+                      style={heroCtaStyle}
                     >
                       {discountLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
                     </Button>

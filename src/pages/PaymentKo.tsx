@@ -2,8 +2,12 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
 import { XCircle } from "lucide-react";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 
 const PaymentKo = () => {
+  const heroCtaStyle = useHeroCtaStyle();
+
   return (
     <main className="min-h-screen bg-cream pt-40 flex items-center justify-center">
       <AnimatedSection>
@@ -18,12 +22,12 @@ const PaymentKo = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to="/checkout">
-              <Button className="bg-gold hover:bg-gold/90 text-white px-8 py-6 rounded-full w-full sm:w-auto">
+              <Button className={`${SITE_CTA_CLASS} w-full sm:w-auto`} style={heroCtaStyle}>
                 Volver al checkout
               </Button>
             </Link>
             <Link to="/">
-              <Button variant="outline" className="border-gold/30 px-8 py-6 rounded-full w-full sm:w-auto">
+              <Button variant="outline" className={`${SITE_CTA_CLASS} w-full sm:w-auto`} style={heroCtaStyle}>
                 Inicio
               </Button>
             </Link>

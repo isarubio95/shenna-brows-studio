@@ -4,9 +4,12 @@ import { useCart } from "@/context/CartContext";
 import { Minus, Plus, Trash2, ShoppingBag, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getProductPosterUrl } from "@/lib/product-images";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 
 const CartDrawer = () => {
   const { items, isOpen, closeCart, removeItem, updateQuantity, totalPrice } = useCart();
+  const heroCtaStyle = useHeroCtaStyle();
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && closeCart()}>
@@ -24,7 +27,7 @@ const CartDrawer = () => {
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-carbon/40">
             <ShoppingBag size={48} strokeWidth={1} />
             <p className="text-sm">Tu carrito está vacío</p>
-            <Button asChild variant="outline" className="border-gold/30 text-carbon hover:text-gold">
+            <Button asChild variant="outline" className={SITE_CTA_CLASS} style={heroCtaStyle}>
               <Link to="/tienda" replace onClick={closeCart}>
                 Seguir comprando
               </Link>
@@ -97,12 +100,12 @@ const CartDrawer = () => {
                 <span>Subtotal</span>
                 <span className="text-carbon font-medium">€{totalPrice.toFixed(2)}</span>
               </div>
-              <Button asChild variant="outline" className="w-full border-gold/30 text-carbon hover:text-gold">
+              <Button asChild variant="outline" className={`${SITE_CTA_CLASS} w-full`} style={heroCtaStyle}>
                 <Link to="/tienda" replace onClick={closeCart}>
                   Seguir comprando
                 </Link>
               </Button>
-              <Button asChild className="w-full bg-gold hover:bg-gold/90 text-white font-medium tracking-wide">
+              <Button asChild className={`${SITE_CTA_CLASS} w-full`} style={heroCtaStyle}>
                 <Link to="/checkout" replace onClick={closeCart}>
                   Finalizar Compra
                 </Link>

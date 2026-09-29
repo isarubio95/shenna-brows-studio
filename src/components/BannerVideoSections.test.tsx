@@ -8,6 +8,7 @@ import { parseHeroConfig } from "@/lib/hero-content";
 import { rememberVideoAspectRatio } from "@/lib/video-aspect-ratio";
 
 beforeAll(() => {
+  if (typeof globalThis.IntersectionObserver === "function") return;
   class IntersectionObserverMock {
     observe() {}
     unobserve() {}
@@ -49,6 +50,17 @@ describe("hero and campaign video backgrounds", () => {
       </MemoryRouter>,
     );
     expect(container.querySelector("section")).toBeNull();
+  });
+
+  it("no pinta el fondo por defecto mientras el hero de la admin no está listo", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <HeroSection config={parseHeroConfig(null)} ready={false} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector("h1")).toBeNull();
   });
 
   it("renders the hero with a video background", () => {

@@ -14,6 +14,8 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import { Button } from "@/components/ui/button";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import {
   Carousel,
   CarouselContent,
@@ -74,6 +76,7 @@ interface ProductCardProps {
 const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisabled, featured }: ProductCardProps) => {
   const gallery = getProductImageGallery(product.image_url, product.slug);
   const outOfStock = Number(product.stock ?? 0) <= 0;
+  const heroCtaStyle = useHeroCtaStyle();
 
   return (
     <AnimatedSection key={product.id} delay={delay} className="h-full">
@@ -140,11 +143,8 @@ const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisa
             </div>
             <div className="flex">
               <Button
-                className={
-                  outOfStock && !addToCartDisabled
-                    ? "w-full border-carbon/20 bg-carbon/5 text-carbon/50 hover:bg-carbon/5"
-                    : "w-full bg-gold hover:bg-gold/90 text-white"
-                }
+                className={`${SITE_CTA_CLASS} w-full`}
+                style={heroCtaStyle}
                 variant={outOfStock && !addToCartDisabled ? "outline" : "default"}
                 onClick={(e) => {
                   e.stopPropagation();

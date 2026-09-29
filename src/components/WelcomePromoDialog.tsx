@@ -20,7 +20,9 @@ import {
   parseWelcomePopupConfig,
   type WelcomePopupConfig,
 } from "@/lib/welcome-popup-content";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { fontStyle } from "@/lib/fonts";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import "animate.css";
 
 const STORAGE_KEY = "sb_welcome_promo_seen";
@@ -64,7 +66,7 @@ export const WelcomePromoDialogView = ({
 
   const bgImage = config.imageUrl.trim();
   const bgIsVideo = isVideoMediaUrl(bgImage);
-  const pink = config.pink || DEFAULT_WELCOME_POPUP.pink;
+  const heroCtaStyle = useHeroCtaStyle();
   const gold = config.gold || DEFAULT_WELCOME_POPUP.gold;
   const fonts = config.fonts;
 
@@ -234,11 +236,8 @@ export const WelcomePromoDialogView = ({
                     <button
                       type="button"
                       onClick={() => setStep("email")}
-                      className="flex w-full items-center justify-center gap-2 rounded-full border border-white/70 px-4 py-3.5 font-sans text-sm font-bold uppercase tracking-[0.18em] text-white shadow-md transition hover:brightness-105"
-                      style={{
-                        background: `linear-gradient(90deg, ${pink} 0%, #F0A0AB 50%, ${pink} 100%)`,
-                        ...fontStyle(fonts.primaryCta),
-                      }}
+                      className={cn(SITE_CTA_CLASS, "w-full")}
+                      style={{ ...heroCtaStyle, ...fontStyle(fonts.primaryCta) }}
                     >
                       <Sparkle className="h-3.5 w-3.5" fill="currentColor" />
                       {config.primaryCta}
@@ -247,12 +246,8 @@ export const WelcomePromoDialogView = ({
                     <button
                       type="button"
                       onClick={dismiss}
-                      className="w-full rounded-full border px-4 py-3 font-sans text-xs font-semibold uppercase tracking-[0.18em] text-carbon/80 transition hover:bg-white/40"
-                      style={{
-                        borderColor: `${gold}99`,
-                        backgroundColor: "rgba(249,247,242,0.55)",
-                        ...fontStyle(fonts.secondaryCta),
-                      }}
+                      className={cn(SITE_CTA_CLASS, "w-full")}
+                      style={{ ...heroCtaStyle, ...fontStyle(fonts.secondaryCta) }}
                     >
                       {config.secondaryCta}
                     </button>
@@ -302,23 +297,16 @@ export const WelcomePromoDialogView = ({
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex w-full items-center justify-center gap-2 rounded-full border border-white/70 px-4 py-3.5 font-sans text-sm font-bold uppercase tracking-[0.18em] text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
-                    style={{
-                      background: `linear-gradient(90deg, ${pink} 0%, #F0A0AB 50%, ${pink} 100%)`,
-                      ...fontStyle(fonts.emailCta),
-                    }}
+                    className={cn(SITE_CTA_CLASS, "w-full disabled:opacity-60")}
+                    style={{ ...heroCtaStyle, ...fontStyle(fonts.emailCta) }}
                   >
                     {submitting ? "Enviando..." : config.emailCta}
                   </button>
                   <button
                     type="button"
                     onClick={() => setStep("offer")}
-                    className="w-full rounded-full border px-4 py-3 font-sans text-xs font-semibold uppercase tracking-[0.18em] text-carbon/80 transition hover:bg-white/40"
-                    style={{
-                      borderColor: `${gold}99`,
-                      backgroundColor: "rgba(249,247,242,0.55)",
-                      ...fontStyle(fonts.secondaryCta),
-                    }}
+                    className={cn(SITE_CTA_CLASS, "w-full")}
+                    style={{ ...heroCtaStyle, ...fontStyle(fonts.secondaryCta) }}
                   >
                     Volver
                   </button>

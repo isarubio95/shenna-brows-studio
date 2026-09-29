@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { TurnstileField } from "@/components/TurnstileField";
 import { getTurnstileSiteKey, getVisitorId, isCloudflareProtectionEnabled } from "@/lib/security";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 
 const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL ?? "https://vanhsuisvxvclxdgutaw.supabase.co";
@@ -33,6 +35,7 @@ const Login = () => {
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const [failCount, setFailCount] = useState(0);
   const { signIn, signUp } = useAuth();
+  const heroCtaStyle = useHeroCtaStyle();
   const { toast } = useToast();
   const navigate = useNavigate();
   const turnstileSiteKey = getTurnstileSiteKey();
@@ -221,7 +224,7 @@ const Login = () => {
                 onError={() => setTurnstileToken("")}
               />
             ) : null}
-            <Button type="submit" disabled={loading} className="w-full bg-gold hover:bg-gold/90 text-white py-5 tracking-wide rounded-full">
+            <Button type="submit" disabled={loading} className={`${SITE_CTA_CLASS} w-full`} style={heroCtaStyle}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : isRegister ? "Registrarse" : "Entrar"}
             </Button>
             {isCooldownActive ? (

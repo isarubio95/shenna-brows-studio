@@ -8,7 +8,9 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { useToast } from "@/hooks/use-toast";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
@@ -17,6 +19,7 @@ import CartDrawer from "@/components/CartDrawer";
 import WelcomePromoDialog from "@/components/WelcomePromoDialog";
 import WhatsAppFloatingButton from "@/components/WhatsAppFloatingButton";
 import ScrollToTop from "@/components/ScrollToTop";
+import { TESTIMONIALS_PAGE_PATH } from "@/lib/testimonials";
 import Index from "./pages/Index";
 import ProductPage from "./pages/ProductPage";
 import Tienda from "./pages/Tienda";
@@ -32,6 +35,7 @@ import ReturnsPolicy from "./pages/ReturnsPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import CookiesPolicy from "./pages/CookiesPolicy";
 import Faq from "./pages/Faq";
+import Testimonials from "./pages/Testimonials";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +50,7 @@ const ThemeLoader = () => {
 
 const MaintenancePage = () => {
   const { toast } = useToast();
+  const heroCtaStyle = useHeroCtaStyle();
   const [email, setEmail] = useState("");
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -159,7 +164,8 @@ const MaintenancePage = () => {
               <Button
                 type="submit"
                 disabled={submitting}
-                className="h-12 w-full bg-gold hover:bg-gold/90 text-white text-base"
+                className={`${SITE_CTA_CLASS} w-full`}
+                style={heroCtaStyle}
               >
                 {submitting ? "Suscribiendo..." : "Quiero suscribirme"}
               </Button>
@@ -203,6 +209,7 @@ const AppShell = () => {
         <Route path="/aviso-legal" element={<TermsOfService />} />
         <Route path="/politica-cookies" element={<CookiesPolicy />} />
         <Route path="/preguntas-frecuentes" element={<Faq />} />
+        <Route path={TESTIMONIALS_PAGE_PATH} element={<Testimonials />} />
         <Route path="/:slug" element={<ProductPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

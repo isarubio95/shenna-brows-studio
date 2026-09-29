@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo-shenna.png";
 import {
   ShoppingBag, User, Menu, Shield,
-  Sparkles, HeartHandshake, CircleHelp,
+  Sparkles, HeartHandshake, CircleHelp, MessageSquareQuote,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
@@ -14,6 +14,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useFaqPageVisible } from "@/hooks/use-faq-page-visible";
 import { FAQ_PAGE_PATH } from "@/lib/faq-content";
+import { TESTIMONIALS_PAGE_PATH } from "@/lib/testimonials";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,7 @@ const navLinks: { label: string; to: string; icon: LucideIcon }[] = [
   { label: "Inicio", to: "/", icon: Sparkles },
   { label: "Colección", to: "/tienda", icon: ShoppingBag },
   { label: "Conócenos", to: "/sobre-mi", icon: HeartHandshake },
+  { label: "Testimonios", to: TESTIMONIALS_PAGE_PATH, icon: MessageSquareQuote },
   { label: "Preguntas", to: FAQ_PAGE_PATH, icon: CircleHelp },
 ];
 

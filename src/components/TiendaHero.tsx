@@ -22,7 +22,9 @@ import {
 import AnimatedSection from "@/components/AnimatedSection";
 import { isVideoMediaUrl, posterUrlForVideoUrl } from "@/lib/media-url";
 import { Button } from "@/components/ui/button";
+import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
 import { fontStyle } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
@@ -96,6 +98,7 @@ const TiendaHero = ({
   } | null>(null);
   const [dragging, setDragging] = useState(false);
   const isMobileViewport = useIsMobile();
+  const heroCtaStyle = useHeroCtaStyle();
 
   const previewMobile = preview && previewDevice === "mobile";
   const useMobileLayout = preview ? previewMobile : isMobileViewport;
@@ -121,8 +124,6 @@ const TiendaHero = ({
   const headlineColor = config.headlineColor || DEFAULT_TIENDA_HERO.headlineColor;
   const descriptionColor = config.descriptionColor || DEFAULT_TIENDA_HERO.descriptionColor;
   const featureColor = config.featureColor || DEFAULT_TIENDA_HERO.featureColor;
-  const ctaBg = config.ctaBg || DEFAULT_TIENDA_HERO.ctaBg;
-  const ctaTextColor = config.ctaTextColor || DEFAULT_TIENDA_HERO.ctaTextColor;
   const href = tiendaHeroCtaHref(config);
   const ctaLabel = config.ctaText.trim() || DEFAULT_TIENDA_HERO.ctaText;
   const features = config.features.filter((f) => f.label.trim());
@@ -178,9 +179,8 @@ const TiendaHero = ({
     setDragging(false);
   }, []);
 
-  const ctaClassName =
-    "mt-6 md:mt-8 rounded-full px-8 py-6 text-sm tracking-[0.15em] uppercase shadow-[0_10px_30px_rgba(197,160,89,0.35)] hover:opacity-90";
-  const ctaStyle = { backgroundColor: ctaBg, color: ctaTextColor, ...fontStyle(config.fonts.cta) };
+  const ctaClassName = cn(SITE_CTA_CLASS, "mt-6 md:mt-8");
+  const ctaStyle = { ...heroCtaStyle, ...fontStyle(config.fonts.cta) };
 
   const ctaButton = preview ? (
     <Button type="button" className={ctaClassName} style={ctaStyle}>
