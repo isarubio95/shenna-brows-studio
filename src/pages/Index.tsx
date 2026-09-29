@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
 import TestimonialsBanner from "@/components/TestimonialsBanner";
+import PromoCodeBanner from "@/components/PromoCodeBanner";
 import Autoplay from "embla-carousel-autoplay";
 import { motion } from "framer-motion";
 
@@ -34,6 +35,10 @@ import {
   TESTIMONIALS_BANNER_CONTENT_KEY,
   parseTestimonialsBannerConfig,
 } from "@/lib/testimonials-banner-content";
+import {
+  PROMO_CODE_BANNER_CONTENT_KEY,
+  parsePromoCodeBannerConfig,
+} from "@/lib/promo-code-banner-content";
 
 const Index = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -44,6 +49,7 @@ const Index = () => {
     "index_video",
     "index_collection_headline",
     "index_campaign",
+    PROMO_CODE_BANNER_CONTENT_KEY,
     TESTIMONIALS_BANNER_CONTENT_KEY,
   ]);
 
@@ -73,6 +79,12 @@ const Index = () => {
   const campaign = useMemo(
     () => parseCampaignConfig(siteContent.index_campaign?.content),
     [siteContent.index_campaign?.content],
+  );
+
+  const promoCodeContent = siteContent[PROMO_CODE_BANNER_CONTENT_KEY]?.content;
+  const promoCodeBanner = useMemo(
+    () => parsePromoCodeBannerConfig(promoCodeContent),
+    [promoCodeContent],
   );
 
   const testimonialsContent = siteContent[TESTIMONIALS_BANNER_CONTENT_KEY]?.content;
@@ -239,6 +251,8 @@ const Index = () => {
       </section>
 
       <CampaignBanner config={campaign} />
+
+      <PromoCodeBanner config={promoCodeBanner} />
 
       {testimonialsReady ? <TestimonialsBanner config={testimonialsBanner} /> : null}
 

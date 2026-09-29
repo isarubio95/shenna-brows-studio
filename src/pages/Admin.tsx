@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
 import { TESTIMONIALS_BANNER_CONTENT_KEY } from "@/lib/testimonials-banner-content";
+import { PROMO_CODE_BANNER_CONTENT_KEY } from "@/lib/promo-code-banner-content";
 import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import AdminNewsletterSubscribers from "@/components/admin/AdminNewsletterSubscribers";
 import AdminDiscountCodes from "@/components/admin/AdminDiscountCodes";
@@ -81,6 +82,7 @@ type ContenidoTab =
   | "video"
   | "headline"
   | "campaign"
+  | "promo_code"
   | "testimonials"
   | "tienda"
   | "badges"
@@ -96,6 +98,7 @@ const CONTENIDO_TABS: { id: ContenidoTab; label: string; keys?: string[] }[] = [
   { id: "video", label: "Vídeo", keys: ["index_video"] },
   { id: "headline", label: "Titular", keys: ["index_collection_headline"] },
   { id: "campaign", label: "Campaña", keys: ["index_campaign"] },
+  { id: "promo_code", label: "Código promo", keys: [PROMO_CODE_BANNER_CONTENT_KEY] },
   { id: "testimonials", label: "Testimonios", keys: [TESTIMONIALS_BANNER_CONTENT_KEY] },
   { id: "tienda", label: "Tienda", keys: ["tienda_hero"] },
   { id: "badges", label: "Badges", keys: ["site_badges"] },

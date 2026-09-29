@@ -94,6 +94,14 @@ import {
   type TestimonialsBannerConfig,
 } from "@/lib/testimonials-banner-content";
 import AdminTestimonialsBannerFields from "@/components/admin/AdminTestimonialsBannerFields";
+import {
+  DEFAULT_PROMO_CODE_BANNER,
+  PROMO_CODE_BANNER_CONTENT_KEY,
+  parsePromoCodeBannerConfig,
+  serializePromoCodeBannerConfig,
+  type PromoCodeBannerConfig,
+} from "@/lib/promo-code-banner-content";
+import AdminPromoCodeBannerFields from "@/components/admin/AdminPromoCodeBannerFields";
 import IndexVideoSection from "@/components/IndexVideoSection";
 import CollectionHeadline from "@/components/CollectionHeadline";
 import { AnnouncementBarView } from "@/components/AnnouncementBar";
@@ -189,6 +197,7 @@ const CONTENT_LABELS: Record<string, string> = {
   index_video: "Vídeo — Al final de la página",
   index_collection_headline: "Titular — Debajo de la colección",
   index_campaign: "Campaña — Después de la colección",
+  [PROMO_CODE_BANNER_CONTENT_KEY]: "Código promocional — Antes de los testimonios",
   [TESTIMONIALS_BANNER_CONTENT_KEY]: "Testimonios — Después de la campaña",
   tienda_hero: "Hero — Página de tienda",
   site_badges: "Badge de oferta — Productos",
@@ -210,6 +219,7 @@ const KEY_ORDER = [
   "index_video",
   "index_collection_headline",
   "index_campaign",
+  PROMO_CODE_BANNER_CONTENT_KEY,
   TESTIMONIALS_BANNER_CONTENT_KEY,
   "tienda_hero",
   "site_badges",
@@ -348,6 +358,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   const [videoDraft, setVideoDraft] = useState<IndexVideoConfig>({ ...DEFAULT_INDEX_VIDEO });
   const [testimonialsDraft, setTestimonialsDraft] = useState<TestimonialsBannerConfig>({
     ...DEFAULT_TESTIMONIALS_BANNER,
+  });
+  const [promoCodeDraft, setPromoCodeDraft] = useState<PromoCodeBannerConfig>({
+    ...DEFAULT_PROMO_CODE_BANNER,
   });
   const [announcementDraft, setAnnouncementDraft] = useState<{
     enabled: boolean;
@@ -608,6 +621,16 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     return {
       title: "Testimonios del inicio",
       content: serializeTestimonialsBannerConfig(config),
+      config,
+    };
+  };
+
+  const buildPromoCodePayload = () => {
+    // Pasar por el parser aplica los mismos valores por defecto que la web.
+    const config = parsePromoCodeBannerConfig(serializePromoCodeBannerConfig(promoCodeDraft));
+    return {
+      title: "Código promocional del inicio",
+      content: serializePromoCodeBannerConfig(config),
       config,
     };
   };
@@ -1190,6 +1213,21 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         if (inserted) rows = [...rows, inserted];
       }
 
+      const hasPromoCode = rows.some((b) => b.key === PROMO_CODE_BANNER_CONTENT_KEY);
+      if (!hasPromoCode) {
+        const { data: inserted } = await (supabase as any)
+          .from("site_content")
+          .insert({
+            key: PROMO_CODE_BANNER_CONTENT_KEY,
+            title: "Código promocional del inicio",
+            content: serializePromoCodeBannerConfig(DEFAULT_PROMO_CODE_BANNER),
+          })
+          .select("*")
+          .single();
+
+        if (inserted) rows = [...rows, inserted];
+      }
+
       const hasTiendaHero = rows.some((b) => b.key === "tienda_hero");
       if (!hasTiendaHero) {
         const { data: inserted } = await (supabase as any)
@@ -1327,6 +1365,14 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         testimonialsRow.content = serializeTestimonialsBannerConfig(cfg);
       }
 
+      const promoCodeRow = rows.find((b) => b.key === PROMO_CODE_BANNER_CONTENT_KEY);
+      if (promoCodeRow) {
+        const cfg = parsePromoCodeBannerConfig(promoCodeRow.content);
+        setPromoCodeDraft(cfg);
+        promoCodeRow.title = "Código promocional del inicio";
+        promoCodeRow.content = serializePromoCodeBannerConfig(cfg);
+      }
+
       const tiendaHeroRow = rows.find((b) => b.key === "tienda_hero");
       if (tiendaHeroRow) {
         const cfg = parseTiendaHeroConfig(tiendaHeroRow.content);
@@ -1417,6 +1463,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     }
     if (block.key === TESTIMONIALS_BANNER_CONTENT_KEY) {
       const payload = buildTestimonialsPayload();
+      return payload.title !== baseline.title || payload.content !== baseline.content;
+    }
+    if (block.key === PROMO_CODE_BANNER_CONTENT_KEY) {
+      const payload = buildPromoCodePayload();
       return payload.title !== baseline.title || payload.content !== baseline.content;
     }
     if (block.key === "tienda_hero") {
@@ -1528,6 +1578,19 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       setBlocks((prev) =>
         prev.map((b) =>
           b.key === TESTIMONIALS_BANNER_CONTENT_KEY
+            ? { ...b, title: payload.title, content: payload.content }
+            : b
+        )
+      );
+    }
+
+    if (block.key === PROMO_CODE_BANNER_CONTENT_KEY) {
+      const { title, content, config } = buildPromoCodePayload();
+      payload = { title, content };
+      setPromoCodeDraft(config);
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.key === PROMO_CODE_BANNER_CONTENT_KEY
             ? { ...b, title: payload.title, content: payload.content }
             : b
         )
@@ -1665,6 +1728,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         const isHeadline = block.key === "index_collection_headline";
         const isCampaign = block.key === "index_campaign";
         const isTestimonials = block.key === TESTIMONIALS_BANNER_CONTENT_KEY;
+        const isPromoCode = block.key === PROMO_CODE_BANNER_CONTENT_KEY;
         const isTiendaHero = block.key === "tienda_hero";
         const isBadges = block.key === "site_badges";
         const isWhatsApp = block.key === "whatsapp_button";
@@ -1680,7 +1744,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
             key={block.key}
             className={cn(
               "bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6",
-              (isHero || isCampaign || isTestimonials || isWelcomePopup || isTiendaHero || isBadges || isWhatsApp || isVideo || isAnnouncement) && "ring-1 ring-gold/20",
+              (isHero || isCampaign || isTestimonials || isPromoCode || isWelcomePopup || isTiendaHero || isBadges || isWhatsApp || isVideo || isAnnouncement) && "ring-1 ring-gold/20",
             )}
           >
             <h3 className="font-playfair text-base font-semibold text-carbon mb-4">
@@ -1695,6 +1759,12 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
               <p className="text-xs text-carbon/40 -mt-2 mb-4">
                 Sección de reseñas de la home: fotos (escritorio y móvil), textos, botón, colores,
                 fuentes y posición del texto.
+              </p>
+            )}
+            {isPromoCode && (
+              <p className="text-xs text-carbon/40 -mt-2 mb-4">
+                Franja con un código de descuento y un botón para copiarlo, justo encima de los
+                testimonios. Código asociado, textos, colores y fuentes.
               </p>
             )}
             {isWelcomePopup && (
@@ -1733,7 +1803,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
             )}
 
             <div className="space-y-4">
-              {!isMarquee && !isHeadline && !isCampaign && !isTestimonials && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
+              {!isMarquee && !isHeadline && !isCampaign && !isTestimonials && !isPromoCode && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">Título</Label>
                   <Input
@@ -3495,6 +3565,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                 />
               )}
 
+              {isPromoCode && (
+                <AdminPromoCodeBannerFields value={promoCodeDraft} onChange={setPromoCodeDraft} />
+              )}
+
               {isCampaign && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4898,7 +4972,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                 </>
               )}
 
-              {!isHeadline && !isCampaign && !isTestimonials && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
+              {!isHeadline && !isCampaign && !isTestimonials && !isPromoCode && !isHero && !isWelcomePopup && !isTiendaHero && !isBadges && !isWhatsApp && !isVideo && !isAnnouncement && (
                 <div>
                   <Label className="text-carbon/60 text-xs uppercase tracking-wider">
                     {isMarquee ? "Textos (uno por línea)" : "Contenido"}
