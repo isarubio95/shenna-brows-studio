@@ -137,7 +137,7 @@ import TiendaHero, { type TiendaHeroPreviewDevice } from "@/components/TiendaHer
 import { SaleBadgeChip } from "@/components/ProductSaleBadge";
 import { WhatsAppButtonView } from "@/components/WhatsAppFloatingButton";
 import { cn } from "@/lib/utils";
-import { invalidateAnnouncementBarCache } from "@/hooks/use-announcement-bar";
+import { invalidateSiteContent } from "@/hooks/use-site-content";
 import { AdminTextFonts } from "@/components/admin/FontSelect";
 import { fontStyle } from "@/lib/fonts";
 import {
@@ -1609,9 +1609,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         ...prev,
         [block.key]: { title: payload.title ?? "", content: payload.content ?? "" },
       }));
-      if (block.key === ANNOUNCEMENT_CONTENT_KEY) {
-        invalidateAnnouncementBarCache();
-      }
+      invalidateSiteContent();
       toast({ title: "Guardado", description: `"${CONTENT_LABELS[block.key] || block.key}" actualizado.` });
     }
     setSaving(null);

@@ -13,24 +13,53 @@
     <meta property="og:description" content="Todo lo que necesitas para tener unas cejas perfectas todo el día 🤍" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <!-- Precarga el hero guardado (misma clave que SITE_CONTENT_CACHE_KEY). El de /public/hero solo es el fallback. -->
+    <!--
+      Pide todo site_content antes de que llegue el bundle (lo recoge use-site-content.ts;
+      misma URL y clave pública que integrations/supabase/client.ts) y precarga la imagen
+      del hero: primero la de la caché (SITE_CONTENT_CACHE_KEY) y, si cambió, la nueva.
+      La de /public/hero solo es el fallback.
+    -->
+    <link rel="preconnect" href="https://vanhsuisvxvclxdgutaw.supabase.co" crossorigin />
     <script>
       (function () {
+        var preloaded = {};
+        function preloadHero(rows) {
+          try {
+            var row = rows && rows.index_hero;
+            if (!row || typeof row.content !== "string") return;
+            var cfg = JSON.parse(row.content);
+            var mobile = window.matchMedia("(max-width: 767px)").matches;
+            var url = String((mobile ? cfg.mobileImageUrl : cfg.desktopImageUrl) || cfg.desktopImageUrl || "").trim();
+            if (!url || preloaded[url] || /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(url)) return;
+            preloaded[url] = true;
+            var link = document.createElement("link");
+            link.rel = "preload";
+            link.as = "image";
+            link.href = url;
+            link.setAttribute("fetchpriority", "high");
+            document.head.appendChild(link);
+          } catch (e) {}
+        }
+
         try {
           var raw = localStorage.getItem("shenna.site-content.v1");
-          if (!raw) return;
-          var row = JSON.parse(raw).index_hero;
-          if (!row || typeof row.content !== "string") return;
-          var cfg = JSON.parse(row.content);
-          var mobile = window.matchMedia("(max-width: 767px)").matches;
-          var url = String((mobile ? cfg.mobileImageUrl : cfg.desktopImageUrl) || cfg.desktopImageUrl || "").trim();
-          if (!url || /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(url)) return;
-          var link = document.createElement("link");
-          link.rel = "preload";
-          link.as = "image";
-          link.href = url;
-          link.setAttribute("fetchpriority", "high");
-          document.head.appendChild(link);
+          if (raw) preloadHero(JSON.parse(raw));
+        } catch (e) {}
+
+        try {
+          var key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhbmhzdWlzdnh2Y2x4ZGd1dGF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNjA4OTAsImV4cCI6MjA4NjczNjg5MH0.12dipjMKxJzZ93aGRSw3GnYYBb19E-FvdDEAGyH35Pg";
+          var prefetch = fetch("https://vanhsuisvxvclxdgutaw.supabase.co/rest/v1/site_content?select=key,title,content", {
+            headers: { apikey: key, Authorization: "Bearer " + key },
+          }).then(function (res) {
+            if (!res.ok) throw new Error("site_content " + res.status);
+            return res.json();
+          });
+          prefetch.then(function (rows) {
+            var map = {};
+            for (var i = 0; i < rows.length; i++) map[rows[i].key] = rows[i];
+            preloadHero(map);
+          }, function () {});
+          window.__siteContentPrefetch = prefetch;
         } catch (e) {}
       })();
     </script>

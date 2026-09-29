@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateSiteContent } from "@/hooks/use-site-content";
 import { Loader2, Save, RotateCcw } from "lucide-react";
 import {
   ThemeConfig,
@@ -122,6 +123,7 @@ const AdminThemeEditor = () => {
     } else {
       applyTheme(theme);
       setSavedTheme(theme);
+      invalidateSiteContent();
       toast({ title: "Tema guardado", description: "Los cambios se han aplicado." });
     }
     setSaving(false);

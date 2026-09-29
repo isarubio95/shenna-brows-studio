@@ -43,7 +43,7 @@ import {
   type FaqPageConfig,
   type FaqSection,
 } from "@/lib/faq-content";
-import { invalidateFaqPageVisibleCache } from "@/hooks/use-faq-page-visible";
+import { invalidateSiteContent } from "@/hooks/use-site-content";
 import { cn } from "@/lib/utils";
 import { AdminTextFonts } from "@/components/admin/FontSelect";
 
@@ -159,7 +159,7 @@ const AdminFaqEditor = () => {
         setRow(data);
       }
       setSavedSnapshot(serializedDraft);
-      invalidateFaqPageVisibleCache();
+      invalidateSiteContent();
       toast({
         title: "FAQ guardado",
         description: draft.pageVisible

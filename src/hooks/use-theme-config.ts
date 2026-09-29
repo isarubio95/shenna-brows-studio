@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useLayoutEffect, useMemo } from "react";
+import { useSiteContent } from "@/hooks/use-site-content";
 import { fontFamily, isFontId } from "@/lib/fonts";
 
 export interface ThemeConfig {
@@ -141,31 +141,24 @@ export function applyTheme(theme: ThemeConfig) {
   );
 }
 
-export function useThemeConfig() {
-  const [theme, setTheme] = useState<ThemeConfig>(DEFAULT_THEME);
-  const [loading, setLoading] = useState(true);
+export function parseThemeConfig(raw?: string | null): ThemeConfig {
+  if (!raw) return DEFAULT_THEME;
+  try {
+    return mergeThemeConfig(JSON.parse(raw));
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
 
-  useEffect(() => {
-    (supabase as any)
-      .from("site_content")
-      .select("content")
-      .eq("key", "theme_config")
-      .maybeSingle()
-      .then(({ data }: any) => {
-        if (data?.content) {
-          try {
-            const merged = mergeThemeConfig(JSON.parse(data.content));
-            setTheme(merged);
-            applyTheme(merged);
-          } catch {
-            applyTheme(DEFAULT_THEME);
-          }
-        } else {
-          applyTheme(DEFAULT_THEME);
-        }
-        setLoading(false);
-      });
-  }, []);
+export function useThemeConfig() {
+  const { data, loading } = useSiteContent(["theme_config"]);
+  const content = data.theme_config?.content;
+  const theme = useMemo(() => parseThemeConfig(content), [content]);
+
+  // Antes del pintado: la web nunca se ve con los colores o fuentes por defecto.
+  useLayoutEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   return { theme, loading };
 }
