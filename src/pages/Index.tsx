@@ -141,8 +141,8 @@ const Index = () => {
                   key={`${copy}-${i}-${item}`}
                   className="flex shrink-0 items-center gap-8 sm:gap-12"
                 >
-                  <span className="whitespace-nowrap font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em] text-carbon/70 sm:text-xs"
-                    style={fontStyle(marquee.fonts.items)}
+                  <span className="whitespace-nowrap font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em] sm:text-xs"
+                    style={{ ...fontStyle(marquee.fonts.items), color: marquee.textColor }}
                   >
                     {item}
                   </span>

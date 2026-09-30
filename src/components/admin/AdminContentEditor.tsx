@@ -286,12 +286,14 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   const [marqueeDraft, setMarqueeDraft] = useState<{
     texts: string;
     background: string;
+    textColor: string;
     /** String para permitir vaciar el input al editar. */
     paddingY: string;
     fonts: MarqueeConfig["fonts"];
   }>({
     texts: marqueeItemsToText(DEFAULT_MARQUEE_ITEMS),
     background: DEFAULT_MARQUEE_CONFIG.background,
+    textColor: DEFAULT_MARQUEE_CONFIG.textColor,
     paddingY: String(DEFAULT_MARQUEE_CONFIG.paddingY),
     fonts: DEFAULT_MARQUEE_CONFIG.fonts,
   });
@@ -406,9 +408,12 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
   const buildMarqueePayload = () => {
     const bg = marqueeDraft.background.trim();
     const background = isHex(bg) ? bg : DEFAULT_MARQUEE_CONFIG.background;
+    const fg = marqueeDraft.textColor.trim();
+    const textColor = isHex(fg) ? fg : DEFAULT_MARQUEE_CONFIG.textColor;
     const config: MarqueeConfig = {
       items: marqueeTextToItems(marqueeDraft.texts),
       background,
+      textColor,
       paddingY: parsePaddingY(marqueeDraft.paddingY),
       fonts: marqueeDraft.fonts,
     };
@@ -1152,6 +1157,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         const seed: MarqueeConfig = {
           items: [...DEFAULT_MARQUEE_ITEMS],
           background: DEFAULT_MARQUEE_CONFIG.background,
+          textColor: DEFAULT_MARQUEE_CONFIG.textColor,
           paddingY: DEFAULT_MARQUEE_CONFIG.paddingY,
           fonts: DEFAULT_MARQUEE_CONFIG.fonts,
         };
@@ -1325,6 +1331,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         setMarqueeDraft({
           texts: marqueeItemsToText(cfg.items),
           background: cfg.background,
+          textColor: cfg.textColor,
           paddingY: String(cfg.paddingY),
           fonts: cfg.fonts,
         });
@@ -1527,6 +1534,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       payload = { title, content };
       setMarqueeDraft({
         background: config.background,
+        textColor: config.textColor,
         paddingY: String(config.paddingY),
         texts: marqueeItemsToText(config.items),
         fonts: config.fonts,
@@ -1847,6 +1855,43 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
                         aria-label="Restaurar color original"
                         title="Restaurar color original"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                      Color del texto
+                    </Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <HexColorField
+                        value={marqueeDraft.textColor}
+                        onChange={(hex) =>
+                          setMarqueeDraft((prev) => ({ ...prev, textColor: hex }))
+                        }
+                        fallback={DEFAULT_MARQUEE_CONFIG.textColor}
+                        aria-label="Color del texto de la marquesina"
+                        className="flex-1 min-w-0"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          toPickerColor(marqueeDraft.textColor) ===
+                          toPickerColor(DEFAULT_MARQUEE_CONFIG.textColor)
+                        }
+                        onClick={() =>
+                          setMarqueeDraft((prev) => ({
+                            ...prev,
+                            textColor: DEFAULT_MARQUEE_CONFIG.textColor,
+                          }))
+                        }
+                        className="shrink-0 border-gold/20 text-carbon/60 hover:text-carbon disabled:opacity-40 h-10"
+                        aria-label="Restaurar color de texto original"
+                        title="Restaurar color de texto original"
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
                       </Button>
@@ -5034,8 +5079,8 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                   }}
                 >
                   <p
-                    className="px-4 text-center font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em] text-carbon/70"
-                    style={fontStyle(marqueeDraft.fonts.items)}
+                    className="px-4 text-center font-sans text-[0.65rem] font-medium uppercase tracking-[0.28em]"
+                    style={{ ...fontStyle(marqueeDraft.fonts.items), color: marqueeDraft.textColor }}
                   >
                     Vista previa · {marqueeTextToItems(marqueeDraft.texts)[0] || "…"}
                   </p>

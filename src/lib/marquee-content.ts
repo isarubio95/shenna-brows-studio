@@ -7,6 +7,8 @@ export type MarqueeFontSlot = (typeof MARQUEE_FONT_SLOTS)[number];
 export interface MarqueeConfig {
   items: string[];
   background: string;
+  /** Color del texto (hex, admite alfa). */
+  textColor: string;
   /** Padding vertical en píxeles (arriba y abajo). */
   paddingY: number;
   /** Fuente propia de cada texto; "" hereda la del tema. */
@@ -25,6 +27,8 @@ export const DEFAULT_MARQUEE_ITEMS = [
 export const DEFAULT_MARQUEE_CONFIG: MarqueeConfig = {
   items: DEFAULT_MARQUEE_ITEMS,
   background: "#F8F3EB",
+  /** Equivale a text-carbon/70, el color que tenía antes de ser editable. */
+  textColor: "#1A1A1AB3",
   paddingY: 26,
   fonts: emptyTextFonts(MARQUEE_FONT_SLOTS),
 };
@@ -61,6 +65,9 @@ export function parseMarqueeConfig(raw?: string | null): MarqueeConfig {
         background: isHexColor(parsed.background)
           ? parsed.background.trim()
           : DEFAULT_MARQUEE_CONFIG.background,
+        textColor: isHexColor(parsed.textColor)
+          ? parsed.textColor.trim()
+          : DEFAULT_MARQUEE_CONFIG.textColor,
         paddingY,
         fonts: parseTextFonts(parsed.fonts, MARQUEE_FONT_SLOTS),
       };
@@ -72,6 +79,7 @@ export function parseMarqueeConfig(raw?: string | null): MarqueeConfig {
   return {
     items: parseItemsFromLines(trimmed),
     background: DEFAULT_MARQUEE_CONFIG.background,
+    textColor: DEFAULT_MARQUEE_CONFIG.textColor,
     paddingY: DEFAULT_MARQUEE_CONFIG.paddingY,
     fonts: DEFAULT_MARQUEE_CONFIG.fonts,
   };
@@ -81,6 +89,7 @@ export function serializeMarqueeConfig(config: MarqueeConfig): string {
   return JSON.stringify({
     items: config.items,
     background: config.background,
+    textColor: config.textColor,
     paddingY: config.paddingY,
     fonts: serializeTextFonts(config.fonts),
   });
