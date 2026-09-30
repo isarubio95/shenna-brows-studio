@@ -337,14 +337,6 @@ serve(async (req) => {
       );
     }
 
-    const shippingEur = shippingEurForShippingAddress(provinceCodeNorm, shipCity, subtotalEur);
-    if (shippingEur == null) {
-      return new Response(JSON.stringify({ error: "Código de provincia de envío no válido" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     let discountAmount = 0;
     let discountCodeId: string | null = null;
     let discountCode: string | null = null;
@@ -365,6 +357,16 @@ serve(async (req) => {
       discountAmount = resolved.discount.amount;
       discountCodeId = resolved.discount.id;
       discountCode = resolved.discount.code;
+    }
+
+    // El umbral de envío gratis se evalúa sobre el importe ya descontado.
+    const subtotalAfterDiscountEur = Math.max(0, subtotalEur - discountAmount);
+    const shippingEur = shippingEurForShippingAddress(provinceCodeNorm, shipCity, subtotalAfterDiscountEur);
+    if (shippingEur == null) {
+      return new Response(JSON.stringify({ error: "Código de provincia de envío no válido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const totalEur = Math.max(0, Math.round((subtotalEur - discountAmount + shippingEur) * 100) / 100);

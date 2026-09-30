@@ -1,7 +1,7 @@
 /**
  * Tarifas de envío (EUR) por zona. Códigos INE de provincia (01–52) y PT para Portugal.
  * Península y Ceuta/Melilla: 7 € · Illes Balears: 10 € · Canarias: 15 € · Portugal: 11 €
- * Envío gratuito a partir de FREE_SHIPPING_MIN_SUBTOTAL_EUR (subtotal del pedido).
+ * Envío gratuito a partir de FREE_SHIPPING_MIN_SUBTOTAL_EUR (subtotal del pedido tras aplicar descuentos).
  */
 export const SHIPPING_RATES_EUR = {
   peninsula: 7,
@@ -47,7 +47,7 @@ export function qualifiesForFreeLogronoShipping(
   return normalizeShippingCity(city ?? "") === "logrono";
 }
 
-/** Envío gratuito por importe: subtotal del pedido ≥ umbral. */
+/** Envío gratuito por importe: subtotal del pedido (ya descontado) ≥ umbral. */
 export function qualifiesForFreeShippingBySubtotal(
   subtotalEur: number | undefined | null,
 ): boolean {

@@ -77,13 +77,15 @@ const Checkout = () => {
     () => [...PROVINCE_OPTIONS].sort((a, b) => a.label.localeCompare(b.label, "es")),
     [],
   );
+  const discountAmount = appliedDiscount?.amount ?? 0;
+  // El umbral de envío gratis se evalúa sobre el importe ya descontado.
+  const subtotalAfterDiscount = Math.max(0, totalPrice - discountAmount);
   const shippingEur = getShippingEurForProvinceCode(
     shipping.province_code,
     shipping.city,
-    totalPrice,
+    subtotalAfterDiscount,
   );
   const canQuoteShipping = shippingEur != null;
-  const discountAmount = appliedDiscount?.amount ?? 0;
   const total = Math.max(0, totalPrice - discountAmount + (shippingEur ?? 0));
 
   const applyDiscountCode = async () => {
@@ -142,7 +144,7 @@ const Checkout = () => {
     const quoted = getShippingEurForProvinceCode(
       shipping.province_code.trim(),
       shipping.city.trim(),
-      totalPrice,
+      subtotalAfterDiscount,
     );
     if (!shipping.province_code.trim() || quoted == null) {
       toast({
