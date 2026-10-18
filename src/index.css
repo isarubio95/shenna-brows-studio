@@ -234,8 +234,8 @@
   background-color: #FFFFFF;
 }
 
-/* «Nuestros valores» va sobre el rosa de la marca: títulos en blanco, no el color del tema. */
-.site-theme .brand-values-section :is(h2, h3) {
+/* Tarjetas de «Nuestros valores» en el rosa de la marca: títulos en blanco, no el color del tema. */
+.site-theme .brand-values-section h3 {
   color: #FFFFFF;
 }
 

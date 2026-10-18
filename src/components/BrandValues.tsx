@@ -31,16 +31,17 @@ export function BrandValuesView({ config, preview = false }: BrandValuesViewProp
   return (
     <section
       aria-labelledby={preview ? undefined : "brand-values-title"}
-      // Rosa de la marca con letras blancas, como el resto de la web (clienta, 18/10).
-      className="brand-values-section bg-gold py-16 md:py-24"
+      // Fondo blanco como el resto de la página; el rosa con letras blancas va dentro
+      // de las tarjetas, como en el resto de la web (clienta, 18/10).
+      className="brand-values-section bg-white py-16 md:py-24"
     >
       <div className="container mx-auto px-6">
         <Wrap className="text-center">
           {config.eyebrow ? (
             <div className="flex items-center justify-center gap-4">
-              <span className="h-px w-8 bg-white/50 sm:w-14" aria-hidden />
-              <p className="text-white text-[0.7rem] uppercase tracking-[0.32em] font-medium">{config.eyebrow}</p>
-              <span className="h-px w-8 bg-white/50 sm:w-14" aria-hidden />
+              <span className="h-px w-8 bg-gold/40 sm:w-14" aria-hidden />
+              <p className="text-gold text-[0.7rem] uppercase tracking-[0.32em] font-medium">{config.eyebrow}</p>
+              <span className="h-px w-8 bg-gold/40 sm:w-14" aria-hidden />
             </div>
           ) : null}
           <h2
@@ -50,7 +51,7 @@ export function BrandValuesView({ config, preview = false }: BrandValuesViewProp
             {titleParts ? (
               <>
                 {titleParts.before}
-                <span className="italic">{titleParts.accent}</span>
+                <span className="italic text-gold">{titleParts.accent}</span>
                 {titleParts.after}
               </>
             ) : (
@@ -58,7 +59,7 @@ export function BrandValuesView({ config, preview = false }: BrandValuesViewProp
             )}
           </h2>
           {config.keywords ? (
-            <p className="mt-4 text-[0.65rem] uppercase tracking-[0.32em] text-white/90 sm:text-xs sm:tracking-[0.4em]">
+            <p className="mt-4 text-[0.65rem] uppercase tracking-[0.32em] text-carbon/60 sm:text-xs sm:tracking-[0.4em]">
               {config.keywords}
             </p>
           ) : null}
@@ -67,17 +68,17 @@ export function BrandValuesView({ config, preview = false }: BrandValuesViewProp
         <Wrap delay={0.08} className="mt-12 md:mt-14">
           <ul
             className={cn(
-              "mx-auto grid max-w-7xl grid-cols-2 gap-x-3 gap-y-6 md:gap-0 md:overflow-hidden md:rounded-2xl md:ring-1 md:ring-white/25",
+              "mx-auto grid max-w-7xl grid-cols-2 gap-x-3 gap-y-6 md:gap-0 md:overflow-hidden md:rounded-2xl md:shadow-[0_18px_40px_-28px_rgba(120,60,70,0.55)]",
               cards.length >= 4 ? "md:grid-cols-4" : cards.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2",
             )}
           >
             {cards.map((card, index) => (
               <li
                 key={`${index}-${card.title}`}
-                className="flex flex-col overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/25 md:rounded-none md:ring-0 md:border-l md:border-white/25 md:first:border-l-0"
+                className="flex flex-col overflow-hidden rounded-2xl bg-gold md:rounded-none md:border-l md:border-white/30 md:first:border-l-0"
               >
                 {card.imageUrl ? (
-                  <div className="aspect-4/3 overflow-hidden bg-white/10 md:aspect-[483/250]">
+                  <div className="aspect-4/3 overflow-hidden bg-gold/20 md:aspect-[483/250]">
                     <img
                       src={card.imageUrl}
                       alt={card.imageAlt}
