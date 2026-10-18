@@ -223,9 +223,25 @@
   color: color-mix(in srgb, var(--theme-color-h2, #1A1A1A) 90%, transparent);
 }
 
-/* Títulos de tarjetas de marca (valores): el tono de los H2 del tema, como en la maqueta. */
-.site-theme .marketing-card-title {
-  color: var(--theme-color-h2, #1A1A1A);
+/*
+  Con la franja de confianza arriba (layout), el hueco del menú fijo ya lo
+  reserva la franja: la página solo necesita un respiro, no su pt-36/pt-40.
+  Y fondo blanco, como la franja: la clienta quiere la web en blanco y rosa,
+  sin saltos de color (las páginas con color propio del Tema lo conservan).
+*/
+.storefront-top-strip + main {
+  padding-top: 2.5rem;
+  background-color: #FFFFFF;
+}
+
+/* «Nuestros valores» va sobre el rosa de la marca: títulos en blanco, no el color del tema. */
+.site-theme .brand-values-section :is(h2, h3) {
+  color: #FFFFFF;
+}
+
+/* Elixir en el bloque «El más vendido»: el mismo rosa que el título de su ficha. */
+.site-theme .spotlight-title {
+  color: var(--sale-badge-bg, #E9808E);
 }
 
 /* Rótulos de ficha (Descripción, Materiales, Envío): carbón, no el rosa del H3. */

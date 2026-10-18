@@ -30,7 +30,7 @@ export function ValuePropositionView({
   );
 
   return (
-    <section aria-label="Propuesta de valor" className="bg-cream py-14 md:py-20">
+    <section aria-label="Propuesta de valor" className="bg-white py-14 md:py-20">
       <div className="container mx-auto px-6">
         {preview ? content : <AnimatedSection>{content}</AnimatedSection>}
       </div>

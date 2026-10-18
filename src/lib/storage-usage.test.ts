@@ -4,6 +4,7 @@ import {
   parseBrandValuesConfig,
   serializeBrandValuesConfig,
 } from "./brand-values-content";
+import { ELIXIR_SPOTLIGHT_CONTENT_KEY } from "./elixir-spotlight-content";
 import { parseCampaignConfig, serializeCampaignConfig } from "./campaign-content";
 import { parseHeroConfig, serializeHeroConfig } from "./hero-content";
 import { serializeProductFeatureVideos } from "./product-feature-videos";
@@ -144,6 +145,28 @@ describe("collectUsedStorageRefs", () => {
       "campaign-images/valores-1.webp",
     ]);
     expect(refs[0].label).toBe("Valores: Precisión en cada detalle");
+  });
+
+  it("marca como usado el vídeo subido al bloque de Elixir, no el de serie", () => {
+    const uploaded = collectUsedStorageRefs({
+      products: [],
+      siteContent: [
+        {
+          key: ELIXIR_SPOTLIGHT_CONTENT_KEY,
+          content: JSON.stringify({ mediaUrl: `${BASE}/campaign-images/elixir-bloque-1.mp4` }),
+        },
+      ],
+    });
+    expect(uploaded.map((r) => storageObjectKey(r.bucket, r.path))).toEqual([
+      "campaign-images/elixir-bloque-1.mp4",
+      "campaign-images/elixir-bloque-1.poster.webp",
+    ]);
+
+    const bundled = collectUsedStorageRefs({
+      products: [],
+      siteContent: [{ key: ELIXIR_SPOTLIGHT_CONTENT_KEY, content: "{}" }],
+    });
+    expect(bundled).toEqual([]);
   });
 });
 

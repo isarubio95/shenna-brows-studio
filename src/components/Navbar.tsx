@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo-shenna.png";
 import {
@@ -42,6 +42,7 @@ const Navbar = () => {
   const [hidden, setHidden] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
   const { openCart, totalItems } = useCart();
   const { user, isAdmin, profile, signOut } = useAuth();
   const faqPageVisible = useFaqPageVisible();
@@ -86,11 +87,28 @@ const Navbar = () => {
     setMobileOpen(false);
   }, [location.pathname]);
 
+  // Altura real del menú fijo (cambia con la barra superior y el breakpoint):
+  // la franja de confianza de arriba de cada página se coloca justo debajo.
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const root = document.documentElement;
+    const update = () => root.style.setProperty("--site-header-height", `${header.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--site-header-height");
+    };
+  }, []);
+
   const linkColor = "text-carbon/80 hover:text-gold";
   const iconColor = "text-carbon/60 hover:text-gold";
 
   return (
     <header
+      ref={headerRef}
       className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${
         hidden ? "-translate-y-full" : "translate-y-0"
       }`}

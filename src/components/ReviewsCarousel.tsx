@@ -56,8 +56,7 @@ const ReviewsCarousel = ({ className }: { className?: string }) => {
   return (
     <section
       aria-labelledby="reviews-carousel-title"
-      className={cn("relative overflow-hidden py-16 md:py-20", className)}
-      style={{ backgroundColor: "var(--theme-section-testimonials-bg, #F9F7F2)" }}
+      className={cn("relative overflow-hidden bg-white py-16 md:py-20", className)}
     >
       <div className="container mx-auto px-6">
         <AnimatedSection className="text-center mb-10 md:mb-12">

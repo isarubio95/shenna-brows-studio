@@ -16,6 +16,8 @@ interface TrustStripViewProps {
   variant?: TrustStripVariant;
   /** Vista previa en el panel: se pinta aunque esté desactivada. */
   preview?: boolean;
+  /** Menos aire: cuando va arriba de la página, antes de la primera imagen. */
+  dense?: boolean;
   className?: string;
 }
 
@@ -23,6 +25,7 @@ export function TrustStripView({
   config,
   variant = "full",
   preview = false,
+  dense = false,
   className,
 }: TrustStripViewProps) {
   const items = config.items.filter((item) => item.title.trim());
@@ -64,10 +67,11 @@ export function TrustStripView({
       aria-label="Ventajas de comprar en Shenna"
       className={cn("border-b border-gold/10 bg-white", className)}
     >
-      <div className="container mx-auto px-6 py-9 md:py-12">
+      <div className={cn("container mx-auto px-6", dense ? "py-6 md:py-8" : "py-9 md:py-12")}>
         <ul
           className={cn(
-            "mx-auto grid max-w-5xl gap-x-5 gap-y-8 md:gap-x-10",
+            "mx-auto grid max-w-5xl gap-x-5 md:gap-x-10",
+            dense ? "gap-y-5" : "gap-y-8",
             items.length === 1
               ? "grid-cols-1"
               : items.length === 3
@@ -97,10 +101,18 @@ export function TrustStripView({
 }
 
 /** Franja de confianza con el contenido guardado en el panel. */
-const TrustStrip = ({ variant = "full", className }: { variant?: TrustStripVariant; className?: string }) => {
+const TrustStrip = ({
+  variant = "full",
+  dense = false,
+  className,
+}: {
+  variant?: TrustStripVariant;
+  dense?: boolean;
+  className?: string;
+}) => {
   const content = useSiteContentValue(TRUST_STRIP_CONTENT_KEY);
   const config = useMemo(() => parseTrustStripConfig(content), [content]);
-  return <TrustStripView config={config} variant={variant} className={className} />;
+  return <TrustStripView config={config} variant={variant} dense={dense} className={className} />;
 };
 
 export default TrustStrip;

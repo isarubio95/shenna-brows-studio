@@ -17,19 +17,27 @@ export interface ElixirSpotlightConfig {
   description: string;
   benefits: string[];
   /**
-   * Vídeo de la ficha que hace de demostración. Vacío = el de «Así se
-   * utiliza…» o, si no hay, el primero; `none` = la foto del producto.
+   * Foto o vídeo propio del bloque, subido desde el panel. Vacío = se usa un
+   * vídeo de la ficha del producto (ver `demoVideoId`).
+   */
+  mediaUrl: string;
+  /**
+   * Vídeo de la ficha que hace de demostración si no hay `mediaUrl`. Vacío =
+   * el de «Así se utiliza…» o, si no hay, el primero; `none` = la foto.
    */
   demoVideoId: string;
   ctaText: string;
   secondaryCtaText: string;
 }
 
+/** Vídeo que mandó la clienta el 18/10 para el bloque (en `public/videos`). */
+export const ELIXIR_SPOTLIGHT_DEFAULT_MEDIA = "/videos/elixir-mas-vendido.mp4";
+
 /** Ganchos de la captura «¿Por qué elegir ELIXIR?» de la clienta. */
 export const DEFAULT_ELIXIR_SPOTLIGHT: ElixirSpotlightConfig = {
   enabled: true,
   productSlug: "elixir",
-  eyebrow: "Producto protagonista",
+  eyebrow: "El más vendido",
   title: "",
   description:
     "El fijador híbrido de cejas y pestañas de Shenna BROWS: fijación y cuidado diario en un solo gesto.",
@@ -40,6 +48,7 @@ export const DEFAULT_ELIXIR_SPOTLIGHT: ElixirSpotlightConfig = {
     "Enriquecido con péptidos y activos cosméticos",
     "Cejas y pestañas en un solo gesto",
   ],
+  mediaUrl: ELIXIR_SPOTLIGHT_DEFAULT_MEDIA,
   demoVideoId: "",
   ctaText: "Añadir al carrito",
   secondaryCtaText: "Ver ficha completa",
@@ -67,6 +76,7 @@ export function parseElixirSpotlightConfig(raw?: string | null): ElixirSpotlight
       title: str(parsed.title),
       description: typeof parsed.description === "string" ? parsed.description.trim() : d.description,
       benefits,
+      mediaUrl: typeof parsed.mediaUrl === "string" ? parsed.mediaUrl.trim() : d.mediaUrl,
       demoVideoId: str(parsed.demoVideoId),
       ctaText: str(parsed.ctaText) || d.ctaText,
       secondaryCtaText:
@@ -85,6 +95,7 @@ export function serializeElixirSpotlightConfig(config: ElixirSpotlightConfig): s
     title: config.title.trim(),
     description: config.description.trim(),
     benefits: config.benefits.map((b) => b.trim()).filter(Boolean).slice(0, ELIXIR_SPOTLIGHT_MAX_BENEFITS),
+    mediaUrl: config.mediaUrl.trim(),
     demoVideoId: config.demoVideoId.trim(),
     ctaText: config.ctaText.trim(),
     secondaryCtaText: config.secondaryCtaText.trim(),

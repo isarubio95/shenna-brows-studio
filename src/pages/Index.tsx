@@ -181,22 +181,55 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Esquema de la clienta: marquesina → confianza → valores → protagonista → colección. */}
+      {/*
+        Orden de la clienta (18/10): marquesina → envíos y valores → campaña →
+        «Todo lo que tus cejas necesitan» → el más vendido → colección → packs →
+        código de descuento → reseñas. Fondos en blanco y rosa.
+      */}
       <TrustStrip />
 
       <ValueProposition />
 
       <BrandValues />
 
-      {!loading && <ElixirSpotlight product={spotlightProduct} />}
-
-      {/* Campaña antes que la colección (petición de la clienta). */}
       <CampaignBanner config={campaign} />
 
-      <PromoCodeBanner config={promoCodeBanner} />
+      <section
+        aria-label="Titular de la colección"
+        className="py-16 md:py-24"
+        style={{ backgroundColor: collectionHeadline.background }}
+      >
+        <div className="container mx-auto px-6">
+          <AnimatedSection>
+            <CollectionHeadline
+              config={collectionHeadline}
+              fontSize={`clamp(2.25rem, 7vw, ${collectionHeadline.fontSize}px)`}
+            />
+          </AnimatedSection>
+        </div>
+      </section>
+
+      {!loading && <ElixirSpotlight product={spotlightProduct} />}
+
+      <section id="coleccion" className="bg-white py-16 md:py-24">
+        <div className="container mx-auto px-6">
+          <AnimatedSection>
+            <CollectionIntro config={collectionIntro} />
+          </AnimatedSection>
+          {/* Cuadrícula como la de los packs: nada que deslizar a los lados. */}
+          <ProductGrid
+            variant="products"
+            products={collectionProducts}
+            loading={loading}
+            onOpenProduct={openProduct}
+            onAddToCart={addToCart}
+            addToCartDisabled={isAddToCartDisabled}
+          />
+        </div>
+      </section>
 
       {(loading || packProducts.length > 0) && (
-        <section id="packs" className="py-16 md:py-24 bg-cream">
+        <section id="packs" className="bg-white pb-16 md:pb-24">
           <div className="container mx-auto px-6">
             <AnimatedSection>
               <div className="text-center mb-10">
@@ -219,42 +252,7 @@ const Index = () => {
         </section>
       )}
 
-      {/* Products Grid */}
-      <section
-        id="coleccion"
-        className="py-20 md:py-24"
-        style={{ backgroundColor: "#F8F3EB" }}
-      >
-        <div className="container mx-auto px-6">
-          <AnimatedSection>
-            <CollectionIntro config={collectionIntro} />
-          </AnimatedSection>
-          {/* Cuadrícula como la de los packs: nada que deslizar a los lados. */}
-          <ProductGrid
-            variant="products"
-            products={collectionProducts}
-            loading={loading}
-            onOpenProduct={openProduct}
-            onAddToCart={addToCart}
-            addToCartDisabled={isAddToCartDisabled}
-          />
-        </div>
-      </section>
-
-      <section
-        aria-label="Titular de la colección"
-        className="py-16 md:py-24"
-        style={{ backgroundColor: collectionHeadline.background }}
-      >
-        <div className="container mx-auto px-6">
-          <AnimatedSection>
-            <CollectionHeadline
-              config={collectionHeadline}
-              fontSize={`clamp(2.25rem, 7vw, ${collectionHeadline.fontSize}px)`}
-            />
-          </AnimatedSection>
-        </div>
-      </section>
+      <PromoCodeBanner config={promoCodeBanner} />
 
       <ReviewsCarousel />
 

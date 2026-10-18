@@ -57,7 +57,7 @@ describe("editor de bloques de marketing", () => {
     renderEditor();
 
     expect(await screen.findByText("Franja de confianza — Todas las páginas")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Tus ventajas al comprar en Shenna")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Tus ventajas al comprar en Shenna BROWS")).toBeInTheDocument();
     expect(screen.getAllByDisplayValue("Envío gratis").length).toBeGreaterThan(0);
     expect(writes).toEqual([]);
   });
@@ -106,6 +106,21 @@ describe("editor del producto protagonista", () => {
     expect(await screen.findByDisplayValue("Fijación con acabado natural")).toBeInTheDocument();
     expect(screen.getAllByRole("textbox", { name: /Beneficio \d/ })).toHaveLength(5);
     expect(screen.getByDisplayValue("Añadir al carrito")).toBeInTheDocument();
+  });
+
+  it("permite subir una foto o un vídeo propio, con el vídeo de la clienta por defecto", async () => {
+    render(
+      <MemoryRouter>
+        <AdminSiteBlockEditor definition={ELIXIR_SPOTLIGHT_BLOCK} />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("button", { name: /Subir foto o vídeo/ })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("El más vendido")).toBeInTheDocument();
+    // Con foto o vídeo propio, el selector de vídeos de la ficha no aplica.
+    expect(screen.getByRole("combobox", { name: "Vídeo de demostración" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Usar un vídeo de la ficha" }));
+    expect(screen.getByRole("combobox", { name: "Vídeo de demostración" })).toBeEnabled();
   });
 });
 

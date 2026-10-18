@@ -1,5 +1,6 @@
 import { BRAND_VALUES_CONTENT_KEY, parseBrandValuesConfig } from "@/lib/brand-values-content";
 import { parseCampaignConfig } from "@/lib/campaign-content";
+import { ELIXIR_SPOTLIGHT_CONTENT_KEY, parseElixirSpotlightConfig } from "@/lib/elixir-spotlight-content";
 import { parseHeroConfig } from "@/lib/hero-content";
 import { isVideoMediaUrl, posterPathForVideoPath, posterUrlForVideoUrl } from "@/lib/media-url";
 import { parseProductFeatureVideos } from "@/lib/product-feature-videos";
@@ -22,6 +23,7 @@ export const MEDIA_SITE_CONTENT_KEYS = [
   "index_video",
   TESTIMONIALS_BANNER_CONTENT_KEY,
   BRAND_VALUES_CONTENT_KEY,
+  ELIXIR_SPOTLIGHT_CONTENT_KEY,
 ] as const;
 
 const PUBLIC_OBJECT_RE = /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/;
@@ -139,6 +141,11 @@ export function collectUsedStorageRefs(input: {
       case BRAND_VALUES_CONTENT_KEY: {
         const cfg = parseBrandValuesConfig(row.content);
         cfg.cards.forEach((card) => pushRef(out, card.imageUrl, `Valores: ${card.title}`));
+        break;
+      }
+      case ELIXIR_SPOTLIGHT_CONTENT_KEY: {
+        const cfg = parseElixirSpotlightConfig(row.content);
+        pushRef(out, cfg.mediaUrl, "Bloque Elixir");
         break;
       }
       default:

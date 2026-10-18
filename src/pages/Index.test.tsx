@@ -80,20 +80,20 @@ const follows = (a: Element, b: Element) =>
   Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
 describe("home", () => {
-  it("sigue el esquema de la clienta: confianza, campaña, packs, colección y opiniones", async () => {
+  it("sigue el orden de la clienta: envíos y valores, campaña, titular, Elixir, colección, packs y reseñas", async () => {
     const { container } = renderHome();
 
     const reviewsTitle = await screen.findByRole("heading", { name: /Lo que dicen nuestras/ });
     const trust = screen.getByRole("region", { name: "Ventajas de comprar en Shenna" });
-    const campaign = container.querySelector('section[aria-label="Campaña publicitaria"]')
-      ?? screen.getByRole("heading", { name: "CAMPAÑA" });
-    const packs = container.querySelector("#packs")!;
+    const values = screen.getByRole("heading", { name: "La esencia que define Shenna BROWS" });
+    const campaign = screen.getByRole("heading", { name: "CAMPAÑA" });
+    const headline = screen.getByRole("region", { name: "Titular de la colección" });
+    const spotlight = await screen.findByRole("heading", { name: "ELIXIR" });
     const collection = container.querySelector("#coleccion")!;
+    const packs = container.querySelector("#packs")!;
 
-    expect(follows(trust, campaign)).toBe(true);
-    expect(follows(campaign, packs)).toBe(true);
-    expect(follows(packs, collection)).toBe(true);
-    expect(follows(collection, reviewsTitle)).toBe(true);
+    const order = [trust, values, campaign, headline, spotlight, collection, packs, reviewsTitle];
+    order.slice(1).forEach((element, i) => expect(follows(order[i], element)).toBe(true));
   });
 
   it("destaca el producto protagonista en su bloque y la colección muestra el resto", async () => {

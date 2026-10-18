@@ -2,50 +2,33 @@ import { describe, expect, it } from "vitest";
 import { layoutStorefrontBlocks } from "./storefront-sections";
 
 describe("layoutStorefrontBlocks", () => {
-  it("adds every shared block to the shop pages, in the client's order", () => {
-    for (const path of ["/tienda", "/sobre-mi", "/preguntas-frecuentes", "/pinzas-gold-edition"]) {
-      expect(layoutStorefrontBlocks(path, { spotlightSlug: "elixir" })).toEqual([
-        "trust",
-        "values",
-        "spotlight",
-        "reviews",
-      ]);
+  it("puts the trust strip on top of every shop page and the reviews at the end", () => {
+    for (const path of ["/sobre-mi", "/preguntas-frecuentes", "/pinzas-gold-edition", "/elixir"]) {
+      expect(layoutStorefrontBlocks(path)).toEqual({ top: ["trust"], bottom: ["reviews"] });
     }
+  });
+
+  it("keeps the brand values only on the shop page, besides the home", () => {
+    expect(layoutStorefrontBlocks("/tienda")).toEqual({ top: ["trust"], bottom: ["values", "reviews"] });
+    expect(layoutStorefrontBlocks("/tienda/")).toEqual({ top: ["trust"], bottom: ["values", "reviews"] });
   });
 
   it("leaves the home alone: it places the blocks itself", () => {
-    expect(layoutStorefrontBlocks("/")).toEqual([]);
-    expect(layoutStorefrontBlocks("")).toEqual([]);
+    expect(layoutStorefrontBlocks("/")).toEqual({ top: [], bottom: [] });
+    expect(layoutStorefrontBlocks("")).toEqual({ top: [], bottom: [] });
   });
 
   it("keeps checkout, payment, account and admin pages clean", () => {
-    for (const path of [
-      "/checkout",
-      "/payment-success",
-      "/payment-ko",
-      "/login",
-      "/account",
-      "/admin",
-      "/admin/",
-    ]) {
-      expect(layoutStorefrontBlocks(path)).toEqual([]);
+    for (const path of ["/checkout", "/payment-success", "/payment-ko", "/login", "/account", "/admin", "/admin/"]) {
+      expect(layoutStorefrontBlocks(path)).toEqual({ top: [], bottom: [] });
     }
   });
 
-  it("does not repeat the featured product on its own page", () => {
-    expect(layoutStorefrontBlocks("/elixir", { spotlightSlug: "elixir" })).toEqual([
-      "trust",
-      "values",
-      "reviews",
-    ]);
-    expect(layoutStorefrontBlocks("/elixir/", { spotlightSlug: "elixir" })).not.toContain("spotlight");
-  });
-
   it("skips the reviews carousel on the full reviews page", () => {
-    expect(layoutStorefrontBlocks("/testimonios")).toEqual(["trust", "values", "spotlight"]);
+    expect(layoutStorefrontBlocks("/testimonios")).toEqual({ top: ["trust"], bottom: [] });
   });
 
   it("does not mistake look-alike paths for excluded ones", () => {
-    expect(layoutStorefrontBlocks("/accountancy-kit")).toContain("trust");
+    expect(layoutStorefrontBlocks("/accountancy-kit").top).toEqual(["trust"]);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_ELIXIR_SPOTLIGHT,
+  ELIXIR_SPOTLIGHT_DEFAULT_MEDIA,
   ELIXIR_SPOTLIGHT_NO_VIDEO,
   parseElixirSpotlightConfig,
   pickDemoVideo,
@@ -41,6 +42,18 @@ describe("elixir-spotlight-content", () => {
     expect(parsed.benefits).toEqual(["Uno", "Dos", "Tres", "Cuatro", "Cinco"]);
     expect(parsed.ctaText).toBe(DEFAULT_ELIXIR_SPOTLIGHT.ctaText);
     expect(parsed.secondaryCtaText).toBe("");
+  });
+
+  it("shows the client's video unless another photo or video is saved", () => {
+    // La fila guardada antes del 18/10 no tenía este campo.
+    expect(parseElixirSpotlightConfig(JSON.stringify({ eyebrow: "Producto protagonista" })).mediaUrl).toBe(
+      ELIXIR_SPOTLIGHT_DEFAULT_MEDIA,
+    );
+    expect(parseElixirSpotlightConfig(JSON.stringify({ mediaUrl: " https://cdn/foto.webp " })).mediaUrl).toBe(
+      "https://cdn/foto.webp",
+    );
+    // Vacío a propósito: vuelve a los vídeos de la ficha del producto.
+    expect(parseElixirSpotlightConfig(JSON.stringify({ mediaUrl: "" })).mediaUrl).toBe("");
   });
 
   it("accepts any valid product slug", () => {

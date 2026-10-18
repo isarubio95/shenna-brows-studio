@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { getProductPosterUrl } from "@/lib/product-images";
 import ProductGrid from "@/components/ProductGrid";
+import ElixirSpotlight from "@/components/ElixirSpotlight";
 import { useCart } from "@/context/CartContext";
 import AnimatedSection from "@/components/AnimatedSection";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -139,6 +140,13 @@ const Tienda = () => {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <TiendaHero config={tiendaHero} />
+
+      {/* El más vendido justo después de la cabecera, antes de los productos (clienta, 18/10). */}
+      {!loading && (
+        <div className="mt-12 md:mt-16">
+          <ElixirSpotlight product={products.find((p) => p.slug === featuredSlug) ?? null} />
+        </div>
+      )}
 
       <section id="productos" className="container mx-auto px-6 mt-16">
         <AnimatedSection>

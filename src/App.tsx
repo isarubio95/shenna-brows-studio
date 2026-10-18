@@ -19,7 +19,7 @@ import CartDrawer from "@/components/CartDrawer";
 import WelcomePromoDialog from "@/components/WelcomePromoDialog";
 import WhatsAppFloatingButton from "@/components/WhatsAppFloatingButton";
 import ScrollToTop from "@/components/ScrollToTop";
-import StorefrontSections from "@/components/StorefrontSections";
+import StorefrontSections, { StorefrontTopSections } from "@/components/StorefrontSections";
 import { TESTIMONIALS_PAGE_PATH } from "@/lib/testimonials";
 import Index from "./pages/Index";
 import ProductPage from "./pages/ProductPage";
@@ -195,6 +195,8 @@ const AppShell = () => {
       {!isAdminRoute && <Navbar />}
       {!isAdminRoute && <CartDrawer />}
       <WelcomePromoDialog />
+      {/* Justo antes de las rutas: `index.css` ajusta el margen del <main> que le sigue. */}
+      {!isAdminRoute && <StorefrontTopSections />}
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/tienda" element={<Tienda />} />

@@ -289,7 +289,7 @@ const CampaignBanner = ({
 
       <div
         className={cn(
-          "bg-cream px-6 py-10 text-center",
+          "bg-white px-6 py-10 text-center",
           preview ? (previewMobile ? "px-5 py-8" : "px-8 py-10") : "sm:py-12",
         )}
       >

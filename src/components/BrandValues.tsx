@@ -10,9 +10,6 @@ import {
 import { splitHeadlineByAccent } from "@/lib/collection-headline-content";
 import { cn } from "@/lib/utils";
 
-/** Fondo crema de la maqueta de la clienta. */
-const SECTION_BG = "#F8F1EA";
-
 /** En la vista previa del panel no hay animación de entrada. */
 const StaticWrap = ({ children, className }: { children: ReactNode; className?: string; delay?: number }) => (
   <div className={className}>{children}</div>
@@ -34,16 +31,16 @@ export function BrandValuesView({ config, preview = false }: BrandValuesViewProp
   return (
     <section
       aria-labelledby={preview ? undefined : "brand-values-title"}
-      className="py-16 md:py-24"
-      style={{ backgroundColor: SECTION_BG }}
+      // Rosa de la marca con letras blancas, como el resto de la web (clienta, 18/10).
+      className="brand-values-section bg-gold py-16 md:py-24"
     >
       <div className="container mx-auto px-6">
         <Wrap className="text-center">
           {config.eyebrow ? (
             <div className="flex items-center justify-center gap-4">
-              <span className="h-px w-8 bg-gold/40 sm:w-14" aria-hidden />
-              <p className="text-gold text-[0.7rem] uppercase tracking-[0.32em] font-medium">{config.eyebrow}</p>
-              <span className="h-px w-8 bg-gold/40 sm:w-14" aria-hidden />
+              <span className="h-px w-8 bg-white/50 sm:w-14" aria-hidden />
+              <p className="text-white text-[0.7rem] uppercase tracking-[0.32em] font-medium">{config.eyebrow}</p>
+              <span className="h-px w-8 bg-white/50 sm:w-14" aria-hidden />
             </div>
           ) : null}
           <h2
@@ -53,7 +50,7 @@ export function BrandValuesView({ config, preview = false }: BrandValuesViewProp
             {titleParts ? (
               <>
                 {titleParts.before}
-                <span className="italic text-gold">{titleParts.accent}</span>
+                <span className="italic">{titleParts.accent}</span>
                 {titleParts.after}
               </>
             ) : (
@@ -61,7 +58,7 @@ export function BrandValuesView({ config, preview = false }: BrandValuesViewProp
             )}
           </h2>
           {config.keywords ? (
-            <p className="mt-4 text-[0.65rem] uppercase tracking-[0.32em] text-carbon/60 sm:text-xs sm:tracking-[0.4em]">
+            <p className="mt-4 text-[0.65rem] uppercase tracking-[0.32em] text-white/90 sm:text-xs sm:tracking-[0.4em]">
               {config.keywords}
             </p>
           ) : null}
@@ -70,17 +67,17 @@ export function BrandValuesView({ config, preview = false }: BrandValuesViewProp
         <Wrap delay={0.08} className="mt-12 md:mt-14">
           <ul
             className={cn(
-              "mx-auto grid max-w-7xl grid-cols-2 gap-x-3 gap-y-6 md:gap-0 md:overflow-hidden md:rounded-2xl md:shadow-[0_18px_40px_-28px_rgba(90,60,40,0.45)]",
+              "mx-auto grid max-w-7xl grid-cols-2 gap-x-3 gap-y-6 md:gap-0 md:overflow-hidden md:rounded-2xl md:ring-1 md:ring-white/25",
               cards.length >= 4 ? "md:grid-cols-4" : cards.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2",
             )}
           >
             {cards.map((card, index) => (
               <li
                 key={`${index}-${card.title}`}
-                className="flex flex-col overflow-hidden rounded-2xl bg-white/55 md:rounded-none md:border-l md:border-white/70 md:first:border-l-0"
+                className="flex flex-col overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/25 md:rounded-none md:ring-0 md:border-l md:border-white/25 md:first:border-l-0"
               >
                 {card.imageUrl ? (
-                  <div className="aspect-4/3 overflow-hidden bg-[#EFE4D8] md:aspect-[483/250]">
+                  <div className="aspect-4/3 overflow-hidden bg-white/10 md:aspect-[483/250]">
                     <img
                       src={card.imageUrl}
                       alt={card.imageAlt}
@@ -98,18 +95,18 @@ export function BrandValuesView({ config, preview = false }: BrandValuesViewProp
                 >
                   <span
                     className={cn(
-                      "grid h-11 w-11 place-items-center rounded-full bg-[#FBF7F2] shadow-[0_6px_16px_-8px_rgba(90,60,40,0.45)] ring-4 ring-[#F8F1EA] md:h-16 md:w-16",
+                      "grid h-11 w-11 place-items-center rounded-full bg-white shadow-[0_6px_16px_-8px_rgba(90,40,50,0.45)] ring-4 ring-gold md:h-16 md:w-16",
                       card.imageUrl && "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2",
                       !card.imageUrl && "mb-3",
                     )}
                   >
                     <MarketingIcon id={card.icon} className="h-5 w-5 text-gold md:h-7 md:w-7" />
                   </span>
-                  <h3 className="marketing-card-title font-cormorant text-[1.15rem] font-semibold leading-tight md:text-[1.75rem]">
+                  <h3 className="font-cormorant text-[1.15rem] font-semibold leading-tight md:text-[1.75rem]">
                     {card.title}
                   </h3>
                   {card.text ? (
-                    <p className="mt-2 text-xs leading-relaxed text-carbon/60 md:mt-3 md:text-sm">{card.text}</p>
+                    <p className="mt-2 text-xs font-medium leading-relaxed text-white/90 md:mt-3 md:text-sm">{card.text}</p>
                   ) : null}
                 </div>
               </li>

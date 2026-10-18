@@ -87,7 +87,7 @@ describe("ficha de producto", () => {
   it("repite las ventajas de compra entre el botón y los desplegables", async () => {
     renderProduct();
 
-    const heading = await screen.findByRole("heading", { name: "Tus ventajas al comprar en Shenna" });
+    const heading = await screen.findByRole("heading", { name: "Tus ventajas al comprar en Shenna BROWS" });
     const addToCart = screen.getByRole("button", { name: /Añadir al Carrito/i });
     const description = screen.getByRole("button", { name: "Descripción" });
 
@@ -100,7 +100,7 @@ describe("ficha de producto", () => {
     renderProduct();
 
     const heading = await screen.findByRole("heading", { name: "¿Por qué elegir ELIXIR?" });
-    const advantages = screen.getByRole("heading", { name: "Tus ventajas al comprar en Shenna" });
+    const advantages = screen.getByRole("heading", { name: "Tus ventajas al comprar en Shenna BROWS" });
     const addToCart = screen.getByRole("button", { name: /Añadir al Carrito/i });
     const lead = screen.getByText("Fijación con acabado natural.");
 

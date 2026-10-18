@@ -33,7 +33,7 @@ export const TRUST_STRIP_PROVISIONAL_DELIVERY = {
 /** Contenido de las capturas de la clienta (franja y «Tus ventajas…»). */
 export const DEFAULT_TRUST_STRIP: TrustStripConfig = {
   enabled: true,
-  compactHeading: "Tus ventajas al comprar en Shenna",
+  compactHeading: "Tus ventajas al comprar en Shenna BROWS",
   items: [
     {
       icon: "truck",

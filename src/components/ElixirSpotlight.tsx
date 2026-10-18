@@ -15,14 +15,12 @@ import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { toCartProduct } from "@/lib/cart-product";
 import { parseColorVariants } from "@/lib/color-variants";
 import { pickDemoVideo, type ElixirSpotlightConfig } from "@/lib/elixir-spotlight-content";
-import { posterUrlForVideoUrl } from "@/lib/media-url";
+import { isVideoMediaUrl, posterUrlForVideoUrl } from "@/lib/media-url";
 import { featureVideoAspectRatio, parseProductFeatureVideos } from "@/lib/product-feature-videos";
 import { getProductPosterUrl } from "@/lib/product-images";
 import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { cn } from "@/lib/utils";
-
-/** Fondo rosado suave: separa el protagonista de los valores (crema) y la campaña. */
-const SECTION_BG = "#FBF1F0";
+import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
 
 /** Reproduce el vídeo solo mientras está en pantalla: ahorra datos en el móvil. */
 function useAutoplayInView(enabled: boolean) {
@@ -62,8 +60,19 @@ export function ElixirSpotlightView({
   const heroCtaStyle = useHeroCtaStyle();
   const mediaRef = useRef<HTMLDivElement>(null);
   const videos = useMemo(() => parseProductFeatureVideos(product.feature_videos), [product.feature_videos]);
-  const demo = pickDemoVideo(videos, config.demoVideoId);
-  const videoRef = useAutoplayInView(Boolean(demo) && !preview);
+  // Primero la foto o el vídeo propio del bloque; si no hay, un vídeo de la ficha.
+  const customMedia = config.mediaUrl.trim();
+  const customIsVideo = Boolean(customMedia) && isVideoMediaUrl(customMedia);
+  const demo = customMedia ? null : pickDemoVideo(videos, config.demoVideoId);
+  const videoSrc = customIsVideo ? customMedia : demo?.videoUrl ?? "";
+  const measuredAspect = useVideoAspectRatio(customIsVideo ? customMedia : null);
+  const videoAspect = customIsVideo
+    ? measuredAspect ?? 16 / 9
+    : demo
+      ? Math.max(featureVideoAspectRatio(demo), 0.62)
+      : null;
+  const landscape = (videoAspect ?? 0) > 1;
+  const videoRef = useAutoplayInView(Boolean(videoSrc) && !preview);
   const outOfStock = Number(product.stock ?? 0) <= 0;
   const needsColor = parseColorVariants(product.color_variants).length > 0;
   const title = config.title || product.category;
@@ -76,7 +85,7 @@ export function ElixirSpotlightView({
       ) : null}
       <h2
         id={preview ? undefined : "elixir-spotlight-title"}
-        className="font-playfair text-4xl font-bold uppercase leading-none tracking-wide md:text-6xl"
+        className="spotlight-title font-playfair text-4xl font-bold uppercase leading-none tracking-wide md:text-6xl"
       >
         {title}
       </h2>
@@ -85,32 +94,35 @@ export function ElixirSpotlightView({
   );
 
   const media = (
-    <div ref={mediaRef} className="relative mx-auto w-full max-w-sm lg:max-w-md">
+    <div
+      ref={mediaRef}
+      className={cn("relative mx-auto w-full", landscape ? "max-w-xl lg:max-w-none" : "max-w-sm lg:max-w-md")}
+    >
       <div className="relative overflow-hidden rounded-3xl bg-carbon/5 shadow-[0_24px_50px_-28px_rgba(120,60,70,0.55)] ring-1 ring-gold/15">
-        {demo ? (
+        {videoSrc ? (
           <video
             ref={videoRef}
-            src={demo.videoUrl}
-            poster={posterUrlForVideoUrl(demo.videoUrl)}
+            src={videoSrc}
+            poster={posterUrlForVideoUrl(videoSrc)}
             className="block w-full max-h-[60vh] object-cover lg:max-h-[72vh]"
-            style={{ aspectRatio: String(Math.max(featureVideoAspectRatio(demo), 0.62)) }}
+            style={videoAspect ? { aspectRatio: String(videoAspect) } : undefined}
             muted
             loop
             playsInline
             preload={preview ? "metadata" : "none"}
-            aria-label={demo.title || `Demostración de ${title}`}
+            aria-label={demo?.title || `Vídeo de ${title}`}
             {...backgroundSoundProps}
           />
         ) : (
           <img
-            src={getProductPosterUrl(product.image_url, product.slug)}
+            src={customMedia || getProductPosterUrl(product.image_url, product.slug)}
             alt={product.name}
             loading={preview ? undefined : "lazy"}
-            className="block aspect-4/5 w-full object-cover"
+            className={cn("block w-full object-cover", customMedia ? "h-auto" : "aspect-4/5")}
           />
         )}
         <ProductSaleBadge product={product} />
-        {demo && !preview ? <BackgroundSoundButton containerRef={mediaRef} className="z-2" /> : null}
+        {videoSrc && !preview ? <BackgroundSoundButton containerRef={mediaRef} className="z-2" /> : null}
       </div>
       {demo?.title ? (
         <p className="mt-3 text-center text-xs uppercase tracking-[0.2em] text-carbon/50">{demo.title}</p>
@@ -193,8 +205,7 @@ export function ElixirSpotlightView({
   return (
     <section
       aria-labelledby={preview ? undefined : "elixir-spotlight-title"}
-      className="py-16 md:py-24"
-      style={{ backgroundColor: SECTION_BG }}
+      className="bg-white py-16 md:py-24"
     >
       <div className="container mx-auto px-6">
         {preview ? content : <AnimatedSection>{content}</AnimatedSection>}
@@ -210,8 +221,8 @@ async function fetchSpotlightProduct(slug: string): Promise<CatalogProduct | nul
 }
 
 /**
- * «Producto protagonista» (Elixir). En la home recibe el producto ya cargado;
- * en el resto de páginas lo pide por su slug.
+ * «El más vendido» (Elixir). En Inicio y Colección recibe el producto ya cargado;
+ * si no se le pasa, lo pide por su slug.
  */
 const ElixirSpotlight = ({ product: givenProduct }: { product?: CatalogProduct | null }) => {
   const config = useElixirSpotlight();

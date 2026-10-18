@@ -48,7 +48,7 @@ export const TRUST_STRIP_BLOCK: SiteBlockDefinition<TrustStripConfig> = {
   rowTitle: "Franja de confianza",
   label: "Franja de confianza — Todas las páginas",
   description:
-    "Cuatro ventajas en fila debajo de la marquesina del inicio y al final del resto de páginas. En la ficha de producto sale la versión compacta «Tus ventajas…».",
+    "Cuatro ventajas en fila: en el inicio debajo de la marquesina, y en el resto de páginas arriba del todo, antes de la primera imagen. En la ficha de producto sale además la versión compacta «Tus ventajas…».",
   defaults: DEFAULT_TRUST_STRIP,
   parse: parseTrustStripConfig,
   serialize: serializeTrustStripConfig,
@@ -58,9 +58,9 @@ export const TRUST_STRIP_BLOCK: SiteBlockDefinition<TrustStripConfig> = {
 export const BRAND_VALUES_BLOCK: SiteBlockDefinition<BrandValuesConfig> = {
   key: BRAND_VALUES_CONTENT_KEY,
   rowTitle: "Nuestros valores",
-  label: "Nuestros valores — Todas las páginas",
+  label: "Nuestros valores — Inicio y Colección",
   description:
-    "«La esencia que define Shenna BROWS»: cuatro tarjetas con foto e icono. En el inicio va después de la franja de confianza; en el resto de páginas, al final.",
+    "«La esencia que define Shenna BROWS»: cuatro tarjetas con foto e icono sobre el rosa de la marca. En el inicio va después de la franja de confianza; en Colección, al final.",
   defaults: DEFAULT_BRAND_VALUES,
   parse: parseBrandValuesConfig,
   serialize: serializeBrandValuesConfig,
@@ -70,9 +70,9 @@ export const BRAND_VALUES_BLOCK: SiteBlockDefinition<BrandValuesConfig> = {
 export const ELIXIR_SPOTLIGHT_BLOCK: SiteBlockDefinition<ElixirSpotlightConfig> = {
   key: ELIXIR_SPOTLIGHT_CONTENT_KEY,
   rowTitle: "Producto protagonista",
-  label: "Producto protagonista — Todas las páginas",
+  label: "El más vendido (Elixir) — Inicio y Colección",
   description:
-    "Elixir con sus beneficios, la demostración en vídeo y el botón de compra. En el inicio va después de los valores; en el resto de páginas, al final (salvo en su propia ficha).",
+    "Elixir con sus beneficios, una foto o vídeo y el botón de compra. En el inicio va después de «Todo lo que tus cejas necesitan»; en Colección, justo después de la cabecera.",
   defaults: DEFAULT_ELIXIR_SPOTLIGHT,
   parse: parseElixirSpotlightConfig,
   serialize: serializeElixirSpotlightConfig,
