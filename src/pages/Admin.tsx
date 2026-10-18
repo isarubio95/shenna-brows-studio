@@ -25,6 +25,14 @@ import AdminSectionNav, {
   type AdminSection,
 } from "@/components/admin/AdminSectionNav";
 import AdminFaqEditor from "@/components/admin/AdminFaqEditor";
+import AdminSiteBlockEditor, { type SiteBlockDefinition } from "@/components/admin/AdminSiteBlockEditor";
+import {
+  BRAND_VALUES_BLOCK,
+  COLLECTION_INTRO_BLOCK,
+  ELIXIR_SPOTLIGHT_BLOCK,
+  TRUST_STRIP_BLOCK,
+  VALUE_PROPOSITION_BLOCK,
+} from "@/components/admin/site-blocks";
 import AdminMediaManager from "@/components/admin/AdminMediaManager";
 import {
   canDownloadOrderInvoice,
@@ -88,18 +96,35 @@ type ContenidoTab =
   | "badges"
   | "whatsapp"
   | "about"
+  | "confianza"
+  | "valores"
+  | "protagonista"
+  | "propuesta"
+  | "coleccion"
   | "tema";
 
-const CONTENIDO_TABS: { id: ContenidoTab; label: string; keys?: string[] }[] = [
+const CONTENIDO_TABS: {
+  id: ContenidoTab;
+  label: string;
+  keys?: string[];
+  /** Bloque con editor propio (no pasa por `AdminContentEditor`). */
+  block?: SiteBlockDefinition<any>;
+}[] = [
   { id: "anuncio", label: "Barra superior", keys: ["announcement_bar"] },
   { id: "hero", label: "Hero", keys: ["index_hero"] },
   { id: "welcome", label: "Bienvenida", keys: ["index_welcome_popup"] },
+  // Resto de pestañas en el orden en que salen en el inicio.
   { id: "marquee", label: "Marquesina", keys: ["index_marquee"] },
-  { id: "video", label: "Vídeo", keys: ["index_video"] },
-  { id: "headline", label: "Titular", keys: ["index_collection_headline"] },
+  { id: "confianza", label: "Confianza", block: TRUST_STRIP_BLOCK },
+  { id: "propuesta", label: "Propuesta", block: VALUE_PROPOSITION_BLOCK },
+  { id: "valores", label: "Valores", block: BRAND_VALUES_BLOCK },
+  { id: "protagonista", label: "Elixir", block: ELIXIR_SPOTLIGHT_BLOCK },
   { id: "campaign", label: "Campaña", keys: ["index_campaign"] },
   { id: "promo_code", label: "Código promo", keys: [PROMO_CODE_BANNER_CONTENT_KEY] },
+  { id: "coleccion", label: "Colección", block: COLLECTION_INTRO_BLOCK },
+  { id: "headline", label: "Titular", keys: ["index_collection_headline"] },
   { id: "testimonials", label: "Testimonios", keys: [TESTIMONIALS_BANNER_CONTENT_KEY] },
+  { id: "video", label: "Vídeo", keys: ["index_video"] },
   { id: "tienda", label: "Tienda", keys: ["tienda_hero"] },
   { id: "badges", label: "Badges", keys: ["site_badges"] },
   { id: "whatsapp", label: "WhatsApp", keys: ["whatsapp_button"] },
@@ -798,6 +823,7 @@ const Admin = () => {
   const [loadingOrderItemsId, setLoadingOrderItemsId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<AdminSection>("pedidos");
   const [contenidoTab, setContenidoTab] = useState<ContenidoTab>("hero");
+  const activeContenidoTab = CONTENIDO_TABS.find((t) => t.id === contenidoTab);
 
   const productCatalogById = useMemo(() => {
     const map = new Map<string, ProductCatalogEntry>();
@@ -2052,10 +2078,10 @@ const Admin = () => {
 
             {contenidoTab === "tema" ? (
               <AdminThemeEditor />
+            ) : activeContenidoTab?.block ? (
+              <AdminSiteBlockEditor key={activeContenidoTab.id} definition={activeContenidoTab.block} />
             ) : (
-              <AdminContentEditor
-                filterKeys={CONTENIDO_TABS.find((t) => t.id === contenidoTab)?.keys}
-              />
+              <AdminContentEditor filterKeys={activeContenidoTab?.keys} />
             )}
           </AnimatedSection>
         )}

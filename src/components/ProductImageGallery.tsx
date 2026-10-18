@@ -30,6 +30,8 @@ interface ProductImageGalleryProps {
   showDots?: boolean;
   /** Flechas más pequeñas, como en las cards. */
   compact?: boolean;
+  /** Clases extra de las flechas (p. ej. ocultarlas en tarjetas muy estrechas). */
+  arrowClassName?: string;
   /** Índice controlado (miniaturas de la ficha). */
   activeIndex?: number;
   onIndexChange?: (index: number) => void;
@@ -45,6 +47,7 @@ const ProductImageGallery = ({
   fetchPriority,
   showDots = false,
   compact = false,
+  arrowClassName,
   activeIndex,
   onIndexChange,
 }: ProductImageGalleryProps) => {
@@ -186,7 +189,7 @@ const ProductImageGallery = ({
         type="button"
         aria-label="Foto anterior"
         onClick={goPrev}
-        className={cn(arrowClass, compact ? "left-2" : "left-3")}
+        className={cn(arrowClass, compact ? "left-2" : "left-3", arrowClassName)}
       >
         <ChevronLeft size={arrowSize} />
       </button>
@@ -194,7 +197,7 @@ const ProductImageGallery = ({
         type="button"
         aria-label="Siguiente foto"
         onClick={goNext}
-        className={cn(arrowClass, compact ? "right-2" : "right-3")}
+        className={cn(arrowClass, compact ? "right-2" : "right-3", arrowClassName)}
       >
         <ChevronRight size={arrowSize} />
       </button>

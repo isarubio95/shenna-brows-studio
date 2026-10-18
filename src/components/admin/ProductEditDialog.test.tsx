@@ -1,9 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { Tables } from "@/integrations/supabase/types";
 import ProductEditDialog from "@/components/admin/ProductEditDialog";
 
 type Product = Tables<"products">;
+
+/** Error de PostgREST cuando `products.claims` todavía no existe; null = columna creada. */
+let claimsColumnError: { message: string } | null = null;
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    from: () => ({
+      select: () => ({
+        limit: () => Promise.resolve({ data: [], error: claimsColumnError }),
+      }),
+    }),
+  },
+}));
+
+afterEach(() => {
+  claimsColumnError = null;
+});
 
 const savedDescription = "<p>Descripción guardada de prueba</p>";
 
@@ -28,6 +45,7 @@ const product: Product = {
   created_at: null,
   updated_at: null,
   stripe_price_id: null,
+  claims: "Fijación ligera. Sin apelmazar.\nVegana",
 };
 
 describe("ProductEditDialog description editor", () => {
@@ -146,3 +164,27 @@ describe("ProductEditDialog vídeos de la ficha", () => {
 function normalizeHtml(html: string) {
   return html.replace(/<br\s*\/?>/gi, "").replace(/<p>\s*<\/p>/gi, "").trim();
 }
+
+describe("ProductEditDialog argumentos de venta", () => {
+  it("precarga los claims guardados en cinco líneas editables", async () => {
+    render(
+      <ProductEditDialog product={product} mode="edit" open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+
+    const first = screen.getByRole("textbox", { name: "Argumento de venta 1" });
+    expect(first).toHaveValue("Fijación ligera. Sin apelmazar.");
+    expect(screen.getByRole("textbox", { name: "Argumento de venta 2" })).toHaveValue("Vegana");
+    expect(screen.getAllByRole("textbox", { name: /Argumento de venta \d/ })).toHaveLength(5);
+    await vi.waitFor(() => expect(first).toBeEnabled());
+  });
+
+  it("avisa de la migración pendiente si la columna no existe", async () => {
+    claimsColumnError = { message: "column products.claims does not exist" };
+    render(
+      <ProductEditDialog product={product} mode="edit" open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+
+    expect(await screen.findByText(/migración pendiente/)).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /Argumento de venta/ })).toBeNull();
+  });
+});

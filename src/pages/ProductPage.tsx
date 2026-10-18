@@ -1,8 +1,14 @@
 import { useParams, Link } from "react-router-dom";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import AnimatedSection from "@/components/AnimatedSection";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
@@ -10,6 +16,7 @@ import { ShoppingBag, Loader2 } from "lucide-react";
 import { getProductImageGallery, getProductPosterUrl } from "@/lib/product-images";
 import ProductMedia from "@/components/ProductMedia";
 import ProductImageGallery from "@/components/ProductImageGallery";
+import TrustStrip from "@/components/TrustStrip";
 import {
   ProductFeatureVideoCarousel,
   ProductFeatureVideoStack,
@@ -19,6 +26,9 @@ import { getEffectivePrice } from "@/lib/product-pricing";
 import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { useSiteBadges } from "@/hooks/use-site-badges";
+import { useElixirSpotlight } from "@/hooks/use-elixir-spotlight";
+import { featuredFirst } from "@/lib/featured-product";
+import { parseProductClaims, productClaimsHeading } from "@/lib/product-claims";
 import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { DEFAULT_SALE_BADGE } from "@/lib/badges-content";
 import { motion } from "framer-motion";
@@ -59,20 +69,20 @@ type CatalogProduct = {
   tagline: string | null;
 };
 
-/** Coincide con `gap-3` (12px) del carrusel en móvil (antes del breakpoint `md`). */
-const RELATED_CAROUSEL_GAP_PX = 12;
+/** Rótulos de los desplegables: mismo aspecto que los antiguos títulos de sección. */
+const PRODUCT_ACCORDION_TRIGGER_CLASS =
+  "product-section-title py-5 text-left text-sm font-medium tracking-wide hover:no-underline [&>svg]:text-gold";
 
 const ProductPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { addItem, isAddToCartDisabled } = useCart();
   const heroCtaStyle = useHeroCtaStyle();
   const { sale } = useSiteBadges();
+  const { productSlug: featuredSlug } = useElixirSpotlight();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [otherProducts, setOtherProducts] = useState<CatalogProduct[]>([]);
-  const relatedCarouselRef = useRef<HTMLDivElement>(null);
-  const [relatedCarouselPage, setRelatedCarouselPage] = useState(0);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
 
   const colorVariants = useMemo(() => parseColorVariants(product?.color_variants), [product?.color_variants]);
@@ -99,27 +109,6 @@ const ProductPage = () => {
     return found ?? colorVariants[0] ?? null;
   }, [colorVariants, selectedVariantId]);
 
-  const syncRelatedCarouselPage = useCallback(() => {
-    const root = relatedCarouselRef.current;
-    if (!root || otherProducts.length === 0) return;
-    const first = root.children[0] as HTMLElement | undefined;
-    if (!first) return;
-    const step = Math.max(1, first.offsetWidth + RELATED_CAROUSEL_GAP_PX);
-    const maxPage = otherProducts.length - 1;
-    const maxScroll = root.scrollWidth - root.clientWidth;
-    const { scrollLeft } = root;
-    if (maxScroll <= 4) {
-      setRelatedCarouselPage(0);
-      return;
-    }
-    if (scrollLeft >= maxScroll - 4) {
-      setRelatedCarouselPage(maxPage);
-      return;
-    }
-    const raw = Math.round(scrollLeft / step);
-    setRelatedCarouselPage(Math.max(0, Math.min(raw, maxPage)));
-  }, [otherProducts.length]);
-
   useEffect(() => {
     if (!slug) return;
     (supabase as any)
@@ -141,37 +130,9 @@ const ProductPage = () => {
       .select("id,name,slug,category,price,is_on_sale,sale_price,image_url,tagline")
       .order("name")
       .then(({ data }: { data: CatalogProduct[] | null }) => {
-        setOtherProducts((data || []).filter((p) => p.slug !== slug));
+        setOtherProducts(featuredFirst((data || []).filter((p) => p.slug !== slug), featuredSlug));
       });
-  }, [slug]);
-
-  useEffect(() => {
-    const root = relatedCarouselRef.current;
-    if (!root || otherProducts.length === 0) return;
-
-    root.scrollLeft = 0;
-    setRelatedCarouselPage(0);
-
-    const sync = () => syncRelatedCarouselPage();
-    sync();
-    root.addEventListener("scroll", sync, { passive: true });
-    root.addEventListener("scrollend", sync as EventListener, { passive: true });
-    const ro = new ResizeObserver(sync);
-    ro.observe(root);
-    return () => {
-      root.removeEventListener("scroll", sync);
-      root.removeEventListener("scrollend", sync as EventListener);
-      ro.disconnect();
-    };
-  }, [slug, otherProducts, syncRelatedCarouselPage]);
-
-  const scrollRelatedCarouselToPage = useCallback((page: number) => {
-    const root = relatedCarouselRef.current;
-    const first = root?.children[0] as HTMLElement | undefined;
-    if (!root || !first) return;
-    const step = first.offsetWidth + RELATED_CAROUSEL_GAP_PX;
-    root.scrollTo({ left: page * step, behavior: "smooth" });
-  }, []);
+  }, [slug, featuredSlug]);
 
   if (loading) {
     return (
@@ -214,6 +175,7 @@ const ProductPage = () => {
   };
 
   const descriptionItems = parseProductDescription(product.description);
+  const claims = parseProductClaims(product.claims);
   const gallery = getProductImageGallery(product.image_url, product.slug);
   const outOfStock = Number(product.stock ?? 0) <= 0;
 
@@ -339,7 +301,7 @@ const ProductPage = () => {
               <Button
                 onClick={handleAdd}
                 disabled={isAddToCartDisabled || outOfStock}
-                className={`${SITE_CTA_CLASS} w-full sm:w-auto mb-10`}
+                className={`${SITE_CTA_CLASS} w-full sm:w-auto mb-8`}
                 style={heroCtaStyle}
                 variant={outOfStock && !isAddToCartDisabled ? "outline" : "default"}
               >
@@ -358,52 +320,87 @@ const ProductPage = () => {
                 )}
               </Button>
 
+              {/* Orden pedido por la clienta: precio → claims → ventajas → desplegables. */}
+              {claims.length > 0 && (
+                <section aria-labelledby="product-claims-title" className="border-t border-gold/10 py-6">
+                  <h2 id="product-claims-title" className="font-playfair text-lg font-semibold leading-snug mb-4">
+                    {productClaimsHeading(product.category || product.name)}
+                  </h2>
+                  <ul className="space-y-3">
+                    {claims.map((claim, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-[0.95rem] leading-relaxed text-carbon/75">
+                        <span className="text-gold mt-0.5 shrink-0" aria-hidden>
+                          ✦
+                        </span>
+                        <span>
+                          <strong className="font-semibold text-carbon">{claim.lead}</strong>
+                          {claim.text ? ` ${claim.text}` : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              <TrustStrip variant="compact" />
+
               <div className="border-t border-gold/10 space-y-0">
-                <section className="border-b border-gold/10 py-5">
-                  <h3 className="product-section-title text-sm font-medium tracking-wide mb-3">Descripción</h3>
-                  {descriptionItems.length > 0 ? (
-                    <ul className="space-y-2">
-                      {descriptionItems.map((item, i) => (
-                        <li
-                          key={i}
-                          className="flex items-start gap-2.5 text-carbon/60 text-sm leading-relaxed [&_a]:text-gold [&_a]:underline"
-                        >
-                          <span className="text-gold/70 mt-0.5 shrink-0">✦</span>
-                          {item.format === "html" ? (
-                            <span dangerouslySetInnerHTML={{ __html: item.content }} />
-                          ) : (
-                            <span>{item.content}</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </section>
-                <section className="border-b border-gold/10 py-5">
-                  <h3 className="product-section-title text-sm font-medium tracking-wide mb-3">
-                    {product.is_pack
-                      ? '¿Qué incluye este pack?'
-                      : product.materials_label === 'composicion'
-                        ? 'Composición'
-                        : 'Materiales'}
-                  </h3>
-                  {product.materials ? (
-                    <ul className="space-y-2">
-                      {product.materials.split('\n').filter((m: string) => m.trim()).map((item: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2.5 text-carbon/60 text-sm leading-relaxed">
-                          <span className="text-gold/70 mt-0.5 shrink-0">✦</span>
-                          <span>{item.trim()}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-carbon/40 text-sm italic">Sin información</p>
-                  )}
-                </section>
-                <section className="border-b border-gold/10 py-5">
-                  <h3 className="product-section-title text-sm font-medium tracking-wide mb-3">Envío</h3>
-                  <p className="text-carbon/60 text-sm leading-relaxed">{product.shipping_info}</p>
-                </section>
+                {/* Cerrados por defecto: la ficha se lee de un vistazo y el detalle queda a un toque. */}
+                <Accordion type="multiple">
+                  <AccordionItem value="descripcion" className="border-gold/10">
+                    <AccordionTrigger className={PRODUCT_ACCORDION_TRIGGER_CLASS}>Descripción</AccordionTrigger>
+                    <AccordionContent className="pb-5">
+                      {descriptionItems.length > 0 ? (
+                        <ul className="space-y-2">
+                          {descriptionItems.map((item, i) => (
+                            <li
+                              key={i}
+                              className="flex items-start gap-2.5 text-carbon/60 text-sm leading-relaxed [&_a]:text-gold [&_a]:underline"
+                            >
+                              <span className="text-gold/70 mt-0.5 shrink-0">✦</span>
+                              {item.format === "html" ? (
+                                <span dangerouslySetInnerHTML={{ __html: item.content }} />
+                              ) : (
+                                <span>{item.content}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-carbon/40 text-sm italic">Sin información</p>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="materiales" className="border-gold/10">
+                    <AccordionTrigger className={PRODUCT_ACCORDION_TRIGGER_CLASS}>
+                      {product.is_pack
+                        ? '¿Qué incluye este pack?'
+                        : product.materials_label === 'composicion'
+                          ? 'Composición'
+                          : 'Materiales'}
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-5">
+                      {product.materials ? (
+                        <ul className="space-y-2">
+                          {product.materials.split('\n').filter((m: string) => m.trim()).map((item: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2.5 text-carbon/60 text-sm leading-relaxed">
+                              <span className="text-gold/70 mt-0.5 shrink-0">✦</span>
+                              <span>{item.trim()}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-carbon/40 text-sm italic">Sin información</p>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="envio" className="border-gold/10">
+                    <AccordionTrigger className={PRODUCT_ACCORDION_TRIGGER_CLASS}>Envío</AccordionTrigger>
+                    <AccordionContent className="pb-5">
+                      <p className="text-carbon/60 text-sm leading-relaxed">{product.shipping_info}</p>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
                 {featureVideos.length > 0 && (
                   <section className="border-b border-gold/10 py-5 lg:hidden">
                     <h3 className="product-section-title text-sm font-medium tracking-wide mb-3">En vídeo</h3>
@@ -429,69 +426,37 @@ const ProductPage = () => {
               </p>
             </div>
 
-            <div className="max-md:-mx-6 max-md:px-6">
-              <div
-                ref={relatedCarouselRef}
-                className="flex flex-row md:grid md:grid-cols-2 lg:grid-cols-4 md:max-w-5xl md:mx-auto gap-3 md:gap-4 overflow-x-auto md:overflow-x-visible overscroll-x-contain touch-pan-x snap-x snap-mandatory md:snap-none pb-1 md:pb-0 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-              >
-                {otherProducts.map((p) => (
-                  <Link
-                    key={p.id}
-                    to={`/${p.slug}`}
-                    className="snap-start shrink-0 w-[78vw] max-w-76 min-w-0 md:w-full md:max-w-none md:shrink"
+            {/* En cuadrícula, como los packs: sin deslizar a los lados. */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 max-w-5xl mx-auto gap-3 md:gap-4">
+              {otherProducts.map((p) => (
+                <Link key={p.id} to={`/${p.slug}`} className="min-w-0">
+                  <motion.div
+                    whileHover={{ y: -3 }}
+                    transition={{ duration: 0.25 }}
+                    className="h-full rounded-xl border border-gold/10 bg-white/70 backdrop-blur-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:border-gold/25 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-shadow duration-300 overflow-hidden flex flex-col"
                   >
-                    <motion.div
-                      whileHover={{ y: -3 }}
-                      transition={{ duration: 0.25 }}
-                      className="h-full rounded-xl border border-gold/10 bg-white/70 backdrop-blur-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:border-gold/25 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-shadow duration-300 overflow-hidden flex flex-col"
-                    >
-                      <div className="aspect-4/3 bg-muted/80 overflow-hidden">
-                        <img
-                          src={getProductPosterUrl(p.image_url, p.slug)}
-                          alt={p.name}
-                          className="w-full h-full object-cover opacity-[0.92] hover:opacity-100 scale-[1.02] hover:scale-105 transition-[opacity,transform] duration-500"
-                          loading="lazy"
-                        />
+                    <div className="aspect-4/3 bg-muted/80 overflow-hidden">
+                      <img
+                        src={getProductPosterUrl(p.image_url, p.slug)}
+                        alt={p.name}
+                        className="w-full h-full object-cover opacity-[0.92] hover:opacity-100 scale-[1.02] hover:scale-105 transition-[opacity,transform] duration-500"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between gap-1">
+                      <div>
+                        <p className="text-gold/80 text-[9px] sm:text-[10px] uppercase tracking-[0.2em] font-medium mb-1 line-clamp-1">
+                          {p.category}
+                        </p>
+                        <h3 className="product-card-title font-playfair text-sm sm:text-base text-carbon/90 font-medium leading-snug line-clamp-2">
+                          {p.name}
+                        </h3>
                       </div>
-                      <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between gap-1">
-                        <div>
-                          <p className="text-gold/80 text-[9px] sm:text-[10px] uppercase tracking-[0.2em] font-medium mb-1 line-clamp-1">
-                            {p.category}
-                          </p>
-                          <h3 className="product-card-title font-playfair text-sm sm:text-base text-carbon/90 font-medium leading-snug line-clamp-2">
-                            {p.name}
-                          </h3>
-                        </div>
-                        <ProductPriceDisplay product={p} size="sm" className="pt-1" />
-                      </div>
-                    </motion.div>
-                  </Link>
-                ))}
-              </div>
-
-              {otherProducts.length > 1 && (
-                <div
-                  className="flex md:hidden justify-center items-center gap-2 mt-5"
-                  role="tablist"
-                  aria-label="Posición en el carrusel de productos"
-                >
-                  {otherProducts.map((p, i) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={i === relatedCarouselPage}
-                      aria-label={`Ver ${p.name}`}
-                      onClick={() => scrollRelatedCarouselToPage(i)}
-                      className={`rounded-full transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F8F3EB] ${
-                        i === relatedCarouselPage
-                          ? "h-2 w-6 bg-gold"
-                          : "h-2 w-2 bg-carbon/20 hover:bg-carbon/35"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
+                      <ProductPriceDisplay product={p} size="sm" className="pt-1" />
+                    </div>
+                  </motion.div>
+                </Link>
+              ))}
             </div>
           </AnimatedSection>
         )}

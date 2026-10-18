@@ -223,6 +223,11 @@
   color: color-mix(in srgb, var(--theme-color-h2, #1A1A1A) 90%, transparent);
 }
 
+/* Títulos de tarjetas de marca (valores): el tono de los H2 del tema, como en la maqueta. */
+.site-theme .marketing-card-title {
+  color: var(--theme-color-h2, #1A1A1A);
+}
+
 /* Rótulos de ficha (Descripción, Materiales, Envío): carbón, no el rosa del H3. */
 .site-theme .product-section-title {
   color: var(--theme-color-h2, #1A1A1A);

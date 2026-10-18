@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import {
+  BRAND_VALUES_CONTENT_KEY,
+  parseBrandValuesConfig,
+  serializeBrandValuesConfig,
+} from "./brand-values-content";
 import { parseCampaignConfig, serializeCampaignConfig } from "./campaign-content";
 import { parseHeroConfig, serializeHeroConfig } from "./hero-content";
 import { serializeProductFeatureVideos } from "./product-feature-videos";
@@ -115,6 +120,30 @@ describe("collectUsedStorageRefs", () => {
     expect(keys.has("campaign-images/index-video-4.poster.webp")).toBe(true);
     expect(keys.has("campaign-images/custom-poster.webp")).toBe(true);
     expect([...keys].some((k) => k.includes("hero-sm"))).toBe(false);
+  });
+
+  it("marca como usadas las fotos subidas a «Nuestros valores», no las de serie", () => {
+    const defaults = parseBrandValuesConfig(null);
+    const refs = collectUsedStorageRefs({
+      products: [],
+      siteContent: [
+        {
+          key: BRAND_VALUES_CONTENT_KEY,
+          content: serializeBrandValuesConfig({
+            ...defaults,
+            cards: [
+              { ...defaults.cards[0], imageUrl: `${BASE}/campaign-images/valores-1.webp` },
+              ...defaults.cards.slice(1),
+            ],
+          }),
+        },
+      ],
+    });
+
+    expect(refs.map((r) => storageObjectKey(r.bucket, r.path))).toEqual([
+      "campaign-images/valores-1.webp",
+    ]);
+    expect(refs[0].label).toBe("Valores: Precisión en cada detalle");
   });
 });
 

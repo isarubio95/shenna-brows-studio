@@ -19,6 +19,7 @@ import CartDrawer from "@/components/CartDrawer";
 import WelcomePromoDialog from "@/components/WelcomePromoDialog";
 import WhatsAppFloatingButton from "@/components/WhatsAppFloatingButton";
 import ScrollToTop from "@/components/ScrollToTop";
+import StorefrontSections from "@/components/StorefrontSections";
 import { TESTIMONIALS_PAGE_PATH } from "@/lib/testimonials";
 import Index from "./pages/Index";
 import ProductPage from "./pages/ProductPage";
@@ -213,6 +214,7 @@ const AppShell = () => {
         <Route path="/:slug" element={<ProductPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      {!isAdminRoute && <StorefrontSections />}
       {!isAdminRoute && <Footer />}
       {!isAdminRoute && <WhatsAppFloatingButton />}
     </>

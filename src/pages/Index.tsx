@@ -1,24 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import AnimatedSection from "@/components/AnimatedSection";
 import TestimonialsBanner from "@/components/TestimonialsBanner";
 import PromoCodeBanner from "@/components/PromoCodeBanner";
-import Autoplay from "embla-carousel-autoplay";
-import { motion } from "framer-motion";
 
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import { getProductImageUrl } from "@/lib/product-images";
-import ProductMedia from "@/components/ProductMedia";
-import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
-import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import CeoSection from "@/components/CeoSection";
 import CampaignBanner from "@/components/CampaignBanner";
 import HeroSection from "@/components/HeroSection";
@@ -31,6 +17,22 @@ import { parseCampaignConfig } from "@/lib/campaign-content";
 import { parseHeroConfig } from "@/lib/hero-content";
 import { parseIndexVideoConfig } from "@/lib/video-content";
 import IndexVideoSection from "@/components/IndexVideoSection";
+import TrustStrip from "@/components/TrustStrip";
+import BrandValues from "@/components/BrandValues";
+import ValueProposition from "@/components/ValueProposition";
+import CollectionIntro from "@/components/CollectionIntro";
+import {
+  COLLECTION_INTRO_CONTENT_KEY,
+  parseCollectionIntroConfig,
+} from "@/lib/collection-intro-content";
+import ElixirSpotlight from "@/components/ElixirSpotlight";
+import ReviewsCarousel from "@/components/ReviewsCarousel";
+import ProductGrid from "@/components/ProductGrid";
+import type { CatalogProduct } from "@/components/ProductCard";
+import { useCart } from "@/context/CartContext";
+import { useElixirSpotlight } from "@/hooks/use-elixir-spotlight";
+import { toCartProduct } from "@/lib/cart-product";
+import { featuredFirst } from "@/lib/featured-product";
 import {
   TESTIMONIALS_BANNER_CONTENT_KEY,
   parseTestimonialsBannerConfig,
@@ -41,8 +43,11 @@ import {
 } from "@/lib/promo-code-banner-content";
 
 const Index = () => {
-  const [products, setProducts] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const { addItem, isAddToCartDisabled } = useCart();
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const spotlight = useElixirSpotlight();
   const { data: siteContent, loading: siteContentLoading } = useSiteContent([
     "index_hero",
     "index_marquee",
@@ -51,6 +56,7 @@ const Index = () => {
     "index_campaign",
     PROMO_CODE_BANNER_CONTENT_KEY,
     TESTIMONIALS_BANNER_CONTENT_KEY,
+    COLLECTION_INTRO_CONTENT_KEY,
   ]);
 
   const hero = useMemo(
@@ -81,6 +87,12 @@ const Index = () => {
     [siteContent.index_campaign?.content],
   );
 
+  const collectionIntroContent = siteContent[COLLECTION_INTRO_CONTENT_KEY]?.content;
+  const collectionIntro = useMemo(
+    () => parseCollectionIntroConfig(collectionIntroContent),
+    [collectionIntroContent],
+  );
+
   const promoCodeContent = siteContent[PROMO_CODE_BANNER_CONTENT_KEY]?.content;
   const promoCodeBanner = useMemo(
     () => parsePromoCodeBannerConfig(promoCodeContent),
@@ -96,11 +108,6 @@ const Index = () => {
   // llega la de la base de datos.
   const testimonialsReady = Boolean(testimonialsContent) || !siteContentLoading;
 
-  const productsAutoplay = useMemo(
-    () => Autoplay({ delay: 4000, stopOnInteraction: true }),
-    [],
-  );
-
   useEffect(() => {
     (supabase as any).from("products").select("*").order("name").then(({ data }: any) => {
       setProducts(data || []);
@@ -108,8 +115,27 @@ const Index = () => {
     });
   }, []);
 
+  // Packs aparte (esquema de la clienta: packs y luego el resto de la colección),
+  // con el producto protagonista siempre el primero.
+  // Si el protagonista ya tiene su bloque, la colección muestra «el resto».
+  const { spotlightProduct, packProducts, collectionProducts } = useMemo(() => {
+    const ordered = featuredFirst(products, spotlight.productSlug);
+    const featured = spotlight.enabled
+      ? ordered.find((p) => p.slug === spotlight.productSlug) ?? null
+      : null;
+    const rest = featured ? ordered.filter((p) => p.id !== featured.id) : ordered;
+    return {
+      spotlightProduct: featured,
+      packProducts: rest.filter((p) => p.is_pack),
+      collectionProducts: rest.filter((p) => !p.is_pack),
+    };
+  }, [products, spotlight.enabled, spotlight.productSlug]);
+
+  const openProduct = (slug: string) => navigate(`/${slug}`);
+  const addToCart = (product: CatalogProduct) => addItem(toCartProduct(product));
+
   const scrollToNextSection = () => {
-    document.getElementById("coleccion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("marquesina")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -122,6 +148,7 @@ const Index = () => {
 
       {/* Marquesina */}
       <div
+        id="marquesina"
         className="relative overflow-hidden border-y border-carbon/10"
         style={{
           backgroundColor: marquee.background,
@@ -154,6 +181,44 @@ const Index = () => {
         </div>
       </div>
 
+      {/* Esquema de la clienta: marquesina → confianza → valores → protagonista → colección. */}
+      <TrustStrip />
+
+      <ValueProposition />
+
+      <BrandValues />
+
+      {!loading && <ElixirSpotlight product={spotlightProduct} />}
+
+      {/* Campaña antes que la colección (petición de la clienta). */}
+      <CampaignBanner config={campaign} />
+
+      <PromoCodeBanner config={promoCodeBanner} />
+
+      {(loading || packProducts.length > 0) && (
+        <section id="packs" className="py-16 md:py-24 bg-cream">
+          <div className="container mx-auto px-6">
+            <AnimatedSection>
+              <div className="text-center mb-10">
+                <p className="text-gold text-xs uppercase tracking-[0.28em] font-medium mb-3">Ahorra con</p>
+                <h2 className="font-playfair text-3xl md:text-4xl font-bold">Nuestros packs</h2>
+                <p className="text-carbon/60 max-w-xl mx-auto mt-3 text-sm md:text-base">
+                  Combinaciones pensadas para ti y para las necesidades de tus cejas, para que encuentres todo lo que necesitas en un solo pack.
+                </p>
+              </div>
+            </AnimatedSection>
+            <ProductGrid
+              variant="packs"
+              products={packProducts}
+              loading={loading}
+              onOpenProduct={openProduct}
+              onAddToCart={addToCart}
+              addToCartDisabled={isAddToCartDisabled}
+            />
+          </div>
+        </section>
+      )}
+
       {/* Products Grid */}
       <section
         id="coleccion"
@@ -162,76 +227,17 @@ const Index = () => {
       >
         <div className="container mx-auto px-6">
           <AnimatedSection>
-            <h2 className="font-playfair text-3xl md:text-4xl font-bold text-center mb-4" style={{ color: "var(--theme-color-h2, #1A1A1A)" }}>
-              Nuestra colección
-            </h2>
-            <p className="text-center mb-12 md:mb-16 max-w-lg mx-auto" style={{ color: "var(--theme-color-paragraph, #1A1A1A)", opacity: 0.6 }}>
-              Todo lo que necesitas para cuidar, definir y realzar tus cejas, con la precisión de la experiencia profesional.
-            </p>
+            <CollectionIntro config={collectionIntro} />
           </AnimatedSection>
-          <AnimatedSection delay={0.1}>
-            <Carousel
-              plugins={loading ? undefined : [productsAutoplay]}
-              opts={{ align: "start", loop: false, containScroll: "trimSnaps" }}
-              className="w-full md:px-12 lg:px-16"
-            >
-              <CarouselContent className="-ml-4">
-                {loading
-                  ? Array.from({ length: 5 }).map((_, i) => (
-                      <CarouselItem
-                        key={i}
-                        className="pl-4 basis-[88%] sm:basis-[55%] md:basis-[42%] lg:basis-[33%] xl:basis-[27%]"
-                      >
-                        <div className="bg-white rounded-2xl overflow-hidden h-full">
-                          <Skeleton className="aspect-square" />
-                          <div className="p-6 space-y-2">
-                            <Skeleton className="h-4 w-20" />
-                            <Skeleton className="h-6 w-40" />
-                            <Skeleton className="h-4 w-32" />
-                          </div>
-                        </div>
-                      </CarouselItem>
-                    ))
-                  : products.map((product) => (
-                      <CarouselItem
-                        key={product.id}
-                        className="pl-4 basis-[88%] sm:basis-[55%] md:basis-[42%] lg:basis-[33%] xl:basis-[27%]"
-                      >
-                        <Link to={`/${product.slug}`} className="block h-full">
-                          <motion.div
-                            whileHover={{ y: -8 }}
-                            transition={{ duration: 0.3 }}
-                            className="group h-full bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-shadow duration-500 flex flex-col"
-                          >
-                            <div className="relative aspect-square bg-muted overflow-hidden">
-                              <ProductSaleBadge product={product} />
-                              <ProductMedia
-                                src={getProductImageUrl(product.image_url, product.slug)}
-                                alt={product.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                              />
-                            </div>
-                            <div className="p-6 flex-1 flex flex-col justify-between">
-                              <div>
-                                <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">
-                                  {product.category}
-                                </p>
-                                <h3 className="product-card-title font-playfair text-xl font-semibold text-carbon mb-1">
-                                  {product.name}
-                                </h3>
-                                <p className="text-sm text-carbon/50">{product.tagline}</p>
-                              </div>
-                              <ProductPriceDisplay product={product} className="mt-4" />
-                            </div>
-                          </motion.div>
-                        </Link>
-                      </CarouselItem>
-                    ))}
-              </CarouselContent>
-              <CarouselPrevious className="hidden md:flex h-10 w-10 lg:-left-14 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/80 backdrop-blur-sm [&_svg]:h-5 [&_svg]:w-5" />
-              <CarouselNext className="hidden md:flex h-10 w-10 lg:-right-14 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/80 backdrop-blur-sm [&_svg]:h-5 [&_svg]:w-5" />
-            </Carousel>
-          </AnimatedSection>
+          {/* Cuadrícula como la de los packs: nada que deslizar a los lados. */}
+          <ProductGrid
+            variant="products"
+            products={collectionProducts}
+            loading={loading}
+            onOpenProduct={openProduct}
+            onAddToCart={addToCart}
+            addToCartDisabled={isAddToCartDisabled}
+          />
         </div>
       </section>
 
@@ -250,9 +256,7 @@ const Index = () => {
         </div>
       </section>
 
-      <CampaignBanner config={campaign} />
-
-      <PromoCodeBanner config={promoCodeBanner} />
+      <ReviewsCarousel />
 
       {testimonialsReady ? <TestimonialsBanner config={testimonialsBanner} /> : null}
 

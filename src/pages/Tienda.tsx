@@ -1,31 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ShoppingCart, Plus, Sparkles } from "lucide-react";
-import Autoplay from "embla-carousel-autoplay";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { getProductImageGallery, getProductPosterUrl } from "@/lib/product-images";
-import ProductImageGallery, {
-  allowEmblaDragOutsideProductGallery,
-} from "@/components/ProductImageGallery";
+import { getProductPosterUrl } from "@/lib/product-images";
+import ProductGrid from "@/components/ProductGrid";
 import { useCart } from "@/context/CartContext";
 import AnimatedSection from "@/components/AnimatedSection";
-import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
-import { ProductSaleBadge } from "@/components/ProductSaleBadge";
-import { Button } from "@/components/ui/button";
-import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
-import { SITE_CTA_CLASS } from "@/lib/site-cta";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-  type CarouselApi,
-} from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEffectivePrice } from "@/lib/product-pricing";
+import { toCartProduct } from "@/lib/cart-product";
+import { featuredFirst } from "@/lib/featured-product";
+import { useElixirSpotlight } from "@/hooks/use-elixir-spotlight";
 import { useSiteContent } from "@/hooks/use-site-content";
 import { parseTiendaHeroConfig } from "@/lib/tienda-hero-content";
 import TiendaHero from "@/components/TiendaHero";
@@ -63,130 +48,13 @@ const setCanonical = (href: string) => {
 
 const stripHtml = (value: string | null) => (value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
-interface ProductCardProps {
-  product: Product;
-  delay: number;
-  onOpenProduct: (slug: string) => void;
-  onAddToCart: (product: Product) => void;
-  addToCartDisabled: boolean;
-  /** Tarjeta resaltada para la sección de packs. */
-  featured?: boolean;
-}
-
-const ProductCard = ({ product, delay, onOpenProduct, onAddToCart, addToCartDisabled, featured }: ProductCardProps) => {
-  const gallery = getProductImageGallery(product.image_url, product.slug);
-  const outOfStock = Number(product.stock ?? 0) <= 0;
-  const heroCtaStyle = useHeroCtaStyle();
-
-  return (
-    <AnimatedSection key={product.id} delay={delay} className="h-full">
-      <motion.article
-        whileHover={{ y: outOfStock ? -2 : -8 }}
-        transition={{ duration: 0.3 }}
-        className={`h-full rounded-2xl overflow-hidden border shadow-[0_6px_24px_rgba(0,0,0,0.05)] hover:shadow-[0_14px_40px_rgba(0,0,0,0.1)] transition-shadow duration-500 flex flex-col cursor-pointer ${
-          outOfStock
-            ? "bg-cream/80 border-carbon/20 ring-1 ring-carbon/10 opacity-[0.97]"
-            : featured
-              ? "bg-[linear-gradient(145deg,#fffef8_0%,#ffffff_45%,#fff9ec_100%)] border-gold/35 ring-1 ring-gold/25"
-              : "bg-white border-gold/10"
-        }`}
-        role="link"
-        tabIndex={0}
-        onClick={() => onOpenProduct(product.slug)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onOpenProduct(product.slug);
-          }
-        }}
-      >
-        <div className="relative aspect-square bg-muted overflow-hidden">
-          <ProductImageGallery
-            images={gallery}
-            alt={`${product.name} - Shenna Brows`}
-            compact
-            showDots
-            mediaClassName={`transition-transform duration-700 ${
-              outOfStock ? "grayscale-[0.4] opacity-90" : "hover:scale-105"
-            }`}
-          />
-          <ProductSaleBadge
-            product={product}
-            className={featured ? "left-3 top-12" : undefined}
-          />
-          {featured && (
-            <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-gold px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white shadow-md">
-              <Sparkles size={12} aria-hidden />
-              Pack
-            </span>
-          )}
-          {outOfStock && (
-            <span className="absolute right-3 top-3 z-10 rounded-full bg-carbon px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white shadow-md">
-              Sin stock
-            </span>
-          )}
-        </div>
-
-        <div className="p-6 flex-1 flex flex-col justify-between">
-          <div>
-            <p className="text-gold text-xs uppercase tracking-[0.2em] font-medium mb-2">{product.category}</p>
-            <h3 className="product-card-title font-playfair text-xl font-semibold text-carbon mb-1">{product.name}</h3>
-            <p className="text-sm text-carbon/60">{product.tagline}</p>
-          </div>
-
-          <div className="mt-5">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-4">
-              <ProductPriceDisplay product={product} muted={outOfStock} />
-              {outOfStock && !addToCartDisabled && (
-                <span className="text-xs font-semibold uppercase tracking-wider text-carbon/55">No disponible</span>
-              )}
-            </div>
-            <div className="flex">
-              <Button
-                className={`${SITE_CTA_CLASS} w-full`}
-                style={heroCtaStyle}
-                variant={outOfStock && !addToCartDisabled ? "outline" : "default"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddToCart(product);
-                }}
-                disabled={addToCartDisabled || outOfStock}
-              >
-                {addToCartDisabled ? (
-                  <>
-                    <span className="relative mr-2 inline-flex">
-                      <ShoppingCart size={16} />
-                      <Plus size={11} className="absolute -top-1 -right-1" />
-                    </span>
-                    Próximamente
-                  </>
-                ) : outOfStock ? (
-                  "Sin stock"
-                ) : (
-                  <>
-                    <span className="relative mr-2 inline-flex">
-                      <ShoppingCart size={16} />
-                      <Plus size={11} className="absolute -top-1 -right-1" />
-                    </span>
-                    Añadir
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </motion.article>
-    </AnimatedSection>
-  );
-};
-
 const Tienda = () => {
   const navigate = useNavigate();
   const { addItem, isAddToCartDisabled } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [productsCarouselApi, setProductsCarouselApi] = useState<CarouselApi>();
   const { data: siteContent } = useSiteContent(["tienda_hero"]);
+  const { productSlug: featuredSlug } = useElixirSpotlight();
   const tiendaHero = useMemo(
     () => parseTiendaHeroConfig(siteContent.tienda_hero?.content),
     [siteContent.tienda_hero?.content],
@@ -223,13 +91,11 @@ const Tienda = () => {
     const byName = (a: Product, b: Product) => a.name.localeCompare(b.name, "es");
     individuals.sort(byName);
     packs.sort(byName);
-    return { individualProducts: individuals, packProducts: packs };
-  }, [products]);
-
-  const productsAutoplay = useMemo(
-    () => Autoplay({ delay: 4500, stopOnInteraction: true }),
-    [],
-  );
+    return {
+      individualProducts: featuredFirst(individuals, featuredSlug),
+      packProducts: featuredFirst(packs, featuredSlug),
+    };
+  }, [products, featuredSlug]);
 
   const catalogForSeo = useMemo(
     () => [...individualProducts, ...packProducts],
@@ -265,20 +131,7 @@ const Tienda = () => {
   }, [catalogForSeo]);
 
   const handleAddToCart = (product: Product) => {
-    addItem({
-      id: product.id,
-      name: product.name,
-      slug: product.slug,
-      category: product.category,
-      price: getEffectivePrice(product),
-      stock: product.stock,
-      image_url: product.image_url,
-      description: product.description,
-      materials: product.materials,
-      shipping_info: product.shipping_info,
-      tagline: product.tagline,
-      stripe_price_id: product.stripe_price_id,
-    });
+    addItem(toCartProduct(product));
   };
 
   return (
@@ -295,59 +148,15 @@ const Tienda = () => {
           </p>
         </AnimatedSection>
 
-        <div className="relative md:px-12 lg:px-16">
-          <Carousel
-            setApi={setProductsCarouselApi}
-            plugins={loading ? undefined : [productsAutoplay]}
-            opts={{
-              align: "start",
-              loop: false,
-              containScroll: "trimSnaps",
-              watchDrag: allowEmblaDragOutsideProductGallery,
-            }}
-            onPointerDownCapture={() => {
-              const autoplay = productsCarouselApi?.plugins()?.autoplay as { stop?: () => void } | undefined;
-              autoplay?.stop();
-            }}
-            className="w-full"
-          >
-            <CarouselContent className="-ml-4">
-              {loading
-                ? Array.from({ length: 4 }).map((_, i) => (
-                    <CarouselItem
-                      key={i}
-                      className="pl-4 basis-[88%] sm:basis-[55%] lg:basis-[40%] xl:basis-[31%]"
-                    >
-                      <div className="bg-white rounded-2xl overflow-hidden border border-gold/10 h-full">
-                        <Skeleton className="aspect-square" />
-                        <div className="p-6 space-y-3">
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-6 w-36" />
-                          <Skeleton className="h-4 w-full" />
-                          <Skeleton className="h-10 w-full mt-4" />
-                        </div>
-                      </div>
-                    </CarouselItem>
-                  ))
-                : individualProducts.map((product, i) => (
-                    <CarouselItem
-                      key={product.id}
-                      className="pl-4 basis-[88%] sm:basis-[55%] lg:basis-[40%] xl:basis-[31%]"
-                    >
-                      <ProductCard
-                        product={product}
-                        delay={i * 0.06}
-                        onOpenProduct={(nextSlug) => navigate(`/${nextSlug}`)}
-                        onAddToCart={handleAddToCart}
-                        addToCartDisabled={isAddToCartDisabled}
-                      />
-                    </CarouselItem>
-                  ))}
-            </CarouselContent>
-            <CarouselPrevious className="hidden md:flex h-10 w-10 lg:-left-14 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/90 [&_svg]:h-5 [&_svg]:w-5" />
-            <CarouselNext className="hidden md:flex h-10 w-10 lg:-right-14 border-gold/20 text-gold hover:bg-gold/10 hover:text-gold bg-white/90 [&_svg]:h-5 [&_svg]:w-5" />
-          </Carousel>
-        </div>
+        {/* Como los packs: todos a la vista, sin deslizar a los lados. */}
+        <ProductGrid
+          variant="products"
+          products={individualProducts}
+          loading={loading}
+          onOpenProduct={(nextSlug) => navigate(`/${nextSlug}`)}
+          onAddToCart={handleAddToCart}
+          addToCartDisabled={isAddToCartDisabled}
+        />
 
         {(loading || packProducts.length > 0) && (
           <div id={loading ? undefined : "packs-destacados"} className="mt-20 md:mt-24">
@@ -372,39 +181,14 @@ const Tienda = () => {
               </div>
             </AnimatedSection>
 
-            <div className="rounded-3xl border border-gold/25 bg-[radial-gradient(ellipse_at_top,rgba(197,160,89,0.12),transparent_55%),linear-gradient(to_bottom,#fffdf8,#ffffff)] p-6 sm:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
-              <div
-                className={
-                  !loading && packProducts.length === 1
-                    ? "grid grid-cols-1 gap-8 max-w-lg mx-auto w-full"
-                    : "grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto"
-                }
-              >
-                {loading
-                  ? Array.from({ length: 2 }).map((_, i) => (
-                      <div key={`pack-skel-${i}`} className="bg-white/80 rounded-2xl overflow-hidden border border-gold/15">
-                        <Skeleton className="aspect-square" />
-                        <div className="p-6 space-y-3">
-                          <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-6 w-40" />
-                          <Skeleton className="h-4 w-full" />
-                          <Skeleton className="h-10 w-full mt-4" />
-                        </div>
-                      </div>
-                    ))
-                  : packProducts.map((product, i) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        delay={i * 0.08}
-                        onOpenProduct={(nextSlug) => navigate(`/${nextSlug}`)}
-                        onAddToCart={handleAddToCart}
-                        addToCartDisabled={isAddToCartDisabled}
-                        featured
-                      />
-                    ))}
-              </div>
-            </div>
+            <ProductGrid
+              variant="packs"
+              products={packProducts}
+              loading={loading}
+              onOpenProduct={(nextSlug) => navigate(`/${nextSlug}`)}
+              onAddToCart={handleAddToCart}
+              addToCartDisabled={isAddToCartDisabled}
+            />
           </div>
         )}
 

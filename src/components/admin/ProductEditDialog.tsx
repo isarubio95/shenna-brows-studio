@@ -40,6 +40,11 @@ import {
   videoUploadNotes,
 } from "@/lib/upload-media";
 import type { Area } from "react-easy-crop";
+import {
+  PRODUCT_CLAIMS_MAX,
+  productClaimLines,
+  serializeProductClaims,
+} from "@/lib/product-claims";
 
 type Product = Tables<"products">;
 
@@ -128,9 +133,16 @@ const EMPTY_CREATE_FORM = {
   sale_price: null as number | null,
 };
 
+/** Las cinco líneas del editor de argumentos de venta, rellenas con vacíos. */
+const claimSlots = (raw: string | null | undefined) => {
+  const lines = productClaimLines(raw);
+  return Array.from({ length: PRODUCT_CLAIMS_MAX }, (_, i) => lines[i] ?? "");
+};
+
 const buildProductSnapshot = (args: {
   form: Partial<Product & { materials_label?: string }>;
   materialItems: string[];
+  claimItems: string[];
   imageUrls: string[];
   colorVariantRows: ColorVariantFormRow[];
   featureVideos: ProductFeatureVideo[];
@@ -149,6 +161,7 @@ const buildProductSnapshot = (args: {
     tagline: args.form.tagline ?? "",
     description: normalizeDescriptionHtml(String(args.form.description || "")),
     materials: args.materialItems.map((m) => m.trim()).filter(Boolean),
+    claims: serializeProductClaims(args.claimItems),
     materials_label: (args.form as { materials_label?: string }).materials_label || "materiales",
     shipping_info: args.form.shipping_info ?? "",
     price: Number(args.form.price) || 0,
@@ -168,6 +181,9 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
 
   const [form, setForm] = useState<Partial<Product & { materials_label?: string }>>({});
   const [materialItems, setMaterialItems] = useState<string[]>([""]);
+  const [claimItems, setClaimItems] = useState<string[]>(() => claimSlots(null));
+  /** `products.claims` existe (la migración puede no estar aplicada todavía). */
+  const [claimsSupported, setClaimsSupported] = useState<boolean | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   /** Progreso (0-1) del re-encode de vídeo; null si no hay ninguno en curso. */
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -200,10 +216,26 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
 
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
+    (supabase as any)
+      .from("products")
+      .select("claims")
+      .limit(1)
+      .then(({ error }: { error: unknown }) => {
+        if (!cancelled) setClaimsSupported(!error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     setSlugConflict(null);
     setSlugChecking(false);
     if (mode === "create") {
       setMaterialItems([""]);
+      setClaimItems(claimSlots(null));
       setForm({ ...EMPTY_CREATE_FORM });
       setImageUrls([]);
       setPreviewIndex(0);
@@ -213,6 +245,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         buildProductSnapshot({
           form: EMPTY_CREATE_FORM,
           materialItems: [""],
+          claimItems: claimSlots(null),
           imageUrls: [],
           colorVariantRows: [],
           featureVideos: [],
@@ -246,7 +279,9 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     const nextFeatureVideos = parseProductFeatureVideos(
       (currentProduct as { feature_videos?: unknown }).feature_videos,
     );
+    const nextClaims = claimSlots((currentProduct as { claims?: string | null }).claims);
     setMaterialItems(nextMaterials);
+    setClaimItems(nextClaims);
     setForm(nextForm);
     setImageUrls(nextImages);
     setPreviewIndex(0);
@@ -256,6 +291,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
       buildProductSnapshot({
         form: nextForm,
         materialItems: nextMaterials,
+        claimItems: nextClaims,
         imageUrls: nextImages,
         colorVariantRows: nextColors,
         featureVideos: nextFeatureVideos,
@@ -266,10 +302,10 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
   const isDirty = useMemo(() => {
     if (!baselineSnapshot) return false;
     return (
-      buildProductSnapshot({ form, materialItems, imageUrls, colorVariantRows, featureVideos }) !==
+      buildProductSnapshot({ form, materialItems, claimItems, imageUrls, colorVariantRows, featureVideos }) !==
       baselineSnapshot
     );
-  }, [baselineSnapshot, form, materialItems, imageUrls, colorVariantRows, featureVideos]);
+  }, [baselineSnapshot, form, materialItems, claimItems, imageUrls, colorVariantRows, featureVideos]);
 
   const updateField = (field: keyof Product, value: string | number | boolean | null) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -662,6 +698,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
 
   const handleSave = async () => {
     const materialsString = materialItems.filter((m) => m.trim()).join("\n");
+    // Sin la columna (migración pendiente) no se envía: el resto del producto se guarda igual.
+    const claimsPayload = claimsSupported ? { claims: serializeProductClaims(claimItems) } : {};
     const descriptionFromEditor = descriptionEditorRef.current
       ? descriptionEditorRef.current.innerHTML
       : String(form.description || "");
@@ -749,6 +787,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
           ...salePayload(),
           color_variants: colorVariantsPayload,
           feature_videos: featureVideosPayload,
+          ...claimsPayload,
         })
         .select("id");
 
@@ -808,6 +847,7 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         ...salePayload(),
         color_variants: colorVariantsPayload,
         feature_videos: featureVideosPayload,
+        ...claimsPayload,
       })
       .eq("id", currentProduct.id);
 
@@ -1123,6 +1163,38 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 className="mt-1 bg-white border-gold/15"
               />
             </div>
+
+            <fieldset className="sm:col-span-2 rounded-xl border border-gold/15 bg-white/60 px-4 py-3 space-y-2">
+              <legend className="px-1 text-carbon/70 text-xs uppercase tracking-wider">
+                Argumentos de venta (hasta {PRODUCT_CLAIMS_MAX})
+              </legend>
+              <p className="text-xs text-carbon/45 leading-snug">
+                Salen en la ficha bajo «Añadir al carrito», con el título «¿Por qué elegir…?». La
+                primera frase de cada línea (hasta el primer punto) va en negrita.
+              </p>
+              {claimsSupported === false ? (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                  Falta activar este campo en la base de datos (migración pendiente). El resto del
+                  producto se guarda con normalidad.
+                </p>
+              ) : (
+                claimItems.map((claim, index) => (
+                  <Input
+                    key={index}
+                    value={claim}
+                    aria-label={`Argumento de venta ${index + 1}`}
+                    disabled={claimsSupported === null}
+                    onChange={(e) =>
+                      setClaimItems((prev) => prev.map((c, i) => (i === index ? e.target.value : c)))
+                    }
+                    placeholder={
+                      index === 0 ? "Fijación con acabado natural. Mantén tus cejas definidas y en su sitio." : "Opcional"
+                    }
+                    className="bg-white border-gold/15"
+                  />
+                ))
+              )}
+            </fieldset>
 
             <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-gold/15 bg-white/60 px-4 py-3">
               <div className="min-w-0">

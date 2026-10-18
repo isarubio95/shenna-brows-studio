@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import CampaignBanner from "./CampaignBanner";
 import HeroSection from "./HeroSection";
 import { parseCampaignConfig } from "@/lib/campaign-content";
@@ -83,6 +83,10 @@ describe("hero and campaign video backgrounds", () => {
   });
 
   it("ofrece el botón de sonido cuando el fondo es un vídeo", () => {
+    // jsdom no maqueta: sin esto ningún vídeo cuenta como visible y el botón se esconde.
+    const getClientRects = vi
+      .spyOn(HTMLVideoElement.prototype, "getClientRects")
+      .mockReturnValue([new DOMRect(0, 0, 100, 100)] as unknown as DOMRectList);
     const config = parseCampaignConfig(
       JSON.stringify({ desktopImageUrl: "https://cdn.example.com/campaign.mp4" }),
     );
@@ -95,6 +99,7 @@ describe("hero and campaign video backgrounds", () => {
     expect(button).not.toBeNull();
     expect(button).toHaveAttribute("aria-label", "Activar el sonido del vídeo");
     expect(button?.className).not.toContain("hidden");
+    getClientRects.mockRestore();
   });
 
   it("esconde el botón de sonido cuando el fondo es una imagen", () => {
