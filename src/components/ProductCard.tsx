@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Plus, ShoppingCart, Sparkles } from "lucide-react";
+import { Palette, Plus, ShoppingCart, Sparkles } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import AnimatedSection from "@/components/AnimatedSection";
 import ProductImageGallery from "@/components/ProductImageGallery";
@@ -7,6 +7,7 @@ import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { ProductSaleBadge } from "@/components/ProductSaleBadge";
 import { Button } from "@/components/ui/button";
 import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
+import { parseColorVariants } from "@/lib/color-variants";
 import { getProductImageGallery } from "@/lib/product-images";
 import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,8 @@ const ProductCard = ({
 }: ProductCardProps) => {
   const gallery = getProductImageGallery(product.image_url, product.slug);
   const outOfStock = Number(product.stock ?? 0) <= 0;
+  // Con colores hay que elegir uno en la ficha: añadir desde aquí lo metería sin color.
+  const needsColor = parseColorVariants(product.color_variants).length > 0;
   const heroCtaStyle = useHeroCtaStyle();
 
   return (
@@ -129,7 +132,8 @@ const ProductCard = ({
                 variant={outOfStock && !addToCartDisabled ? "outline" : "default"}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onAddToCart(product);
+                  if (needsColor) onOpenProduct(product.slug);
+                  else onAddToCart(product);
                 }}
                 disabled={addToCartDisabled || outOfStock}
               >
@@ -143,6 +147,11 @@ const ProductCard = ({
                   </>
                 ) : outOfStock ? (
                   "Sin stock"
+                ) : needsColor ? (
+                  <>
+                    <Palette size={16} className="mr-2" />
+                    Elegir color
+                  </>
                 ) : (
                   <>
                     <span className="relative mr-2 inline-flex">
