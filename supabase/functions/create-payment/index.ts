@@ -250,6 +250,13 @@ serve(async (req) => {
       variantName: string | null;
     }> = [];
 
+    // Los colores de un producto comparten stock: se valida la suma de todas sus líneas.
+    const qtyByProduct = new Map<string, number>();
+    for (const line of items) {
+      const pid = String(line.productId);
+      qtyByProduct.set(pid, (qtyByProduct.get(pid) ?? 0) + Math.floor(Number(line.quantity)));
+    }
+
     for (const line of items) {
       const pid = String(line.productId);
       const qty = Math.floor(Number(line.quantity));
@@ -260,7 +267,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (p.stock != null && qty > Number(p.stock)) {
+      if (p.stock != null && (qtyByProduct.get(pid) ?? qty) > Number(p.stock)) {
         return new Response(JSON.stringify({ error: `Stock insuficiente: ${p.name}` }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
