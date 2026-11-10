@@ -1,5 +1,3 @@
-import type { ColorVariant } from "@/lib/color-variants";
-
 export interface Product {
   id: string;
   name: string;
@@ -13,8 +11,6 @@ export interface Product {
   shipping_info: string;
   tagline: string;
   stripe_price_id: string;
-  /** Variante de color elegida en tienda (no aplica al catálogo estático de `products`). */
-  selectedColorVariant?: ColorVariant | null;
 }
 
 export const products: Product[] = [

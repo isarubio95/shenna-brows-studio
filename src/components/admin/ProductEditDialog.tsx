@@ -152,6 +152,7 @@ const buildProductSnapshot = (args: {
       id: r.id,
       name: r.name.trim(),
       hex: (normalizeHex(r.hexDraft ?? r.hex) ?? "").toUpperCase(),
+      group: (r.group ?? "").trim(),
     }))
     .filter((c) => c.name || c.hex);
 
@@ -402,6 +403,14 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
 
   const removeColorVariantRow = (index: number) => {
     setColorVariantRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateColorVariantGroup = (index: number, group: string) => {
+    setColorVariantRows((prev) => {
+      const next = [...prev];
+      if (next[index]) next[index] = { ...next[index], group };
+      return next;
+    });
   };
 
   const updateColorVariantName = (index: number, name: string) => {
@@ -706,6 +715,17 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
     const normalizedDescription = normalizeDescriptionHtml(descriptionFromEditor);
 
     const colorVariantsPayload: ColorVariant[] = [];
+    const filledRows = colorVariantRows.filter((r) => r.name.trim() || normalizeHex(r.hexDraft ?? r.hex));
+    const groupedRows = filledRows.filter((r) => (r.group ?? "").trim());
+    if (groupedRows.length > 0 && groupedRows.length < filledRows.length) {
+      toast({
+        title: "Faltan grupos en las variantes",
+        description:
+          "Si usas grupos (p. ej. Lápiz y Herramientas), pon un grupo a cada variante, o déjalos todos vacíos.",
+        variant: "destructive",
+      });
+      return;
+    }
     for (const r of colorVariantRows) {
       const name = r.name.trim();
       const hex = normalizeHex(r.hexDraft ?? r.hex);
@@ -718,7 +738,8 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
         });
         return;
       }
-      colorVariantsPayload.push({ id: r.id, name, hex });
+      const group = (r.group ?? "").trim();
+      colorVariantsPayload.push(group ? { id: r.id, name, hex, group } : { id: r.id, name, hex });
     }
 
     const untitledVideo = featureVideos.find((v) => !v.title.trim());
@@ -1380,6 +1401,10 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                   <p className="text-xs text-carbon/45 mt-1 leading-snug">
                     Opcional. En la tienda se muestran como círculos para elegir color. Usa el selector o escribe el código hex.
                   </p>
+                  <p className="text-xs text-carbon/45 mt-1 leading-snug">
+                    Si hay que elegir dos cosas (p. ej. el tono del lápiz y la edición de las herramientas), pon el
+                    mismo grupo a las variantes de cada cosa: se elegirá una de cada grupo.
+                  </p>
                 </div>
                 <Button
                   type="button"
@@ -1396,11 +1421,27 @@ const ProductEditDialog = ({ product, mode, open, onOpenChange, onSaved }: Produ
                 <p className="text-sm text-carbon/40 italic">Sin variantes. El producto se vende sin elegir color.</p>
               ) : (
                 <div className="space-y-3">
+                  <datalist id="color-variant-groups">
+                    {[...new Set(colorVariantRows.map((r) => (r.group ?? "").trim()).filter(Boolean))].map((g) => (
+                      <option key={g} value={g} />
+                    ))}
+                  </datalist>
                   {colorVariantRows.map((row, index) => (
                     <div
                       key={row.id}
                       className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end p-3 rounded-lg border border-gold/10 bg-white/80"
                     >
+                      <div className="sm:w-36">
+                        <Label className="text-[10px] uppercase tracking-wider text-carbon/50">Grupo</Label>
+                        <Input
+                          value={row.group ?? ""}
+                          onChange={(e) => updateColorVariantGroup(index, e.target.value)}
+                          placeholder="Ej. Lápiz"
+                          aria-label={`Grupo de ${row.name || "la variante"}`}
+                          list="color-variant-groups"
+                          className="mt-1 bg-white border-gold/15 text-sm"
+                        />
+                      </div>
                       <div className="flex-1 min-w-[140px]">
                         <Label className="text-[10px] uppercase tracking-wider text-carbon/50">Nombre visible</Label>
                         <Input

@@ -5,7 +5,8 @@ import { cartLineId, normalizeHex, type ColorVariant } from "@/lib/color-variant
 export interface CartItem {
   lineId: string;
   product: Product;
-  colorVariant: ColorVariant | null;
+  /** Una variante por grupo del producto, en el orden de sus grupos; vacía si no tiene. */
+  colorVariants: ColorVariant[];
   quantity: number;
 }
 
@@ -15,7 +16,7 @@ interface CartContextType {
   isAddToCartDisabled: boolean;
   openCart: () => void;
   closeCart: () => void;
-  addItem: (product: Product, colorVariant?: ColorVariant | null) => void;
+  addItem: (product: Product, colorVariants?: readonly ColorVariant[]) => void;
   removeItem: (lineId: string) => void;
   updateQuantity: (lineId: string, quantity: number) => void;
   clearCart: () => void;
@@ -70,7 +71,6 @@ const restoreProduct = (value: unknown): Product | null => {
     shipping_info: restoreString(value.shipping_info),
     tagline: restoreString(value.tagline),
     stripe_price_id: restoreString(value.stripe_price_id),
-    selectedColorVariant: null,
   };
 };
 
@@ -78,7 +78,7 @@ const restoreColorVariant = (value: unknown): ColorVariant | null => {
   if (value == null) return null;
   if (!isRecord(value)) return null;
 
-  const { id, name, hex } = value;
+  const { id, name, hex, group } = value;
   if (typeof id !== "string" || typeof name !== "string" || typeof hex !== "string") {
     return null;
   }
@@ -86,7 +86,18 @@ const restoreColorVariant = (value: unknown): ColorVariant | null => {
   const normalizedHex = normalizeHex(hex);
   if (!normalizedHex) return null;
 
-  return { id, name, hex: normalizedHex };
+  return typeof group === "string" && group.trim()
+    ? { id, name, hex: normalizedHex, group: group.trim() }
+    : { id, name, hex: normalizedHex };
+};
+
+/** `colorVariants` o, en carritos guardados antes de los packs con dos elecciones, `colorVariant`. */
+const restoreColorVariants = (value: Record<string, unknown>): ColorVariant[] => {
+  const raw = Array.isArray(value.colorVariants) ? value.colorVariants : [value.colorVariant];
+  return raw.flatMap((item) => {
+    const restored = restoreColorVariant(item);
+    return restored ? [restored] : [];
+  });
 };
 
 const restoreCartItem = (value: unknown): CartItem | null => {
@@ -99,10 +110,10 @@ const restoreCartItem = (value: unknown): CartItem | null => {
     return null;
   }
 
-  const colorVariant = restoreColorVariant(value.colorVariant);
-  const lineId = cartLineId(product.id, colorVariant?.id ?? null);
+  const colorVariants = restoreColorVariants(value);
+  const lineId = cartLineId(product.id, colorVariants.map((v) => v.id));
 
-  return { lineId, product, colorVariant, quantity };
+  return { lineId, product, colorVariants, quantity };
 };
 
 const restoreCartItems = (): CartItem[] => {
@@ -196,11 +207,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [isOpen]);
 
-  const addItem = useCallback((product: Product, colorVariant?: ColorVariant | null) => {
+  const addItem = useCallback((product: Product, colorVariants: readonly ColorVariant[] = []) => {
     if (IS_STORE_UNDER_CONSTRUCTION) return;
 
-    const variant = colorVariant ?? product.selectedColorVariant ?? null;
-    const lineId = cartLineId(product.id, variant?.id ?? null);
+    const lineId = cartLineId(product.id, colorVariants.map((v) => v.id));
 
     setItems((prev) => {
       const existing = prev.find((i) => i.lineId === lineId);
@@ -209,8 +219,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           i.lineId === lineId ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
-      const { selectedColorVariant: _s, ...rest } = product;
-      return [...prev, { lineId, product: { ...rest, selectedColorVariant: null }, colorVariant: variant, quantity: 1 }];
+      return [...prev, { lineId, product, colorVariants: [...colorVariants], quantity: 1 }];
     });
     setIsOpen(true);
   }, []);

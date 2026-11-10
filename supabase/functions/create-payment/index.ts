@@ -14,6 +14,7 @@ import {
 } from "../_shared/redsys.ts";
 import { normalizeProvinceCode, shippingEurForShippingAddress } from "../_shared/shipping.ts";
 import { resolveDiscountCode } from "../_shared/discountCodes.ts";
+import { parseColorVariantsFromDb, requestedVariantIds, resolveVariantChoice } from "../_shared/colorVariants.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,37 +39,6 @@ function effectiveUnitPrice(p: CheckoutProductRow): number {
     if (Number.isFinite(sale) && sale > 0 && sale < regular) return sale;
   }
   return regular;
-}
-
-type ParsedColorVariant = { id: string; name: string; hex: string };
-
-function normalizeHexStrict(raw: string): string | null {
-  let s = (raw || "").trim();
-  if (!s) return null;
-  if (!s.startsWith("#")) s = `#${s}`;
-  const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(s);
-  if (!m) return null;
-  const body = m[1];
-  if (body.length === 3) {
-    const [a, b, c] = body.split("");
-    return `#${a}${a}${b}${b}${c}${c}`.toUpperCase();
-  }
-  return `#${body.toUpperCase()}`;
-}
-
-function parseColorVariantsFromDb(raw: unknown): ParsedColorVariant[] {
-  if (!raw || !Array.isArray(raw)) return [];
-  const out: ParsedColorVariant[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") continue;
-    const o = item as Record<string, unknown>;
-    const id = String(o.id ?? "").trim();
-    const name = String(o.name ?? "").trim();
-    const hex = normalizeHexStrict(String(o.hex ?? ""));
-    if (!id || !name || !hex) continue;
-    out.push({ id, name, hex });
-  }
-  return out;
 }
 
 function getRedsysEnv(): "test" | "production" {
@@ -160,7 +130,7 @@ serve(async (req) => {
     const terminalPadded = terminal.length >= 3 ? terminal : terminal.padStart(3, "0");
 
     const body = await req.json() as {
-      items?: Array<{ productId: string; quantity: number; colorVariantId?: string }>;
+      items?: Array<{ productId: string; quantity: number; colorVariantId?: string; colorVariantIds?: string[] }>;
       customerEmail?: string;
       turnstileToken?: string;
       shippingAddress?: Record<string, unknown>;
@@ -246,7 +216,7 @@ serve(async (req) => {
       name: string;
       quantity: number;
       unitPrice: number;
-      colorVariantId: string | null;
+      colorVariantIds: string[];
       variantName: string | null;
     }> = [];
 
@@ -276,34 +246,27 @@ serve(async (req) => {
       const unit = effectiveUnitPrice(p);
       subtotalEur += unit * qty;
 
-      const colorVariants = parseColorVariantsFromDb(p.color_variants);
-      const variantIdRaw = line.colorVariantId != null ? String(line.colorVariantId).trim() : "";
-      let displayName = String(p.name);
-      let variantName: string | null = null;
-      if (colorVariants.length > 0) {
-        if (!variantIdRaw) {
-          return new Response(
-            JSON.stringify({ error: `Debes elegir un color para: ${p.name}` }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-        const chosen = colorVariants.find((v) => v.id === variantIdRaw);
-        if (!chosen) {
-          return new Response(JSON.stringify({ error: "Color de producto no válido" }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        variantName = chosen.name;
-        displayName = `${String(p.name)} — ${chosen.name}`;
+      // Un pack puede pedir una variante de cada grupo (p. ej. tono de lápiz y edición de herramientas).
+      const choice = resolveVariantChoice(
+        String(p.name),
+        parseColorVariantsFromDb(p.color_variants),
+        requestedVariantIds(line),
+      );
+      if (!choice.ok) {
+        return new Response(JSON.stringify({ error: choice.error }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
+      const variantName = choice.chosen.length ? choice.chosen.map((v) => v.name).join(" + ") : null;
+      const displayName = variantName ? `${String(p.name)} — ${variantName}` : String(p.name);
 
       resolvedLines.push({
         productId: pid,
         name: displayName,
         quantity: qty,
         unitPrice: unit,
-        colorVariantId: variantIdRaw || null,
+        colorVariantIds: choice.chosen.map((v) => v.id),
         variantName,
       });
     }
@@ -411,7 +374,9 @@ serve(async (req) => {
         name: l.name,
         productDisplayName: l.name,
         unitPrice: l.unitPrice,
-        ...(l.colorVariantId ? { colorVariantId: l.colorVariantId } : {}),
+        // Con una sola variante, el panel de pedidos pinta su color a partir del id.
+        ...(l.colorVariantIds.length === 1 ? { colorVariantId: l.colorVariantIds[0] } : {}),
+        ...(l.colorVariantIds.length ? { colorVariantIds: l.colorVariantIds } : {}),
         ...(l.variantName ? { variantName: l.variantName } : {}),
       })),
     };
@@ -442,7 +407,7 @@ serve(async (req) => {
         productId: l.productId,
         quantity: l.quantity,
         productDisplayName: l.name,
-        ...(l.colorVariantId ? { colorVariantId: l.colorVariantId } : {}),
+        ...(l.colorVariantIds.length === 1 ? { colorVariantId: l.colorVariantIds[0] } : {}),
       })),
       shippingEur,
       subtotalEur,

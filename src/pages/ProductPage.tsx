@@ -23,7 +23,7 @@ import {
 } from "@/components/ProductFeatureVideos";
 import { parseProductFeatureVideos } from "@/lib/product-feature-videos";
 import { getEffectivePrice } from "@/lib/product-pricing";
-import { parseColorVariants, type ColorVariant } from "@/lib/color-variants";
+import { groupColorVariants, parseColorVariants, type ColorVariant } from "@/lib/color-variants";
 import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { useSiteBadges } from "@/hooks/use-site-badges";
 import { useElixirSpotlight } from "@/hooks/use-elixir-spotlight";
@@ -83,31 +83,24 @@ const ProductPage = () => {
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [otherProducts, setOtherProducts] = useState<CatalogProduct[]>([]);
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  /** Variante elegida en cada grupo, por la clave del grupo. */
+  const [selectedByGroup, setSelectedByGroup] = useState<Record<string, string>>({});
 
-  const colorVariants = useMemo(() => parseColorVariants(product?.color_variants), [product?.color_variants]);
+  const variantGroups = useMemo(
+    () => groupColorVariants(parseColorVariants(product?.color_variants)),
+    [product?.color_variants],
+  );
 
   const featureVideos = useMemo(
     () => parseProductFeatureVideos(product?.feature_videos),
     [product?.feature_videos],
   );
 
-  useEffect(() => {
-    if (colorVariants.length > 0) {
-      setSelectedVariantId((prev) => {
-        if (prev && colorVariants.some((v) => v.id === prev)) return prev;
-        return colorVariants[0].id;
-      });
-    } else {
-      setSelectedVariantId(null);
-    }
-  }, [product?.id, colorVariants]);
-
-  const selectedColorVariant: ColorVariant | null = useMemo(() => {
-    if (colorVariants.length === 0) return null;
-    const found = colorVariants.find((v) => v.id === selectedVariantId);
-    return found ?? colorVariants[0] ?? null;
-  }, [colorVariants, selectedVariantId]);
+  // Sin elección propia en un grupo, vale su primera variante.
+  const selectedColorVariants: ColorVariant[] = useMemo(
+    () => variantGroups.map((g) => g.variants.find((v) => v.id === selectedByGroup[g.key]) ?? g.variants[0]),
+    [variantGroups, selectedByGroup],
+  );
 
   useEffect(() => {
     if (!slug) return;
@@ -154,7 +147,6 @@ const ProductPage = () => {
   }
 
   const handleAdd = () => {
-    const variantForCart = colorVariants.length > 0 ? selectedColorVariant : null;
     addItem(
       {
         id: product.id,
@@ -170,7 +162,7 @@ const ProductPage = () => {
         tagline: product.tagline,
         stripe_price_id: product.stripe_price_id ?? "",
       },
-      variantForCart
+      selectedColorVariants,
     );
   };
 
@@ -250,41 +242,54 @@ const ProductPage = () => {
               <p className="text-carbon/50 text-lg italic mb-6">{product.tagline}</p>
               <ProductPriceDisplay product={product} size="lg" className="mb-4" muted={outOfStock} />
 
-              {colorVariants.length > 0 && selectedColorVariant && (
-                <div className="mb-6 space-y-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-carbon text-sm font-medium tracking-wide">Color</span>
-                    <div className="flex flex-wrap gap-2" role="listbox" aria-label="Elegir color">
-                      {colorVariants.map((v) => {
-                        const selected = v.id === selectedColorVariant.id;
-                        return (
-                          <button
-                            key={v.id}
-                            type="button"
-                            role="option"
-                            aria-selected={selected}
-                            title={v.name}
-                            onClick={() => setSelectedVariantId(v.id)}
-                            className={`h-9 w-9 rounded-full border-2 transition shadow-sm shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
-                              selected ? "border-gold ring-2 ring-gold/35 scale-105" : "border-white ring-1 ring-carbon/15 hover:ring-gold/40"
-                            }`}
-                            style={{ backgroundColor: v.hex }}
+              {variantGroups.length > 0 && (
+                <div className="mb-6 space-y-5">
+                  {variantGroups.map((group, groupIndex) => {
+                    const chosen = selectedColorVariants[groupIndex];
+                    const label = group.name || "Color";
+                    return (
+                      <div key={group.key} className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-carbon text-sm font-medium tracking-wide">{label}</span>
+                          <div
+                            className="flex flex-wrap gap-2"
+                            role="listbox"
+                            aria-label={group.name ? `Elegir ${group.name}` : "Elegir color"}
+                          >
+                            {group.variants.map((v) => {
+                              const selected = v.id === chosen.id;
+                              return (
+                                <button
+                                  key={v.id}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={selected}
+                                  title={v.name}
+                                  onClick={() => setSelectedByGroup((prev) => ({ ...prev, [group.key]: v.id }))}
+                                  className={`h-9 w-9 rounded-full border-2 transition shadow-sm shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+                                    selected ? "border-gold ring-2 ring-gold/35 scale-105" : "border-white ring-1 ring-carbon/15 hover:ring-gold/40"
+                                  }`}
+                                  style={{ backgroundColor: v.hex }}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <p className="flex flex-wrap items-center gap-2 text-sm text-carbon/80">
+                          <span
+                            className="inline-block h-4 w-4 rounded-full border border-carbon/15 shadow-inner shrink-0"
+                            style={{ backgroundColor: chosen.hex }}
+                            aria-hidden
                           />
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <p className="flex flex-wrap items-center gap-2 text-sm text-carbon/80">
-                    <span
-                      className="inline-block h-4 w-4 rounded-full border border-carbon/15 shadow-inner shrink-0"
-                      style={{ backgroundColor: selectedColorVariant.hex }}
-                      aria-hidden
-                    />
-                    <span>
-                      Color elegido: <span className="font-medium text-carbon">{selectedColorVariant.name}</span>
-                    </span>
-                    <span className="text-carbon/45 font-mono text-xs">({selectedColorVariant.hex})</span>
-                  </p>
+                          <span>
+                            {group.name ? "Has elegido" : "Color elegido"}:{" "}
+                            <span className="font-medium text-carbon">{chosen.name}</span>
+                          </span>
+                          <span className="text-carbon/45 font-mono text-xs">({chosen.hex})</span>
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

@@ -50,16 +50,16 @@ const CartDrawer = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-medium text-carbon truncate">{item.product.name}</h4>
-                    {item.colorVariant ? (
-                      <div className="flex items-center gap-2 mt-1">
+                    {item.colorVariants.map((variant) => (
+                      <div key={variant.id} className="flex items-center gap-2 mt-1">
                         <span
                           className="h-3.5 w-3.5 shrink-0 rounded-full border border-carbon/15 shadow-sm"
-                          style={{ backgroundColor: item.colorVariant.hex }}
-                          title={item.colorVariant.hex}
+                          style={{ backgroundColor: variant.hex }}
+                          title={variant.hex}
                         />
-                        <span className="text-xs text-carbon/55 truncate">{item.colorVariant.name}</span>
+                        <span className="text-xs text-carbon/55 truncate">{variant.name}</span>
                       </div>
-                    ) : null}
+                    ))}
                     <p className="text-sm text-gold font-semibold mt-0.5">
                       €{item.product.price.toFixed(2)}
                     </p>

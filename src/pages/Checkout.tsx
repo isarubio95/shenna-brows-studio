@@ -206,7 +206,13 @@ const Checkout = () => {
           items: items.map((i) => ({
             productId: i.product.id,
             quantity: i.quantity,
-            ...(i.colorVariant?.id ? { colorVariantId: i.colorVariant.id } : {}),
+            ...(i.colorVariants.length
+              ? {
+                  colorVariantIds: i.colorVariants.map((v) => v.id),
+                  // La versión anterior de create-payment solo lee este campo.
+                  colorVariantId: i.colorVariants[0].id,
+                }
+              : {}),
           })),
           customerEmail: email,
           shippingAddress: ship,
@@ -520,15 +526,15 @@ const Checkout = () => {
                   <div key={item.lineId} className="flex justify-between text-sm gap-3">
                     <span className="text-carbon/70 min-w-0">
                       <span className="block truncate">{item.product.name}</span>
-                      {item.colorVariant ? (
-                        <span className="mt-0.5 flex items-center gap-1.5 text-xs text-carbon/50">
+                      {item.colorVariants.map((variant) => (
+                        <span key={variant.id} className="mt-0.5 flex items-center gap-1.5 text-xs text-carbon/50">
                           <span
                             className="h-2.5 w-2.5 shrink-0 rounded-full border border-carbon/10"
-                            style={{ backgroundColor: item.colorVariant.hex }}
+                            style={{ backgroundColor: variant.hex }}
                           />
-                          {item.colorVariant.name}
+                          {variant.name}
                         </span>
-                      ) : null}
+                      ))}
                       <span className="block text-carbon/50">× {item.quantity}</span>
                     </span>
                     <span className="text-carbon font-medium shrink-0">

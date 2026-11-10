@@ -188,3 +188,20 @@ describe("ProductEditDialog argumentos de venta", () => {
     expect(screen.queryByRole("textbox", { name: /Argumento de venta/ })).toBeNull();
   });
 });
+
+describe("ProductEditDialog variantes de color", () => {
+  it("precarga el grupo de cada variante para los packs con dos elecciones", () => {
+    const pack: Product = {
+      ...product,
+      is_pack: true,
+      color_variants: [
+        { id: "gold", name: "Gold Edition", hex: "#EAC562", group: "Herramientas" },
+        { id: "soft", name: "Soft Brown", hex: "#736049", group: "Lápiz" },
+      ],
+    };
+    render(<ProductEditDialog product={pack} mode="edit" open onOpenChange={() => {}} onSaved={() => {}} />);
+
+    expect(screen.getByRole("combobox", { name: "Grupo de Gold Edition" })).toHaveValue("Herramientas");
+    expect(screen.getByRole("combobox", { name: "Grupo de Soft Brown" })).toHaveValue("Lápiz");
+  });
+});
