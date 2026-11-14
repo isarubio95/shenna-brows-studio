@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import AdminCtaVisibleSwitch from "@/components/admin/AdminCtaVisibleSwitch";
 import { useToast } from "@/hooks/use-toast";
 import { AdminColorField } from "@/components/admin/HexColorField";
 import { AdminTextFonts } from "@/components/admin/FontSelect";
@@ -283,6 +284,11 @@ const AdminTestimonialsBannerFields = ({ value, onChange }: Props) => {
           ariaLabel="Color de la línea decorativa"
         />
       </div>
+
+      <AdminCtaVisibleSwitch
+        checked={value.ctaVisible}
+        onCheckedChange={(checked) => set("ctaVisible", checked)}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

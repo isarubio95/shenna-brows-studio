@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import AdminCtaVisibleSwitch from "@/components/admin/AdminCtaVisibleSwitch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -281,6 +282,12 @@ const AdminElixirSpotlightFields = ({ value, onChange }: SiteBlockFieldsProps<El
           />
         ))}
       </fieldset>
+
+      <AdminCtaVisibleSwitch
+        label="Mostrar botón de compra"
+        checked={value.ctaVisible}
+        onCheckedChange={(checked) => set("ctaVisible", checked)}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>

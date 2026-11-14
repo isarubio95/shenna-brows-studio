@@ -165,7 +165,7 @@ const TestimonialsBanner = ({
             {config.subtitle}
           </p>
         ) : null}
-        {preview ? (
+        {!config.ctaVisible ? null : preview ? (
           <span className={cn(ctaClass, "pointer-events-none")} style={ctaStyle}>
             {ctaContent}
           </span>

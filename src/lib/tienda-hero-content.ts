@@ -44,6 +44,8 @@ export interface TiendaHeroConfig {
   headline: string;
   description: string;
   features: TiendaHeroFeature[];
+  /** Muestra u oculta el botón; sus textos y ajustes se conservan. */
+  ctaVisible: boolean;
   ctaText: string;
   /** Ancla (#productos), ruta interna (/packs) o URL absoluta. */
   ctaHref: string;
@@ -100,6 +102,7 @@ export const DEFAULT_TIENDA_HERO: TiendaHeroConfig = {
     { icon: "truck", label: "Envío rápido 24/72h" },
     { icon: "sparkles", label: "Resultados de precisión" },
   ],
+  ctaVisible: true,
   ctaText: "Comprar ahora",
   ctaHref: "#productos",
   accentColor: "#C5A059",
@@ -217,6 +220,8 @@ export function parseTiendaHeroConfig(raw?: string | null): TiendaHeroConfig {
         asString(parsed.description, DEFAULT_TIENDA_HERO.description).trim() ||
         DEFAULT_TIENDA_HERO.description,
       features: parseFeatures(parsed.features),
+      ctaVisible:
+        typeof parsed.ctaVisible === "boolean" ? parsed.ctaVisible : DEFAULT_TIENDA_HERO.ctaVisible,
       ctaText:
         asString(parsed.ctaText, DEFAULT_TIENDA_HERO.ctaText).trim() || DEFAULT_TIENDA_HERO.ctaText,
       ctaHref:
@@ -269,6 +274,7 @@ export function serializeTiendaHeroConfig(config: TiendaHeroConfig): string {
       }))
       .filter((f) => f.label.length > 0)
       .slice(0, MAX_FEATURES),
+    ctaVisible: config.ctaVisible,
     ctaText: config.ctaText.trim() || DEFAULT_TIENDA_HERO.ctaText,
     ctaHref: config.ctaHref.trim() || DEFAULT_TIENDA_HERO.ctaHref,
     accentColor: config.accentColor,

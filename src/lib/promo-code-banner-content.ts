@@ -16,6 +16,8 @@ export interface PromoCodeBannerConfig {
    * la sección no se pinta, para no anunciar un código que no existe.
    */
   code: string;
+  /** Muestra u oculta el botón de copiar; el código sigue a la vista. */
+  buttonVisible: boolean;
   copyText: string;
   /** Texto del botón durante unos segundos tras copiar. */
   copiedText: string;
@@ -38,6 +40,7 @@ export const DEFAULT_PROMO_CODE_BANNER: PromoCodeBannerConfig = {
   title: "¿ES TU PRIMER PEDIDO?",
   subtitle: "Te regalamos 10€ en tu primera compra",
   code: "",
+  buttonVisible: true,
   copyText: "Copiar código",
   copiedText: "¡Copiado!",
   backgroundColor: "#E4ACCF",
@@ -82,6 +85,7 @@ export function parsePromoCodeBannerConfig(raw?: string | null): PromoCodeBanner
       title: text(parsed.title, d.title),
       subtitle: typeof parsed.subtitle === "string" ? parsed.subtitle.trim() : d.subtitle,
       code: normalizePromoCode(parsed.code),
+      buttonVisible: typeof parsed.buttonVisible === "boolean" ? parsed.buttonVisible : d.buttonVisible,
       copyText: text(parsed.copyText, d.copyText),
       copiedText: text(parsed.copiedText, d.copiedText),
       backgroundColor: color(parsed.backgroundColor, d.backgroundColor),
@@ -104,6 +108,7 @@ export function serializePromoCodeBannerConfig(config: PromoCodeBannerConfig): s
     title: config.title,
     subtitle: config.subtitle,
     code: normalizePromoCode(config.code),
+    buttonVisible: config.buttonVisible,
     copyText: config.copyText,
     copiedText: config.copiedText,
     backgroundColor: config.backgroundColor,

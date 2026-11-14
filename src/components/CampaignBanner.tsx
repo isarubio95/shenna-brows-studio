@@ -289,7 +289,7 @@ const CampaignBanner = ({
           <div className="absolute inset-0 bg-[#E8DFD0]" aria-hidden />
         )}
 
-        {ctaOverlay}
+        {config.ctaVisible ? ctaOverlay : null}
 
         {hasMedia ? <BackgroundSoundButton containerRef={mediaRef} className="z-2" /> : null}
 

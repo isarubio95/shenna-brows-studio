@@ -18,6 +18,8 @@ export interface HeroConfig {
   line2Accent: string;
   headlineColor: string;
   headlineAccentColor: string;
+  /** Muestra u oculta el botón; sus textos y ajustes se conservan. */
+  ctaVisible: boolean;
   ctaText: string;
   ctaHref: string;
   ctaBg: string;
@@ -42,6 +44,7 @@ export const DEFAULT_HERO: HeroConfig = {
   line2Accent: "define",
   headlineColor: "#F7F0E2",
   headlineAccentColor: "#F7F0E2",
+  ctaVisible: true,
   ctaText: "DESCUBRIR LA COLECCIÓN",
   ctaHref: "/tienda",
   ctaBg: "#E9808E",
@@ -114,6 +117,7 @@ export function parseHeroConfig(raw?: string | null): HeroConfig {
       headlineAccentColor: isHexColor(parsed.headlineAccentColor)
         ? parsed.headlineAccentColor.trim()
         : DEFAULT_HERO.headlineAccentColor,
+      ctaVisible: typeof parsed.ctaVisible === "boolean" ? parsed.ctaVisible : DEFAULT_HERO.ctaVisible,
       ctaText: asString(parsed.ctaText, DEFAULT_HERO.ctaText).trim() || DEFAULT_HERO.ctaText,
       ctaHref: asString(parsed.ctaHref, DEFAULT_HERO.ctaHref).trim() || DEFAULT_HERO.ctaHref,
       ctaBg: isHexColor(parsed.ctaBg) ? parsed.ctaBg.trim() : DEFAULT_HERO.ctaBg,
@@ -143,6 +147,7 @@ export function serializeHeroConfig(config: HeroConfig): string {
     line2Accent: config.line2Accent,
     headlineColor: config.headlineColor,
     headlineAccentColor: config.headlineAccentColor,
+    ctaVisible: config.ctaVisible,
     ctaText: config.ctaText,
     ctaHref: config.ctaHref,
     ctaBg: config.ctaBg,

@@ -170,7 +170,7 @@ export function ElixirSpotlightView({
       ) : null}
       <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap lg:items-center">
         <ProductPriceDisplay product={product} size="lg" muted={outOfStock} />
-        {primaryCta}
+        {config.ctaVisible ? primaryCta : null}
       </div>
       {config.secondaryCtaText ? (
         <div className="mt-5 text-center sm:text-left">

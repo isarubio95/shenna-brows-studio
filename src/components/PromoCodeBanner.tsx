@@ -109,26 +109,28 @@ const PromoCodeBanner = ({ config, preview = false }: PromoCodeBannerProps) => {
         >
           {code}
         </span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="inline-flex min-h-11 shrink-0 items-center justify-center px-5 text-[0.95rem] font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.16)] transition-[filter,transform] duration-200 hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 @3xl:min-h-14 @3xl:px-8 @3xl:text-base"
-          style={{
-            backgroundColor: config.buttonBg,
-            color: config.buttonTextColor,
-            ...fontStyle(config.fonts.button),
-          }}
-        >
-          {/* Ambos textos ocupan la misma celda: el botón no cambia de ancho al copiar. */}
-          <span className="grid">
-            <span className={cn("col-start-1 row-start-1", copied && "invisible")}>
-              {config.copyText}
+        {config.buttonVisible ? (
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center px-5 text-[0.95rem] font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.16)] transition-[filter,transform] duration-200 hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 @3xl:min-h-14 @3xl:px-8 @3xl:text-base"
+            style={{
+              backgroundColor: config.buttonBg,
+              color: config.buttonTextColor,
+              ...fontStyle(config.fonts.button),
+            }}
+          >
+            {/* Ambos textos ocupan la misma celda: el botón no cambia de ancho al copiar. */}
+            <span className="grid">
+              <span className={cn("col-start-1 row-start-1", copied && "invisible")}>
+                {config.copyText}
+              </span>
+              <span className={cn("col-start-1 row-start-1", !copied && "invisible")}>
+                {config.copiedText}
+              </span>
             </span>
-            <span className={cn("col-start-1 row-start-1", !copied && "invisible")}>
-              {config.copiedText}
-            </span>
-          </span>
-        </button>
+          </button>
+        ) : null}
         <span className="sr-only" aria-live="polite">
           {copied ? `Código ${code} copiado` : ""}
         </span>

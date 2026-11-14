@@ -26,6 +26,8 @@ export interface ElixirSpotlightConfig {
    * el de «Así se utiliza…» o, si no hay, el primero; `none` = la foto.
    */
   demoVideoId: string;
+  /** Muestra u oculta el botón de compra; el precio sigue a la vista. */
+  ctaVisible: boolean;
   ctaText: string;
   secondaryCtaText: string;
 }
@@ -50,6 +52,7 @@ export const DEFAULT_ELIXIR_SPOTLIGHT: ElixirSpotlightConfig = {
   ],
   mediaUrl: ELIXIR_SPOTLIGHT_DEFAULT_MEDIA,
   demoVideoId: "",
+  ctaVisible: true,
   ctaText: "Añadir al carrito",
   secondaryCtaText: "Ver ficha completa",
 };
@@ -78,6 +81,7 @@ export function parseElixirSpotlightConfig(raw?: string | null): ElixirSpotlight
       benefits,
       mediaUrl: typeof parsed.mediaUrl === "string" ? parsed.mediaUrl.trim() : d.mediaUrl,
       demoVideoId: str(parsed.demoVideoId),
+      ctaVisible: typeof parsed.ctaVisible === "boolean" ? parsed.ctaVisible : d.ctaVisible,
       ctaText: str(parsed.ctaText) || d.ctaText,
       secondaryCtaText:
         typeof parsed.secondaryCtaText === "string" ? parsed.secondaryCtaText.trim() : d.secondaryCtaText,
@@ -97,6 +101,7 @@ export function serializeElixirSpotlightConfig(config: ElixirSpotlightConfig): s
     benefits: config.benefits.map((b) => b.trim()).filter(Boolean).slice(0, ELIXIR_SPOTLIGHT_MAX_BENEFITS),
     mediaUrl: config.mediaUrl.trim(),
     demoVideoId: config.demoVideoId.trim(),
+    ctaVisible: config.ctaVisible,
     ctaText: config.ctaText.trim(),
     secondaryCtaText: config.secondaryCtaText.trim(),
   });

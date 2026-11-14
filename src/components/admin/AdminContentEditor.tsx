@@ -140,6 +140,7 @@ import HeroSection, {
   type HeroPreviewDevice,
 } from "@/components/HeroSection";
 import { Switch } from "@/components/ui/switch";
+import AdminCtaVisibleSwitch from "@/components/admin/AdminCtaVisibleSwitch";
 import {
   Select,
   SelectContent,
@@ -478,6 +479,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       dividerColor: isHex(campaignDraft.dividerColor)
         ? campaignDraft.dividerColor.trim()
         : DEFAULT_CAMPAIGN.dividerColor,
+      ctaVisible: campaignDraft.ctaVisible,
       ctaText: campaignDraft.ctaText.trim() || DEFAULT_CAMPAIGN.ctaText,
       ctaProductSlug: campaignDraft.ctaProductSlug.trim().replace(/^\/+|\/+$/g, ""),
       ctaTarget: campaignDraft.ctaTarget,
@@ -665,6 +667,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
       headlineAccentColor: isHex(heroDraft.headlineAccentColor)
         ? heroDraft.headlineAccentColor.trim()
         : DEFAULT_HERO.headlineAccentColor,
+      ctaVisible: heroDraft.ctaVisible,
       ctaText: heroDraft.ctaText.trim() || DEFAULT_HERO.ctaText,
       ctaHref: heroDraft.ctaHref.trim() || DEFAULT_HERO.ctaHref,
       ctaBg: isHex(heroDraft.ctaBg) ? heroDraft.ctaBg.trim() : DEFAULT_HERO.ctaBg,
@@ -2942,6 +2945,13 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     </div>
                   </div>
 
+                  <AdminCtaVisibleSwitch
+                    checked={heroDraft.ctaVisible}
+                    onCheckedChange={(ctaVisible) =>
+                      setHeroDraft((prev) => ({ ...prev, ctaVisible }))
+                    }
+                  />
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
@@ -4115,6 +4125,13 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     </div>
                   </div>
 
+                  <AdminCtaVisibleSwitch
+                    checked={campaignDraft.ctaVisible}
+                    onCheckedChange={(ctaVisible) =>
+                      setCampaignDraft((prev) => ({ ...prev, ctaVisible }))
+                    }
+                  />
+
                   <div>
                     <Label className="text-carbon/60 text-xs uppercase tracking-wider">
                       Texto del CTA
@@ -4897,6 +4914,13 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     ))}
                     <p className="text-xs text-carbon/30">Hasta 4 ventajas. Vacías no se muestran.</p>
                   </div>
+
+                  <AdminCtaVisibleSwitch
+                    checked={tiendaHeroDraft.ctaVisible}
+                    onCheckedChange={(ctaVisible) =>
+                      setTiendaHeroDraft((prev) => ({ ...prev, ctaVisible }))
+                    }
+                  />
 
                   <div>
                     <Label className="text-carbon/60 text-xs uppercase tracking-wider">

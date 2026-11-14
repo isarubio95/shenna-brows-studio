@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import AdminCtaVisibleSwitch from "@/components/admin/AdminCtaVisibleSwitch";
 import {
   Select,
   SelectContent,
@@ -200,6 +201,12 @@ const AdminPromoCodeBannerFields = ({ value, onChange }: Props) => {
           mismo descuento.
         </p>
       </div>
+
+      <AdminCtaVisibleSwitch
+        label="Mostrar botón de copiar"
+        checked={value.buttonVisible}
+        onCheckedChange={(checked) => set("buttonVisible", checked)}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

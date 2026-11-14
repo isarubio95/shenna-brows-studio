@@ -21,6 +21,8 @@ export interface TestimonialsBannerConfig {
   subtitle: string;
   subtitleColor: string;
   dividerColor: string;
+  /** Muestra u oculta el botón; sus textos y ajustes se conservan. */
+  ctaVisible: boolean;
   ctaText: string;
   ctaHref: string;
   /** Tamaño de los textos respecto al de diseño, en % (100 = igual). */
@@ -52,6 +54,7 @@ export const DEFAULT_TESTIMONIALS_BANNER: TestimonialsBannerConfig = {
   subtitle: "Una comunidad que confía en Shenna Brows.",
   subtitleColor: "#6A4E3F",
   dividerColor: "#B9826A",
+  ctaVisible: true,
   ctaText: "Ver opiniones",
   ctaHref: TESTIMONIALS_PAGE_PATH,
   textScale: 100,
@@ -126,6 +129,7 @@ export function parseTestimonialsBannerConfig(raw?: string | null): Testimonials
       subtitle: typeof parsed.subtitle === "string" ? parsed.subtitle.trim() : d.subtitle,
       subtitleColor: color(parsed.subtitleColor, d.subtitleColor),
       dividerColor: color(parsed.dividerColor, d.dividerColor),
+      ctaVisible: typeof parsed.ctaVisible === "boolean" ? parsed.ctaVisible : d.ctaVisible,
       ctaText: text(parsed.ctaText, d.ctaText),
       ctaHref: text(parsed.ctaHref, d.ctaHref),
       textScale: num(parsed.textScale, d.textScale, TEXT_SCALE_MIN, TEXT_SCALE_MAX),
@@ -154,6 +158,7 @@ export function serializeTestimonialsBannerConfig(config: TestimonialsBannerConf
     subtitle: c.subtitle,
     subtitleColor: c.subtitleColor,
     dividerColor: c.dividerColor,
+    ctaVisible: c.ctaVisible,
     ctaText: c.ctaText,
     ctaHref: c.ctaHref,
     textScale: c.textScale,

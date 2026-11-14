@@ -16,6 +16,8 @@ export interface CampaignConfig {
   subheadlineColor: string;
   subheadlineAccentColor: string;
   dividerColor: string;
+  /** Muestra u oculta el botón; sus textos y ajustes se conservan. */
+  ctaVisible: boolean;
   ctaText: string;
   /** Slug del producto del catálogo al que enlaza el CTA. Vacío → /tienda. */
   ctaProductSlug: string;
@@ -59,6 +61,7 @@ export const DEFAULT_CAMPAIGN: CampaignConfig = {
   subheadlineColor: "#5C4A32",
   subheadlineAccentColor: "#C5A059",
   dividerColor: "#C5A059",
+  ctaVisible: true,
   ctaText: "DESCUBRIR",
   ctaProductSlug: "",
   ctaTarget: "link",
@@ -161,6 +164,8 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
       dividerColor: isHexColor(parsed.dividerColor)
         ? parsed.dividerColor.trim()
         : DEFAULT_CAMPAIGN.dividerColor,
+      ctaVisible:
+        typeof parsed.ctaVisible === "boolean" ? parsed.ctaVisible : DEFAULT_CAMPAIGN.ctaVisible,
       ctaText:
         asString(parsed.ctaText, DEFAULT_CAMPAIGN.ctaText).trim() || DEFAULT_CAMPAIGN.ctaText,
       ctaProductSlug,
@@ -203,6 +208,7 @@ export function serializeCampaignConfig(config: CampaignConfig): string {
     subheadlineColor: config.subheadlineColor,
     subheadlineAccentColor: config.subheadlineAccentColor,
     dividerColor: config.dividerColor,
+    ctaVisible: config.ctaVisible,
     ctaText: config.ctaText,
     ctaProductSlug: config.ctaProductSlug.trim().replace(/^\/+|\/+$/g, ""),
     ctaTarget: config.ctaTarget === "newsletter" ? "newsletter" : "link",

@@ -244,7 +244,7 @@ const TiendaHero = ({
       >
         {config.description}
       </p>
-      <div className="flex justify-center">{ctaButton}</div>
+      {config.ctaVisible ? <div className="flex justify-center">{ctaButton}</div> : null}
     </>
   );
 

@@ -174,7 +174,7 @@ const HeroSection = ({
   const textInner = (
     <div className="flex flex-col items-start">
       {preview ? headline : <AnimatedSection>{headline}</AnimatedSection>}
-      {preview ? (
+      {!config.ctaVisible ? null : preview ? (
         <div className="pointer-events-none">{ctaButton}</div>
       ) : (
         <AnimatedSection delay={0.15}>
