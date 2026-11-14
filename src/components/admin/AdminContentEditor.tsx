@@ -7,7 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
-import { SITE_CTA_CLASS, siteCtaStyle } from "@/lib/site-cta";
+import {
+  isSiteCtaSize,
+  SITE_CTA_SIZE_LABELS,
+  SITE_CTA_SIZES,
+  siteCtaClass,
+  siteCtaStyle,
+} from "@/lib/site-cta";
 import { Crop, Loader2, Monitor, Play, Plus, RotateCcw, Save, Smartphone, Sparkle, Trash2, Upload } from "lucide-react";
 import {
   DEFAULT_MARQUEE_CONFIG,
@@ -54,6 +60,7 @@ import {
   DEFAULT_WELCOME_POPUP,
   parseWelcomePopupConfig,
   serializeWelcomePopupConfig,
+  welcomePopupHasOfferText,
   type WelcomePopupConfig,
 } from "@/lib/welcome-popup-content";
 import {
@@ -156,6 +163,7 @@ import {
 } from "@/lib/about-content";
 
 const CAMPAIGN_CTA_TIENDA_VALUE = "__tienda__";
+const CAMPAIGN_CTA_NEWSLETTER_VALUE = "__newsletter__";
 
 type CampaignProductOption = {
   id: string;
@@ -472,6 +480,9 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         : DEFAULT_CAMPAIGN.dividerColor,
       ctaText: campaignDraft.ctaText.trim() || DEFAULT_CAMPAIGN.ctaText,
       ctaProductSlug: campaignDraft.ctaProductSlug.trim().replace(/^\/+|\/+$/g, ""),
+      ctaTarget: campaignDraft.ctaTarget,
+      newsletterTitle: campaignDraft.newsletterTitle.trim(),
+      newsletterText: campaignDraft.newsletterText.trim(),
       ctaBg: isHex(campaignDraft.ctaBg) ? campaignDraft.ctaBg.trim() : DEFAULT_CAMPAIGN.ctaBg,
       ctaTextColor: isHex(campaignDraft.ctaTextColor)
         ? campaignDraft.ctaTextColor.trim()
@@ -679,15 +690,15 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
     const config: WelcomePopupConfig = {
       enabled: Boolean(welcomePopupDraft.enabled),
       imageUrl: welcomePopupDraft.imageUrl.trim(),
-      eyebrow: welcomePopupDraft.eyebrow.trim() || DEFAULT_WELCOME_POPUP.eyebrow,
-      offerAmount: welcomePopupDraft.offerAmount.trim() || DEFAULT_WELCOME_POPUP.offerAmount,
-      offerSuffix: welcomePopupDraft.offerSuffix.trim() || DEFAULT_WELCOME_POPUP.offerSuffix,
-      badgeText: welcomePopupDraft.badgeText.trim() || DEFAULT_WELCOME_POPUP.badgeText,
+      // Textos vacíos se respetan: la admin puede dejar solo la imagen.
+      eyebrow: welcomePopupDraft.eyebrow.trim(),
+      offerAmount: welcomePopupDraft.offerAmount.trim(),
+      offerSuffix: welcomePopupDraft.offerSuffix.trim(),
+      badgeText: welcomePopupDraft.badgeText.trim(),
       primaryCta: welcomePopupDraft.primaryCta.trim() || DEFAULT_WELCOME_POPUP.primaryCta,
       secondaryCta: welcomePopupDraft.secondaryCta.trim() || DEFAULT_WELCOME_POPUP.secondaryCta,
-      emailTitle: welcomePopupDraft.emailTitle.trim() || DEFAULT_WELCOME_POPUP.emailTitle,
-      emailDescription:
-        welcomePopupDraft.emailDescription.trim() || DEFAULT_WELCOME_POPUP.emailDescription,
+      emailTitle: welcomePopupDraft.emailTitle.trim(),
+      emailDescription: welcomePopupDraft.emailDescription.trim(),
       emailCta: welcomePopupDraft.emailCta.trim() || DEFAULT_WELCOME_POPUP.emailCta,
       pink: isHex(welcomePopupDraft.pink)
         ? welcomePopupDraft.pink.trim()
@@ -699,6 +710,7 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
         ? Math.min(15000, Math.max(0, Math.round(delayRaw)))
         : DEFAULT_WELCOME_POPUP.delayMs,
       alt: welcomePopupDraft.alt.trim() || DEFAULT_WELCOME_POPUP.alt,
+      ctaSize: welcomePopupDraft.ctaSize,
       fonts: welcomePopupDraft.fonts,
     };
     return {
@@ -3273,6 +3285,12 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                     </div>
                   </div>
 
+                  <p className="text-xs text-carbon/50">
+                    Deja vacío cualquier texto para que no salga: si la imagen ya lleva el mensaje,
+                    vacía los cuatro primeros y solo se verán la imagen y los botones. Los botones
+                    vacíos vuelven a su texto original.
+                  </p>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-carbon/60 text-xs uppercase tracking-wider">
@@ -3358,6 +3376,32 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         }
                         className="mt-1 border-gold/20"
                       />
+                    </div>
+                    <div>
+                      <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                        Tamaño de los botones
+                      </Label>
+                      <Select
+                        value={welcomePopupDraft.ctaSize}
+                        onValueChange={(value) =>
+                          setWelcomePopupDraft((prev) => ({
+                            ...prev,
+                            ctaSize: isSiteCtaSize(value) ? value : prev.ctaSize,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="mt-1 border-gold/20 bg-white focus:ring-gold/30">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SITE_CTA_SIZES.map((size) => (
+                            <SelectItem key={size} value={size}>
+                              {SITE_CTA_SIZE_LABELS[size]}
+                              {size === "sm" ? " (estrechos, tapan menos la imagen)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -3488,54 +3532,83 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         backgroundPosition: "center",
                       }}
                     >
-                      <div className="bg-gradient-to-b from-white/70 via-white/30 to-black/20 px-4 py-6 text-center min-h-[280px] flex flex-col items-center">
-                        <p className="font-sans text-[0.55rem] font-semibold uppercase tracking-[0.22em] text-carbon/80" style={fontStyle(welcomePopupDraft.fonts.eyebrow)}>
-                          {welcomePopupDraft.eyebrow || DEFAULT_WELCOME_POPUP.eyebrow}
-                        </p>
-                        <p
-                          className="mt-1 font-playfair text-4xl font-bold leading-none tracking-tight"
-                          style={{
-                            backgroundImage: `linear-gradient(180deg, #E8D5A3 0%, ${welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold} 45%, #8B6914 100%)`,
-                            WebkitBackgroundClip: "text",
-                            backgroundClip: "text",
-                            color: "transparent",
-                            ...fontStyle(welcomePopupDraft.fonts.offer),
-                          }}
+                      <div
+                        className={cn(
+                          "px-4 py-6 text-center min-h-[280px] flex flex-col items-center",
+                          (!welcomePopupDraft.imageUrl || welcomePopupHasOfferText(welcomePopupDraft)) &&
+                            "bg-gradient-to-b from-white/70 via-white/30 to-black/20",
+                        )}
+                      >
+                        {welcomePopupDraft.eyebrow.trim() ? (
+                          <p className="font-sans text-[0.55rem] font-semibold uppercase tracking-[0.22em] text-carbon/80" style={fontStyle(welcomePopupDraft.fonts.eyebrow)}>
+                            {welcomePopupDraft.eyebrow}
+                          </p>
+                        ) : null}
+                        {welcomePopupDraft.offerAmount.trim() ? (
+                          <p
+                            className="mt-1 font-playfair text-4xl font-bold leading-none tracking-tight"
+                            style={{
+                              backgroundImage: `linear-gradient(180deg, #E8D5A3 0%, ${welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold} 45%, #8B6914 100%)`,
+                              WebkitBackgroundClip: "text",
+                              backgroundClip: "text",
+                              color: "transparent",
+                              ...fontStyle(welcomePopupDraft.fonts.offer),
+                            }}
+                          >
+                            {welcomePopupDraft.offerAmount}
+                          </p>
+                        ) : null}
+                        {welcomePopupDraft.offerSuffix.trim() ? (
+                          <p className="mt-1 font-playfair text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(welcomePopupDraft.fonts.offerSuffix)}>
+                            {welcomePopupDraft.offerSuffix}
+                          </p>
+                        ) : null}
+                        {(welcomePopupDraft.eyebrow.trim() ||
+                          welcomePopupDraft.offerAmount.trim() ||
+                          welcomePopupDraft.offerSuffix.trim()) &&
+                        welcomePopupDraft.badgeText.trim() ? (
+                          <div className="my-2.5 flex w-full max-w-[7rem] items-center gap-1.5">
+                            <span
+                              className="h-px flex-1"
+                              style={{
+                                backgroundColor:
+                                  welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold,
+                              }}
+                            />
+                            <Sparkle
+                              className="h-2.5 w-2.5"
+                              style={{
+                                color: welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold,
+                              }}
+                              fill={welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold}
+                            />
+                            <span
+                              className="h-px flex-1"
+                              style={{
+                                backgroundColor:
+                                  welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold,
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                        {welcomePopupDraft.badgeText.trim() ? (
+                          <p className="font-playfair text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(welcomePopupDraft.fonts.badge)}>
+                            {welcomePopupDraft.badgeText}
+                          </p>
+                        ) : null}
+                        <div
+                          className={cn(
+                            "mt-auto w-full pt-8",
+                            welcomePopupDraft.ctaSize === "sm"
+                              ? "flex flex-col items-center gap-1"
+                              : "space-y-1.5",
+                          )}
                         >
-                          {welcomePopupDraft.offerAmount || DEFAULT_WELCOME_POPUP.offerAmount}
-                        </p>
-                        <p className="mt-1 font-playfair text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(welcomePopupDraft.fonts.offerSuffix)}>
-                          {welcomePopupDraft.offerSuffix || DEFAULT_WELCOME_POPUP.offerSuffix}
-                        </p>
-                        <div className="my-2.5 flex w-full max-w-[7rem] items-center gap-1.5">
-                          <span
-                            className="h-px flex-1"
-                            style={{
-                              backgroundColor:
-                                welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold,
-                            }}
-                          />
-                          <Sparkle
-                            className="h-2.5 w-2.5"
-                            style={{
-                              color: welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold,
-                            }}
-                            fill={welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold}
-                          />
-                          <span
-                            className="h-px flex-1"
-                            style={{
-                              backgroundColor:
-                                welcomePopupDraft.gold || DEFAULT_WELCOME_POPUP.gold,
-                            }}
-                          />
-                        </div>
-                        <p className="font-playfair text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(welcomePopupDraft.fonts.badge)}>
-                          {welcomePopupDraft.badgeText || DEFAULT_WELCOME_POPUP.badgeText}
-                        </p>
-                        <div className="mt-auto w-full space-y-1.5 pt-8">
                           <div
-                            className={SITE_CTA_CLASS}
+                            className={siteCtaClass(
+                              welcomePopupDraft.ctaSize,
+                              welcomePopupDraft.ctaSize === "sm" ? "min-w-24" : "w-full",
+                            )}
                             style={{ ...siteCtaStyle(), ...fontStyle(welcomePopupDraft.fonts.primaryCta) }}
                           >
                             <Sparkle className="h-2.5 w-2.5" fill="currentColor" />
@@ -3543,7 +3616,10 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                             <Sparkle className="h-2.5 w-2.5" fill="currentColor" />
                           </div>
                           <div
-                            className={SITE_CTA_CLASS}
+                            className={siteCtaClass(
+                              welcomePopupDraft.ctaSize,
+                              welcomePopupDraft.ctaSize === "sm" ? "min-w-24" : "w-full",
+                            )}
                             style={{ ...siteCtaStyle(), ...fontStyle(welcomePopupDraft.fonts.secondaryCta) }}
                           >
                             {welcomePopupDraft.secondaryCta || DEFAULT_WELCOME_POPUP.secondaryCta}
@@ -3564,13 +3640,16 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                       }}
                     >
                       <div className="flex min-h-[280px] flex-col bg-gradient-to-b from-white/70 via-white/30 to-black/20 px-4 py-6">
-                        <p className="text-center font-playfair text-base font-bold text-carbon" style={fontStyle(welcomePopupDraft.fonts.emailTitle)}>
-                          {welcomePopupDraft.emailTitle || DEFAULT_WELCOME_POPUP.emailTitle}
-                        </p>
-                        <p className="mt-1.5 text-center text-[0.65rem] leading-snug text-carbon/70" style={fontStyle(welcomePopupDraft.fonts.emailDescription)}>
-                          {welcomePopupDraft.emailDescription ||
-                            DEFAULT_WELCOME_POPUP.emailDescription}
-                        </p>
+                        {welcomePopupDraft.emailTitle.trim() ? (
+                          <p className="text-center font-playfair text-base font-bold text-carbon" style={fontStyle(welcomePopupDraft.fonts.emailTitle)}>
+                            {welcomePopupDraft.emailTitle}
+                          </p>
+                        ) : null}
+                        {welcomePopupDraft.emailDescription.trim() ? (
+                          <p className="mt-1.5 text-center text-[0.65rem] leading-snug text-carbon/70" style={fontStyle(welcomePopupDraft.fonts.emailDescription)}>
+                            {welcomePopupDraft.emailDescription}
+                          </p>
+                        ) : null}
                         <div className="mt-4 space-y-2.5 rounded-xl bg-white/85 p-2.5">
                           <div className="rounded-md border border-gold/30 bg-white px-2 py-1.5 text-[0.6rem] text-carbon/40">
                             tu@email.com
@@ -3583,15 +3662,28 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                             </span>
                           </div>
                         </div>
-                        <div className="mt-auto w-full space-y-1.5 pt-6">
+                        <div
+                          className={cn(
+                            "mt-auto w-full pt-6",
+                            welcomePopupDraft.ctaSize === "sm"
+                              ? "flex flex-col items-center gap-1"
+                              : "space-y-1.5",
+                          )}
+                        >
                           <div
-                            className={SITE_CTA_CLASS}
+                            className={siteCtaClass(
+                              welcomePopupDraft.ctaSize,
+                              welcomePopupDraft.ctaSize === "sm" ? "min-w-24" : "w-full",
+                            )}
                             style={{ ...siteCtaStyle(), ...fontStyle(welcomePopupDraft.fonts.emailCta) }}
                           >
                             {welcomePopupDraft.emailCta || DEFAULT_WELCOME_POPUP.emailCta}
                           </div>
                           <div
-                            className={SITE_CTA_CLASS}
+                            className={siteCtaClass(
+                              welcomePopupDraft.ctaSize,
+                              welcomePopupDraft.ctaSize === "sm" ? "min-w-24" : "w-full",
+                            )}
                             style={siteCtaStyle()}
                           >
                             Volver
@@ -4039,24 +4131,34 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
 
                   <div>
                     <Label className="text-carbon/60 text-xs uppercase tracking-wider">
-                      Producto del CTA
+                      Destino del botón
                     </Label>
                     <Select
                       value={
-                        campaignDraft.ctaProductSlug.trim() || CAMPAIGN_CTA_TIENDA_VALUE
+                        campaignDraft.ctaTarget === "newsletter"
+                          ? CAMPAIGN_CTA_NEWSLETTER_VALUE
+                          : campaignDraft.ctaProductSlug.trim() || CAMPAIGN_CTA_TIENDA_VALUE
                       }
                       onValueChange={(value) =>
-                        setCampaignDraft((prev) => ({
-                          ...prev,
-                          ctaProductSlug:
-                            value === CAMPAIGN_CTA_TIENDA_VALUE ? "" : value,
-                        }))
+                        setCampaignDraft((prev) =>
+                          value === CAMPAIGN_CTA_NEWSLETTER_VALUE
+                            ? { ...prev, ctaTarget: "newsletter" }
+                            : {
+                                ...prev,
+                                ctaTarget: "link",
+                                ctaProductSlug:
+                                  value === CAMPAIGN_CTA_TIENDA_VALUE ? "" : value,
+                              },
+                        )
                       }
                     >
                       <SelectTrigger className="mt-1 border-gold/20 bg-white focus:ring-gold/30">
                         <SelectValue placeholder="Elige un producto del catálogo" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value={CAMPAIGN_CTA_NEWSLETTER_VALUE}>
+                          Suscripción a la newsletter
+                        </SelectItem>
                         <SelectItem value={CAMPAIGN_CTA_TIENDA_VALUE}>
                           Tienda (catálogo completo)
                         </SelectItem>
@@ -4076,16 +4178,54 @@ const AdminContentEditor = ({ filterKeys }: { filterKeys?: string[] }) => {
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="mt-1 text-xs text-carbon/30">
-                      Enlace:{" "}
-                      <span className="font-mono text-carbon/50">
-                        {campaignCtaPath(campaignDraft)}
-                      </span>
-                      {campaignProducts.length === 0
-                        ? " · Añade productos en el catálogo para enlazarlos aquí."
-                        : null}
-                    </p>
+                    {campaignDraft.ctaTarget === "newsletter" ? (
+                      <p className="mt-1 text-xs text-carbon/40">
+                        El botón abre una ventana para dejar el email. Quien se suscribe recibe el
+                        email «Bienvenida a la newsletter» (sección Emails automáticos).
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-carbon/30">
+                        Enlace:{" "}
+                        <span className="font-mono text-carbon/50">
+                          {campaignCtaPath(campaignDraft)}
+                        </span>
+                        {campaignProducts.length === 0
+                          ? " · Añade productos en el catálogo para enlazarlos aquí."
+                          : null}
+                      </p>
+                    )}
                   </div>
+
+                  {campaignDraft.ctaTarget === "newsletter" ? (
+                    <div className="grid grid-cols-1 gap-4 rounded-lg border border-gold/15 bg-cream/40 p-4">
+                      <div>
+                        <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                          Título de la ventana de suscripción
+                        </Label>
+                        <Input
+                          value={campaignDraft.newsletterTitle}
+                          onChange={(e) =>
+                            setCampaignDraft((prev) => ({ ...prev, newsletterTitle: e.target.value }))
+                          }
+                          className="mt-1 border-gold/20 focus-visible:ring-gold/30"
+                          placeholder={DEFAULT_CAMPAIGN.newsletterTitle}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-carbon/60 text-xs uppercase tracking-wider">
+                          Texto de la ventana
+                        </Label>
+                        <Textarea
+                          value={campaignDraft.newsletterText}
+                          onChange={(e) =>
+                            setCampaignDraft((prev) => ({ ...prev, newsletterText: e.target.value }))
+                          }
+                          className="mt-1 min-h-[70px] border-gold/20 focus-visible:ring-gold/30"
+                          placeholder={DEFAULT_CAMPAIGN.newsletterText}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>

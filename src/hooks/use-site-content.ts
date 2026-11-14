@@ -112,7 +112,9 @@ async function fetchRows(): Promise<SiteContentMap> {
   }
   const { data, error } = await (supabase as any)
     .from("site_content")
-    .select("key, title, content");
+    .select("key, title, content")
+    // Las plantillas de email solo las lee el panel (y las Edge Functions).
+    .neq("key", "customer_emails");
   if (error) throw error;
   return toMap(data);
 }

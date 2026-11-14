@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildOrderConfirmationHtml } from "../_shared/orderConfirmationEmail.ts";
+import { buildCustomerEmail, loadCustomerEmailOverrides } from "../_shared/customerEmails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,7 +102,7 @@ serve(async (req) => {
   const { data: order, error: orderErr } = await admin
     .from("orders")
     .select(
-      "id, email, subtotal, shipping, total, stripe_session_id, correos_shipment_code, order_items ( product_name, quantity, unit_price )",
+      "id, email, subtotal, shipping, total, discount_amount, discount_code, stripe_session_id, correos_shipment_code, order_items ( product_name, quantity, unit_price )",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -153,15 +153,22 @@ serve(async (req) => {
   const shipping = Number(order.shipping ?? 0);
   const total = Number(order.total ?? subtotal + shipping);
 
-  const html = buildOrderConfirmationHtml({
-    variant: "tracking",
-    orderRef,
-    subtotal,
-    shipping,
-    total,
-    lines,
-    correosShipmentCode: code,
-  });
+  const { subject, html } = buildCustomerEmail(
+    {
+      key: "order_tracking",
+      order: {
+        orderRef,
+        subtotal,
+        shipping,
+        total,
+        discountAmount: Number(order.discount_amount ?? 0),
+        discountCode: order.discount_code ? String(order.discount_code) : null,
+        lines,
+        trackingCode: code,
+      },
+    },
+    await loadCustomerEmailOverrides(admin),
+  );
 
   const response = await fetch(resendApiUrl, {
     method: "POST",
@@ -172,7 +179,7 @@ serve(async (req) => {
     body: JSON.stringify({
       from: resendFromAddress,
       to: [email],
-      subject: "Confirmación de pedido (seguimiento Correos) - Shenna Brows",
+      subject,
       html,
     }),
   });

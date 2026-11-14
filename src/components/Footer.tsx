@@ -13,11 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SITE_CTA_CLASS } from "@/lib/site-cta";
 import { useFaqPageVisible } from "@/hooks/use-faq-page-visible";
 import { FAQ_PAGE_PATH } from "@/lib/faq-content";
-import { supabase } from "@/integrations/supabase/client";
-
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL ?? "https://vanhsuisvxvclxdgutaw.supabase.co";
-const NEWSLETTER_ENDPOINT = `${SUPABASE_URL}/functions/v1/newsletter-subscribe`;
+import { subscribeToNewsletter } from "@/lib/newsletter";
 
 const Footer = () => {
   const { toast } = useToast();
@@ -45,30 +41,12 @@ const Footer = () => {
 
     setIsSubmitting(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      const response = await fetch(NEWSLETTER_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          email,
-          privacyAccepted: true,
-          source: "footer_form",
-          action: "subscribe",
-        }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result?.error || "No se pudo completar la suscripción");
-      }
-
+      const result = await subscribeToNewsletter(email, "footer_form");
       toast({
-        title: "Suscripción completada",
-        description: "Te avisaremos por email de nuestras novedades y lanzamientos.",
+        title: result.alreadySubscribed ? "Ya estabas suscrita" : "Suscripción completada",
+        description: result.welcomeEmailSent
+          ? "Te hemos enviado un email de bienvenida."
+          : "Te avisaremos por email de nuestras novedades y lanzamientos.",
       });
       setNewsletterEmail("");
       setPrivacyAccepted(false);

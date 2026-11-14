@@ -38,6 +38,7 @@ import CookiesPolicy from "./pages/CookiesPolicy";
 import Faq from "./pages/Faq";
 import Testimonials from "./pages/Testimonials";
 import NotFound from "./pages/NotFound";
+import Unsubscribe from "./pages/Unsubscribe";
 
 const queryClient = new QueryClient();
 const MANTEINANCE_MODE = import.meta.env.VITE_MANTEINANCE_MODE === "true";
@@ -213,6 +214,7 @@ const AppShell = () => {
         <Route path="/politica-cookies" element={<CookiesPolicy />} />
         <Route path="/preguntas-frecuentes" element={<Faq />} />
         <Route path={TESTIMONIALS_PAGE_PATH} element={<Testimonials />} />
+        <Route path="/baja" element={<Unsubscribe />} />
         <Route path="/:slug" element={<ProductPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

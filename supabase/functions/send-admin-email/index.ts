@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
+import { unsubscribeFooterHtml } from "../_shared/customerEmails.ts";
+import { buildUnsubscribeHeaders, buildUnsubscribePageUrl } from "../_shared/newsletterUnsubscribe.ts";
 
 const RESEND_API = "https://api.resend.com";
 const FROM_ADDRESS = "Shenna Brows <info@shennabrows.com>";
@@ -156,6 +158,8 @@ serve(async (req) => {
     const results: { email: string; success: boolean; error?: string }[] = [];
     let lastResendCallAt = 0;
 
+    const isNewsletter = audience === NEWSLETTER_AUDIENCE;
+
     const sendOne = async (email: string): Promise<{ success: boolean; error?: string }> => {
       const sendBody: Record<string, unknown> = {
         from: FROM_ADDRESS,
@@ -163,6 +167,13 @@ serve(async (req) => {
         subject,
         html,
       };
+
+      // Email comercial: cada suscriptora recibe su propio enlace de baja.
+      if (isNewsletter) {
+        const unsubscribeUrl = await buildUnsubscribePageUrl(email);
+        sendBody.html = `${html}<div style="max-width: 640px; margin: 0 auto; padding: 0 12px 24px; font-family: Arial, sans-serif;">${unsubscribeFooterHtml(unsubscribeUrl)}</div>`;
+        sendBody.headers = await buildUnsubscribeHeaders(email);
+      }
 
       if (attachments?.length > 0) {
         sendBody.attachments = attachments.map((att: { filename: string; content: string; content_type: string }) => ({

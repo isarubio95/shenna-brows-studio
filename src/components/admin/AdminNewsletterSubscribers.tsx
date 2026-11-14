@@ -21,6 +21,7 @@ const SOURCE_LABELS: Record<string, string> = {
   maintenance_page: "Página mantenimiento",
   public_form: "Formulario público",
   welcome_popup: "Popup bienvenida",
+  campaign_cta: "Botón de campaña",
 };
 
 const formatSource = (source: string) => SOURCE_LABELS[source] ?? source;

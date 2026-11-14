@@ -18,6 +18,7 @@ import AdminEmailSender from "@/components/admin/AdminEmailSender";
 import AdminNewsletterSubscribers from "@/components/admin/AdminNewsletterSubscribers";
 import AdminDiscountCodes from "@/components/admin/AdminDiscountCodes";
 import AdminCustomerEmails from "@/components/admin/AdminCustomerEmails";
+import AdminAutomaticEmails from "@/components/admin/AdminAutomaticEmails";
 import AdminThemeEditor from "@/components/admin/AdminThemeEditor";
 import AdminStockManager from "@/components/admin/AdminStockManager";
 import AdminReturnsManager from "@/components/admin/AdminReturnsManager";
@@ -2024,6 +2025,18 @@ const Admin = () => {
               Envía emails individuales a clientes con pedido (incluidos invitados) y a usuarios registrados.
             </p>
             <AdminCustomerEmails />
+          </AnimatedSection>
+        )}
+
+        {activeSection === "emails" && (
+          <AnimatedSection delay={0.05}>
+            <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Emails automáticos</h2>
+            <p className="text-carbon/40 text-sm mb-6">
+              Los emails que salen solos: al pagar, enviar, entregar, cancelar, en las devoluciones
+              y al suscribirse a la newsletter. Cambia el asunto y los textos; el resto (resumen del
+              pedido, seguimiento, código) se rellena solo.
+            </p>
+            <AdminAutomaticEmails />
           </AnimatedSection>
         )}
 

@@ -19,6 +19,11 @@ export interface CampaignConfig {
   ctaText: string;
   /** Slug del producto del catálogo al que enlaza el CTA. Vacío → /tienda. */
   ctaProductSlug: string;
+  /** "newsletter": el botón abre la suscripción en vez de enlazar a un producto. */
+  ctaTarget: CampaignCtaTarget;
+  /** Textos de la ventana de suscripción (solo con `ctaTarget: "newsletter"`). */
+  newsletterTitle: string;
+  newsletterText: string;
   /** Color rosa del botón (mismo default que el popup de bienvenida). */
   ctaBg: string;
   ctaTextColor: string;
@@ -40,6 +45,7 @@ export interface CampaignConfig {
 
 export type CampaignCtaFill = "gradient" | "solid";
 export type CampaignCtaSize = "sm" | "md" | "lg";
+export type CampaignCtaTarget = "link" | "newsletter";
 
 export const CAMPAIGN_CTA_SIZES: CampaignCtaSize[] = ["sm", "md", "lg"];
 
@@ -55,6 +61,9 @@ export const DEFAULT_CAMPAIGN: CampaignConfig = {
   dividerColor: "#C5A059",
   ctaText: "DESCUBRIR",
   ctaProductSlug: "",
+  ctaTarget: "link",
+  newsletterTitle: "Suscríbete a la newsletter",
+  newsletterText: "Déjanos tu email y serás de las primeras en enterarte de lanzamientos y ofertas.",
   ctaBg: "#E9808E",
   ctaTextColor: "#FFFFFF",
   ctaBorderColor: "#FFFFFFB3",
@@ -155,6 +164,9 @@ export function parseCampaignConfig(raw?: string | null): CampaignConfig {
       ctaText:
         asString(parsed.ctaText, DEFAULT_CAMPAIGN.ctaText).trim() || DEFAULT_CAMPAIGN.ctaText,
       ctaProductSlug,
+      ctaTarget: parsed.ctaTarget === "newsletter" ? "newsletter" : "link",
+      newsletterTitle: asString(parsed.newsletterTitle, DEFAULT_CAMPAIGN.newsletterTitle).trim(),
+      newsletterText: asString(parsed.newsletterText, DEFAULT_CAMPAIGN.newsletterText).trim(),
       ctaBg: isHexColor(parsed.ctaBg) ? parsed.ctaBg.trim() : DEFAULT_CAMPAIGN.ctaBg,
       ctaTextColor: isHexColor(parsed.ctaTextColor)
         ? parsed.ctaTextColor.trim()
@@ -193,6 +205,9 @@ export function serializeCampaignConfig(config: CampaignConfig): string {
     dividerColor: config.dividerColor,
     ctaText: config.ctaText,
     ctaProductSlug: config.ctaProductSlug.trim().replace(/^\/+|\/+$/g, ""),
+    ctaTarget: config.ctaTarget === "newsletter" ? "newsletter" : "link",
+    newsletterTitle: config.newsletterTitle.trim(),
+    newsletterText: config.newsletterText.trim(),
     ctaBg: config.ctaBg,
     ctaTextColor: config.ctaTextColor,
     ctaBorderColor: config.ctaBorderColor,

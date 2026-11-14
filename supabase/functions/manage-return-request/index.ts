@@ -1,7 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
-import { buildReturnCustomerStatusHtml } from "../_shared/returnEmails.ts";
+import {
+  buildCustomerEmail,
+  loadCustomerEmailOverrides,
+  type CustomerEmailKey,
+} from "../_shared/customerEmails.ts";
 import { executeRedsysRefund, getRedsysCredentialsFromEnv } from "../_shared/redsys.ts";
 
 const corsHeaders = {
@@ -303,19 +307,25 @@ serve(async (req) => {
   }
 
   if (CUSTOMER_NOTIFY_STATUSES.has(newStatus) && orderEmail) {
-    const html = buildReturnCustomerStatusHtml({
-      status: newStatus,
-      orderIdShort: String(row.order_id).slice(0, 8),
-      adminNote: (updatePayload.admin_note as string | undefined) ?? adminNote,
-    });
-    const subjects: Record<string, string> = {
-      approved: "Tu devolucion ha sido aprobada",
-      rejected: "Actualizacion sobre tu solicitud de devolucion",
-      product_received: "Hemos recibido tu devolucion",
-      refunded: "Reembolso tramitado",
-      cancelled: "Solicitud de devolucion cancelada",
+    const emailKeys: Record<string, CustomerEmailKey> = {
+      approved: "return_approved",
+      rejected: "return_rejected",
+      product_received: "return_product_received",
+      refunded: "return_refunded",
+      cancelled: "return_cancelled",
     };
-    await sendResendEmail(orderEmail, subjects[newStatus] ?? "Actualizacion de devolucion", html);
+    const emailKey = emailKeys[newStatus];
+    if (emailKey) {
+      const { subject, html } = buildCustomerEmail(
+        {
+          key: emailKey as "return_approved",
+          orderRef: String(row.order_id).slice(0, 8),
+          adminNote: (updatePayload.admin_note as string | undefined) ?? adminNote,
+        },
+        await loadCustomerEmailOverrides(admin),
+      );
+      await sendResendEmail(orderEmail, subject, html);
+    }
   }
 
   return new Response(JSON.stringify({ ok: true, status: newStatus }), {

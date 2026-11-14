@@ -28,15 +28,3 @@ export function buildOrderCancelAdminNotifyHtml(params: {
       ${note}
     </div>`;
 }
-
-export function buildOrderCancelCustomerHtml(params: {
-  orderIdShort: string;
-  total: number;
-}): string {
-  return `<div style="font-family: Georgia, serif; color: #2c2c2c; max-width: 560px;">
-      <h2 style="color: #b8860b;">Pedido cancelado</h2>
-      <p>Hemos registrado la cancelación de tu pedido <strong>${escapeHtml(params.orderIdShort)}</strong>.</p>
-      <p>Procederemos al reembolso de <strong>€${params.total.toFixed(2)}</strong> en la tarjeta con la que pagaste. Puede tardar varios días en aparecer en tu extracto.</p>
-      <p style="color: #666; font-size: 14px; margin-top: 24px;">Shenna Brows Studio · info@shennabrows.com</p>
-    </div>`;
-}

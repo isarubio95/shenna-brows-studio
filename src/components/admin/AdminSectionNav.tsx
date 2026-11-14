@@ -13,6 +13,7 @@ import {
   FileText,
   Images,
   Mail,
+  MailCheck,
   Megaphone,
   Menu,
   MessageSquareQuote,
@@ -51,6 +52,7 @@ export type AdminSection =
   | "catalogo"
   | "media"
   | "correos"
+  | "emails"
   | "newsletter"
   | "codigos_dto"
   | "contenido"
@@ -63,6 +65,7 @@ const SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
   { id: "catalogo", label: "Catálogo", icon: Package },
   { id: "media", label: "Media", icon: Images },
   { id: "correos", label: "Correos", icon: Mail },
+  { id: "emails", label: "Emails automáticos", icon: MailCheck },
   { id: "newsletter", label: "Newsletter", icon: Megaphone },
   { id: "codigos_dto", label: "Códigos dto.", icon: Ticket },
   { id: "contenido", label: "Contenido", icon: FileText },
@@ -76,6 +79,7 @@ const SECTION_DESCRIPTIONS: Record<AdminSection, string> = {
   catalogo: "Controla stock y productos del catálogo.",
   media: "Archivos subidos a Storage y cuáles están en uso.",
   correos: "Envía correos individuales a clientes.",
+  emails: "Asunto y textos de los emails que reciben las clientas.",
   newsletter: "Campañas a suscriptores con consentimiento activo.",
   codigos_dto: "Crea y gestiona códigos promocionales y sus usos.",
   contenido: "Textos de la web y tema visual.",

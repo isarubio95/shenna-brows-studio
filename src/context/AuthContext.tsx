@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeToNewsletter } from "@/lib/newsletter";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface Profile {
@@ -118,17 +119,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     });
     if (!error && newsletterOptIn) {
-      await supabase.from("newsletter_subscribers").upsert(
-        {
-          email: email.trim().toLowerCase(),
-          user_id: data.user?.id ?? null,
-          is_subscribed: true,
-          privacy_accepted_at: acceptedAt,
-          source: "register_form",
-          unsubscribed_at: null,
-        },
-        { onConflict: "email" }
-      );
+      // Por la Edge Function: la tabla no admite altas desde el navegador y así
+      // también sale el email de bienvenida.
+      try {
+        await subscribeToNewsletter(email, "register_form");
+      } catch (subscribeError) {
+        console.warn("register_newsletter_subscribe", subscribeError);
+      }
     }
     return { error: error as Error | null };
   };

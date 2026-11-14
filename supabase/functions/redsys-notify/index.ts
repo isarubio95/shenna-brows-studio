@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { decodeMerchantParameters, isMerchantSignatureValid } from "../_shared/redsys.ts";
-import { buildOrderConfirmationHtml } from "../_shared/orderConfirmationEmail.ts";
+import { buildCustomerEmail, loadCustomerEmailOverrides } from "../_shared/customerEmails.ts";
 import { generatePurchaseTicketPdfBase64 } from "../_shared/purchaseTicket.ts";
 
 const secretKey = Deno.env.get("REDSYS_SECRET_KEY")?.trim();
@@ -201,6 +201,7 @@ function pick(obj: Record<string, unknown>, keys: string[]): string {
 }
 
 async function sendOrderConfirmationEmail(args: {
+  admin: Parameters<typeof loadCustomerEmailOverrides>[0];
   email: string;
   orderRef: string;
   subtotal: number;
@@ -217,17 +218,22 @@ async function sendOrderConfirmationEmail(args: {
     return;
   }
 
-  const html = buildOrderConfirmationHtml({
-    variant: "paid",
-    orderRef: args.orderRef,
-    subtotal: args.subtotal,
-    shipping: args.shipping,
-    total: args.total,
-    discountAmount: args.discountAmount,
-    discountCode: args.discountCode,
-    lines: args.lines,
-    correosShipmentCode: args.correosShipmentCode,
-  });
+  const { subject, html } = buildCustomerEmail(
+    {
+      key: "order_paid",
+      order: {
+        orderRef: args.orderRef,
+        subtotal: args.subtotal,
+        shipping: args.shipping,
+        total: args.total,
+        discountAmount: args.discountAmount,
+        discountCode: args.discountCode,
+        lines: args.lines,
+        trackingCode: args.correosShipmentCode,
+      },
+    },
+    await loadCustomerEmailOverrides(args.admin),
+  );
 
   let ticketPdfBase64: string | null = null;
   try {
@@ -253,7 +259,7 @@ async function sendOrderConfirmationEmail(args: {
     body: JSON.stringify({
       from: resendFromAddress,
       to: [args.email],
-      subject: "Confirmacion de pedido - Shenna Brows",
+      subject,
       html,
       ...(ticketPdfBase64
         ? {
@@ -444,6 +450,7 @@ serve(async (req) => {
           }
           const row = updated[0] as { id?: string; correos_shipment_code?: string | null };
           await sendOrderConfirmationEmail({
+            admin,
             email: payload.email,
             orderRef: dsOrder,
             subtotal,
@@ -509,6 +516,7 @@ serve(async (req) => {
       console.error("redsys_notify_order_items", itemsErr);
     }
     await sendOrderConfirmationEmail({
+      admin,
       email: payload.email,
       orderRef: dsOrder,
       subtotal,

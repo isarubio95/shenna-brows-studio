@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
-import { buildOrderCancelAdminNotifyHtml, buildOrderCancelCustomerHtml } from "../_shared/orderCancelEmails.ts";
+import { buildOrderCancelAdminNotifyHtml } from "../_shared/orderCancelEmails.ts";
+import { buildCustomerEmail, loadCustomerEmailOverrides } from "../_shared/customerEmails.ts";
 import { executeRedsysRefund, getRedsysCredentialsFromEnv } from "../_shared/redsys.ts";
 
 const corsHeaders = {
@@ -255,10 +256,10 @@ serve(async (req) => {
     total,
     customerNote,
   });
-  const customerHtml = buildOrderCancelCustomerHtml({
-    orderIdShort: orderId.slice(0, 8),
-    total,
-  });
+  const customerEmail = buildCustomerEmail(
+    { key: "order_cancelled", orderRef: orderId.slice(0, 8), total },
+    await loadCustomerEmailOverrides(admin),
+  );
 
   await sendResendEmail(
     adminNotifyEmail,
@@ -268,11 +269,7 @@ serve(async (req) => {
 
   const notifyEmail = orderEmail || userEmail;
   if (notifyEmail) {
-    await sendResendEmail(
-      notifyEmail,
-      "Tu pedido ha sido cancelado — Shenna Brows",
-      customerHtml,
-    );
+    await sendResendEmail(notifyEmail, customerEmail.subject, customerEmail.html);
   }
 
   return new Response(JSON.stringify({ ok: true, status: "cancelled" }), {

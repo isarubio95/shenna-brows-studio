@@ -8,6 +8,8 @@ export async function sendResendEmail(args: {
   to: string;
   subject: string;
   html: string;
+  headers?: Record<string, string>;
+  attachments?: Array<{ filename: string; content: string; content_type: string }>;
 }): Promise<{ ok: true } | { ok: false; status: number; detail: string }> {
   const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim();
   if (!resendApiKey) {
@@ -30,6 +32,8 @@ export async function sendResendEmail(args: {
       to: [email],
       subject: args.subject,
       html: args.html,
+      ...(args.headers ? { headers: args.headers } : {}),
+      ...(args.attachments?.length ? { attachments: args.attachments } : {}),
     }),
   });
 

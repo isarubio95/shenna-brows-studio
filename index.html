@@ -48,7 +48,7 @@
 
         try {
           var key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhbmhzdWlzdnh2Y2x4ZGd1dGF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNjA4OTAsImV4cCI6MjA4NjczNjg5MH0.12dipjMKxJzZ93aGRSw3GnYYBb19E-FvdDEAGyH35Pg";
-          var prefetch = fetch("https://vanhsuisvxvclxdgutaw.supabase.co/rest/v1/site_content?select=key,title,content", {
+          var prefetch = fetch("https://vanhsuisvxvclxdgutaw.supabase.co/rest/v1/site_content?select=key,title,content&key=neq.customer_emails", {
             headers: { apikey: key, Authorization: "Bearer " + key },
           }).then(function (res) {
             if (!res.ok) throw new Error("site_content " + res.status);

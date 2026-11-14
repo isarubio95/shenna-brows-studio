@@ -22,7 +22,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useVideoAspectRatio } from "@/lib/video-aspect-ratio";
 import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { fontStyle } from "@/lib/fonts";
-import { SITE_CTA_CLASS } from "@/lib/site-cta";
+import { siteCtaClass } from "@/lib/site-cta";
+import NewsletterSignupDialog from "@/components/NewsletterSignupDialog";
 import { cn } from "@/lib/utils";
 
 export type CampaignPreviewDevice = "desktop" | "mobile";
@@ -62,6 +63,7 @@ const CampaignBanner = ({
     originY: number;
   } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [newsletterOpen, setNewsletterOpen] = useState(false);
   const isMobileViewport = useIsMobile();
   const heroCtaStyle = useHeroCtaStyle();
 
@@ -127,6 +129,8 @@ const CampaignBanner = ({
   if (!preview && !config.desktopImageUrl.trim()) return null;
 
   const ctaLabel = config.ctaText.trim() || DEFAULT_CAMPAIGN.ctaText;
+  const ctaClass = siteCtaClass(config.ctaSize);
+  const opensNewsletter = config.ctaTarget === "newsletter";
   const ctaStyle: CSSProperties = {
     ...heroCtaStyle,
     ...fontStyle(config.fonts.cta),
@@ -165,14 +169,25 @@ const CampaignBanner = ({
       aria-label={canDrag ? "Arrastra para colocar el botón de la campaña" : undefined}
     >
       {preview ? (
-        <span className={cn(SITE_CTA_CLASS, "pointer-events-none")} style={ctaStyle}>
+        <span className={cn(ctaClass, "pointer-events-none")} style={ctaStyle}>
           {ctaLabel}
         </span>
       ) : (
         <AnimatedSection>
-          <Link to={campaignCtaPath(config)} className={SITE_CTA_CLASS} style={ctaStyle}>
-            {ctaLabel}
-          </Link>
+          {opensNewsletter ? (
+            <button
+              type="button"
+              onClick={() => setNewsletterOpen(true)}
+              className={ctaClass}
+              style={ctaStyle}
+            >
+              {ctaLabel}
+            </button>
+          ) : (
+            <Link to={campaignCtaPath(config)} className={ctaClass} style={ctaStyle}>
+              {ctaLabel}
+            </Link>
+          )}
         </AnimatedSection>
       )}
     </div>
@@ -297,6 +312,16 @@ const CampaignBanner = ({
           {preview ? textInner : <AnimatedSection className="flex flex-col items-center">{textInner}</AnimatedSection>}
         </div>
       </div>
+
+      {opensNewsletter && !preview ? (
+        <NewsletterSignupDialog
+          open={newsletterOpen}
+          onOpenChange={setNewsletterOpen}
+          title={config.newsletterTitle || DEFAULT_CAMPAIGN.newsletterTitle}
+          description={config.newsletterText || DEFAULT_CAMPAIGN.newsletterText}
+          source="campaign_cta"
+        />
+      ) : null}
     </section>
   );
 };

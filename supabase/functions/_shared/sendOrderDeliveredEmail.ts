@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   buildAccountReviewUrl,
-  buildOrderDeliveredHtml,
   getPublicSiteUrl,
+  SHENNA_INSTAGRAM_URL,
 } from "./orderDeliveredEmail.ts";
+import { buildCustomerEmail, loadCustomerEmailOverrides } from "./customerEmails.ts";
 import { sendResendEmail } from "./resend.ts";
 
 export async function sendOrderDeliveredEmail(
@@ -20,16 +21,17 @@ export async function sendOrderDeliveredEmail(
   }
 
   const orderRef = String(order.stripe_session_id || order.id);
-  const html = buildOrderDeliveredHtml({
-    orderRef,
-    accountReviewUrl: buildAccountReviewUrl(getPublicSiteUrl()),
-  });
+  const { subject, html } = buildCustomerEmail(
+    {
+      key: "order_delivered",
+      orderRef,
+      reviewUrl: buildAccountReviewUrl(getPublicSiteUrl()),
+      instagramUrl: SHENNA_INSTAGRAM_URL,
+    },
+    await loadCustomerEmailOverrides(admin),
+  );
 
-  const result = await sendResendEmail({
-    to: email,
-    subject: "Tu pedido ha sido entregado — Shenna Brows",
-    html,
-  });
+  const result = await sendResendEmail({ to: email, subject, html });
 
   if (!result.ok) {
     console.error("order_delivered_email_resend", order.id, result.status, result.detail);

@@ -41,7 +41,7 @@ const reviews = [{ full_name: "Celia", content: "Mi básico sí o sí", created_
 
 function query(result: { data: unknown; error: null; count?: number }) {
   const builder: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "in", "order", "limit"]) {
+  for (const method of ["select", "eq", "neq", "in", "order", "limit"]) {
     builder[method] = () => builder;
   }
   builder.range = () => Promise.resolve(result);

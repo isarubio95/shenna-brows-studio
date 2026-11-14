@@ -12,23 +12,21 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { subscribeToNewsletter } from "@/lib/newsletter";
 import { cn } from "@/lib/utils";
 import { useSiteContent } from "@/hooks/use-site-content";
 import {
   DEFAULT_WELCOME_POPUP,
   parseWelcomePopupConfig,
+  welcomePopupHasOfferText,
   type WelcomePopupConfig,
 } from "@/lib/welcome-popup-content";
 import { useHeroCtaStyle } from "@/hooks/use-hero-cta-style";
 import { fontStyle } from "@/lib/fonts";
-import { SITE_CTA_CLASS } from "@/lib/site-cta";
+import { siteCtaClass } from "@/lib/site-cta";
 import "animate.css";
 
 const STORAGE_KEY = "sb_welcome_promo_seen";
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL ?? "https://vanhsuisvxvclxdgutaw.supabase.co";
-const NEWSLETTER_ENDPOINT = `${SUPABASE_URL}/functions/v1/newsletter-subscribe`;
 /** Fondo sólido hasta que el admin suba una imagen. */
 const FALLBACK_BG = "#E8DFD0";
 
@@ -42,6 +40,7 @@ const HIDDEN_PATHS = [
   "/politica-devoluciones",
   "/aviso-legal",
   "/politica-cookies",
+  "/baja",
 ];
 
 export type WelcomePromoDialogViewProps = {
@@ -69,6 +68,13 @@ export const WelcomePromoDialogView = ({
   const heroCtaStyle = useHeroCtaStyle();
   const gold = config.gold || DEFAULT_WELCOME_POPUP.gold;
   const fonts = config.fonts;
+  const hasOfferText = welcomePopupHasOfferText(config);
+  const hasHeadline = Boolean(config.eyebrow || config.offerAmount || config.offerSuffix);
+  // Pequeño: botones estrechos y centrados, para tapar menos la imagen.
+  const compactCtas = config.ctaSize === "sm";
+  const ctaClass = siteCtaClass(config.ctaSize, compactCtas ? "w-auto min-w-40" : "w-full");
+  const ctaIcon = compactCtas ? "h-2.5 w-2.5" : "h-3.5 w-3.5";
+  const ctaStack = cn("w-full", compactCtas ? "flex flex-col items-center gap-2" : "space-y-2.5");
 
   useEffect(() => {
     if (open) {
@@ -114,29 +120,13 @@ export const WelcomePromoDialogView = ({
 
     setSubmitting(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      const response = await fetch(NEWSLETTER_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          email: normalized,
-          privacyAccepted: true,
-          source: "welcome_popup",
-          action: "subscribe",
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result?.error || "No se pudo completar la suscripción");
-      }
+      const result = await subscribeToNewsletter(normalized, "welcome_popup");
 
       toast({
         title: "¡Listo!",
-        description: "Revisa tu correo: te hemos enviado tu código de descuento.",
+        description: result.welcomeCouponSent
+          ? "Revisa tu correo: te hemos enviado tu código de descuento."
+          : "Te has suscrito a la newsletter. Revisa tu correo.",
       });
       dismiss();
       setStep("offer");
@@ -186,7 +176,7 @@ export const WelcomePromoDialogView = ({
               aria-hidden
             />
           ) : null}
-          {bgImage ? (
+          {bgImage && (step === "email" || hasOfferText) ? (
             <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/55 via-white/20 to-black/35" />
           ) : null}
           {bgIsVideo ? <BackgroundSoundButton className="bottom-auto right-auto left-3 top-3 z-20" /> : null}
@@ -195,58 +185,70 @@ export const WelcomePromoDialogView = ({
             {step === "offer" ? (
               <>
                 <DialogTitle className="sr-only">
-                  {config.eyebrow} {config.offerAmount} {config.offerSuffix}
+                  {[config.eyebrow, config.offerAmount, config.offerSuffix].filter(Boolean).join(" ") ||
+                    config.alt}
                 </DialogTitle>
                 <DialogDescription className="sr-only">
-                  {config.badgeText}. {config.primaryCta} para recibir el código por email.
+                  {config.badgeText ? `${config.badgeText}. ` : ""}
+                  {config.primaryCta} para recibir el código por email.
                 </DialogDescription>
 
                 <div className="flex flex-1 flex-col items-center text-center">
-                  <p className="font-sans text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-carbon/80" style={fontStyle(fonts.eyebrow)}>
-                    {config.eyebrow}
-                  </p>
-                  <p
-                    className="mt-1 font-playfair text-6xl font-bold leading-none tracking-tight sm:text-7xl"
-                    style={{
-                      backgroundImage: `linear-gradient(180deg, #E8D5A3 0%, ${gold} 45%, #8B6914 100%)`,
-                      WebkitBackgroundClip: "text",
-                      backgroundClip: "text",
-                      color: "transparent",
-                      textShadow: "0 1px 0 rgba(255,255,255,0.35)",
-                      ...fontStyle(fonts.offer),
-                    }}
-                  >
-                    {config.offerAmount}
-                  </p>
-                  <p className="mt-1 font-playfair text-lg font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(fonts.offerSuffix)}>
-                    {config.offerSuffix}
-                  </p>
+                  {config.eyebrow ? (
+                    <p className="font-sans text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-carbon/80" style={fontStyle(fonts.eyebrow)}>
+                      {config.eyebrow}
+                    </p>
+                  ) : null}
+                  {config.offerAmount ? (
+                    <p
+                      className="mt-1 font-playfair text-6xl font-bold leading-none tracking-tight sm:text-7xl"
+                      style={{
+                        backgroundImage: `linear-gradient(180deg, #E8D5A3 0%, ${gold} 45%, #8B6914 100%)`,
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        color: "transparent",
+                        textShadow: "0 1px 0 rgba(255,255,255,0.35)",
+                        ...fontStyle(fonts.offer),
+                      }}
+                    >
+                      {config.offerAmount}
+                    </p>
+                  ) : null}
+                  {config.offerSuffix ? (
+                    <p className="mt-1 font-playfair text-lg font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(fonts.offerSuffix)}>
+                      {config.offerSuffix}
+                    </p>
+                  ) : null}
 
-                  <div className="my-4 flex w-full max-w-56 items-center gap-2">
-                    <span className="h-px flex-1" style={{ backgroundColor: gold }} />
-                    <Sparkle className="h-3.5 w-3.5" style={{ color: gold }} fill={gold} />
-                    <span className="h-px flex-1" style={{ backgroundColor: gold }} />
-                  </div>
+                  {hasHeadline && config.badgeText ? (
+                    <div className="my-4 flex w-full max-w-56 items-center gap-2">
+                      <span className="h-px flex-1" style={{ backgroundColor: gold }} />
+                      <Sparkle className="h-3.5 w-3.5" style={{ color: gold }} fill={gold} />
+                      <span className="h-px flex-1" style={{ backgroundColor: gold }} />
+                    </div>
+                  ) : null}
 
-                  <p className="font-playfair text-sm font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(fonts.badge)}>
-                    {config.badgeText}
-                  </p>
+                  {config.badgeText ? (
+                    <p className="font-playfair text-sm font-semibold uppercase tracking-[0.12em] text-carbon/85" style={fontStyle(fonts.badge)}>
+                      {config.badgeText}
+                    </p>
+                  ) : null}
 
-                  <div className="mt-auto w-full space-y-2.5 pt-36">
+                  <div className={cn("mt-auto", ctaStack, hasOfferText ? "pt-36" : "pt-0")}>
                     <button
                       type="button"
                       onClick={() => setStep("email")}
-                      className={cn(SITE_CTA_CLASS, "w-full")}
+                      className={ctaClass}
                       style={{ ...heroCtaStyle, ...fontStyle(fonts.primaryCta) }}
                     >
-                      <Sparkle className="h-3.5 w-3.5" fill="currentColor" />
+                      <Sparkle className={ctaIcon} fill="currentColor" />
                       {config.primaryCta}
-                      <Sparkle className="h-3.5 w-3.5" fill="currentColor" />
+                      <Sparkle className={ctaIcon} fill="currentColor" />
                     </button>
                     <button
                       type="button"
                       onClick={dismiss}
-                      className={cn(SITE_CTA_CLASS, "w-full")}
+                      className={ctaClass}
                       style={{ ...heroCtaStyle, ...fontStyle(fonts.secondaryCta) }}
                     >
                       {config.secondaryCta}
@@ -256,11 +258,23 @@ export const WelcomePromoDialogView = ({
               </>
             ) : (
               <form onSubmit={handleSubscribe} className="flex flex-1 flex-col">
-                <DialogTitle className="text-center font-playfair text-2xl font-bold text-carbon" style={fontStyle(fonts.emailTitle)}>
-                  {config.emailTitle}
+                <DialogTitle
+                  className={cn(
+                    "text-center font-playfair text-2xl font-bold text-carbon",
+                    !config.emailTitle && "sr-only",
+                  )}
+                  style={fontStyle(fonts.emailTitle)}
+                >
+                  {config.emailTitle || config.emailCta}
                 </DialogTitle>
-                <DialogDescription className="mt-2 text-center text-sm text-carbon/70" style={fontStyle(fonts.emailDescription)}>
-                  {config.emailDescription}
+                <DialogDescription
+                  className={cn(
+                    "mt-2 text-center text-sm text-carbon/70",
+                    !config.emailDescription && "sr-only",
+                  )}
+                  style={fontStyle(fonts.emailDescription)}
+                >
+                  {config.emailDescription || "Déjanos tu email para suscribirte."}
                 </DialogDescription>
 
                 <div className="mt-8 space-y-4 rounded-2xl bg-white/85 p-4 backdrop-blur-sm">
@@ -293,11 +307,11 @@ export const WelcomePromoDialogView = ({
                   </label>
                 </div>
 
-                <div className="mt-auto space-y-2.5 pt-6">
+                <div className={cn("mt-auto pt-6", ctaStack)}>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className={cn(SITE_CTA_CLASS, "w-full disabled:opacity-60")}
+                    className={cn(ctaClass, "disabled:opacity-60")}
                     style={{ ...heroCtaStyle, ...fontStyle(fonts.emailCta) }}
                   >
                     {submitting ? "Enviando..." : config.emailCta}
@@ -305,7 +319,7 @@ export const WelcomePromoDialogView = ({
                   <button
                     type="button"
                     onClick={() => setStep("offer")}
-                    className={cn(SITE_CTA_CLASS, "w-full")}
+                    className={ctaClass}
                     style={{ ...heroCtaStyle, ...fontStyle(fonts.secondaryCta) }}
                   >
                     Volver

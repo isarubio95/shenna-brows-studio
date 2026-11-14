@@ -2,8 +2,14 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyRateLimit, getClientIp, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { sendResendEmail } from "../_shared/resend.ts";
-import { buildWelcomeDiscountEmailHtml } from "../_shared/welcomeDiscountEmail.ts";
 import { formatDiscountLabel, type DiscountCodeRow } from "../_shared/discountCodes.ts";
+import { buildCustomerEmail, loadCustomerEmailOverrides } from "../_shared/customerEmails.ts";
+import { getPublicSiteUrl } from "../_shared/orderDeliveredEmail.ts";
+import {
+  buildUnsubscribeHeaders,
+  buildUnsubscribePageUrl,
+  isValidUnsubscribeToken,
+} from "../_shared/newsletterUnsubscribe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,7 +52,20 @@ serve(async (req) => {
   }
 
   try {
-    const { email, privacyAccepted, source, action } = await req.json();
+    // El botón «Cancelar suscripción» del gestor de correo hace un POST con los
+    // datos en la URL (RFC 8058); la web y el resto mandan JSON.
+    const query = new URL(req.url).searchParams;
+    const fromQuery = query.get("action") === "unsubscribe";
+    const body = fromQuery ? {} : await req.json().catch(() => ({}));
+    const { email, privacyAccepted, source, action, token } = fromQuery
+      ? {
+          email: query.get("email"),
+          privacyAccepted: undefined,
+          source: "unsubscribe_link",
+          action: "unsubscribe",
+          token: query.get("token"),
+        }
+      : body;
     const normalizedEmail = String(email ?? "").trim().toLowerCase();
     const mode = action === "unsubscribe" ? "unsubscribe" : "subscribe";
     const sourceStr = String(source ?? "public_form");
@@ -79,12 +98,17 @@ serve(async (req) => {
     );
 
     if (mode === "unsubscribe") {
+      if (!(await isValidUnsubscribeToken(normalizedEmail, token))) {
+        return new Response(JSON.stringify({ error: "El enlace de baja no es válido" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const { error } = await adminClient
         .from("newsletter_subscribers")
         .update({
           is_subscribed: false,
           unsubscribed_at: new Date().toISOString(),
-          source: sourceStr,
         })
         .eq("email", normalizedEmail);
 
@@ -116,7 +140,7 @@ serve(async (req) => {
 
     const { data: existingSub } = await adminClient
       .from("newsletter_subscribers")
-      .select("id, welcome_coupon_sent_at")
+      .select("id, is_subscribed, welcome_coupon_sent_at")
       .eq("email", normalizedEmail)
       .maybeSingle();
 
@@ -131,10 +155,12 @@ serve(async (req) => {
       );
     }
 
+    const wasSubscribed = existingSub?.is_subscribed === true;
     const nowIso = new Date().toISOString();
     const payload = {
       email: normalizedEmail,
-      user_id: userId,
+      // Sin sesión no se pisa la cuenta ya enlazada (p. ej. desde el registro).
+      ...(userId ? { user_id: userId } : {}),
       is_subscribed: true,
       privacy_accepted_at: nowIso,
       unsubscribed_at: null,
@@ -150,35 +176,53 @@ serve(async (req) => {
     }
 
     let welcomeCouponSent = false;
+    let welcomeEmailSent = false;
 
-    if (sourceStr === "welcome_popup") {
-      const { data: welcomeCode, error: welcomeErr } = await adminClient
-        .from("discount_codes")
-        .select(
-          "id, code, discount_type, discount_value, min_subtotal, first_order_only, is_active, is_welcome_offer",
-        )
-        .eq("is_welcome_offer", true)
-        .eq("is_active", true)
-        .maybeSingle();
+    // Quien ya estaba suscrita no recibe otra bienvenida.
+    if (!wasSubscribed) {
+      const overrides = await loadCustomerEmailOverrides(adminClient);
+      const unsubscribeUrl = await buildUnsubscribePageUrl(normalizedEmail);
+      const unsubscribeHeaders = await buildUnsubscribeHeaders(normalizedEmail);
 
-      if (welcomeErr) {
-        console.error("newsletter_welcome_code_query", welcomeErr);
-      } else if (welcomeCode) {
-        const row = welcomeCode as DiscountCodeRow;
-        const html = buildWelcomeDiscountEmailHtml({
-          code: row.code,
-          discount: row,
-        });
-        const label = formatDiscountLabel(row);
+      let welcomeCode: DiscountCodeRow | null = null;
+      if (sourceStr === "welcome_popup") {
+        const { data, error: welcomeErr } = await adminClient
+          .from("discount_codes")
+          .select(
+            "id, code, discount_type, discount_value, min_subtotal, first_order_only, is_active, is_welcome_offer",
+          )
+          .eq("is_welcome_offer", true)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (welcomeErr) console.error("newsletter_welcome_code_query", welcomeErr);
+        else if (!data) console.warn("newsletter_welcome_no_active_offer");
+        welcomeCode = (data as DiscountCodeRow | null) ?? null;
+      }
+
+      if (welcomeCode) {
+        const min = welcomeCode.min_subtotal == null ? null : Number(welcomeCode.min_subtotal);
+        const built = buildCustomerEmail(
+          {
+            key: "welcome_discount",
+            code: welcomeCode.code,
+            discountLabel: formatDiscountLabel(welcomeCode),
+            minSubtotal: min != null && Number.isFinite(min) ? min : null,
+            firstOrderOnly: Boolean(welcomeCode.first_order_only),
+            unsubscribeUrl,
+          },
+          overrides,
+        );
         const sent = await sendResendEmail({
           to: normalizedEmail,
-          subject: `Tu código de descuento ${label} — Shenna Brows`,
-          html,
+          subject: built.subject,
+          html: built.html,
+          headers: unsubscribeHeaders,
         });
         if (!sent.ok) {
           console.error("newsletter_welcome_email_failed", sent.status, sent.detail);
         } else {
           welcomeCouponSent = true;
+          welcomeEmailSent = true;
           const { error: markErr } = await adminClient
             .from("newsletter_subscribers")
             .update({ welcome_coupon_sent_at: nowIso })
@@ -188,7 +232,18 @@ serve(async (req) => {
           }
         }
       } else {
-        console.warn("newsletter_welcome_no_active_offer");
+        const built = buildCustomerEmail(
+          { key: "newsletter_welcome", shopUrl: `${getPublicSiteUrl()}/tienda`, unsubscribeUrl },
+          overrides,
+        );
+        const sent = await sendResendEmail({
+          to: normalizedEmail,
+          subject: built.subject,
+          html: built.html,
+          headers: unsubscribeHeaders,
+        });
+        if (!sent.ok) console.error("newsletter_plain_welcome_failed", sent.status, sent.detail);
+        else welcomeEmailSent = true;
       }
     }
 
@@ -196,6 +251,8 @@ serve(async (req) => {
       JSON.stringify({
         message: "Suscripción guardada correctamente",
         welcomeCouponSent,
+        welcomeEmailSent,
+        alreadySubscribed: wasSubscribed,
       }),
       {
         status: 200,
