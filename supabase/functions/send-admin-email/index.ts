@@ -121,11 +121,29 @@ serve(async (req) => {
     );
 
     let finalRecipients: string[] = [];
+    let skippedNotSubscribed = 0;
     if (audience === NEWSLETTER_AUDIENCE) {
-      const { data, error } = await adminClient
+      // Con `recipients`: solo las marcadas en el panel (p. ej. una tanda de 100), y solo si
+      // siguen suscritas. Sin `recipients`: todas las suscritas.
+      const requestedRaw: string[] | null = Array.isArray(recipients)
+        ? recipients.map((email: unknown) => String(email ?? "").trim()).filter(Boolean)
+        : null;
+      const requested = requestedRaw
+        ? [...new Set(requestedRaw.map((email) => email.toLowerCase()))]
+        : null;
+      if (requested && (requested.length === 0 || requested.length > 100)) {
+        return new Response(
+          JSON.stringify({ error: requested.length === 0 ? "Missing required fields" : "Too many recipients in one request" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      let query = adminClient
         .from("newsletter_subscribers")
         .select("email")
         .eq("is_subscribed", true);
+      // Tal cual llegan y en minúsculas, por si alguna fila antigua se guardó con mayúsculas.
+      if (requestedRaw && requested) query = query.in("email", [...new Set([...requestedRaw, ...requested])]);
+      const { data, error } = await query;
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), {
           status: 500,
@@ -135,6 +153,7 @@ serve(async (req) => {
       finalRecipients = (data ?? [])
         .map((item) => String(item.email || "").trim().toLowerCase())
         .filter((email) => !!email);
+      if (requested) skippedNotSubscribed = requested.length - new Set(finalRecipients).size;
     } else {
       finalRecipients = Array.isArray(recipients) ? recipients : [];
     }
@@ -230,8 +249,11 @@ serve(async (req) => {
     const sent = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
 
+    const skippedNote = skippedNotSubscribed > 0
+      ? `, ${skippedNotSubscribed} omitidos (ya no están suscritos)`
+      : "";
     return new Response(
-      JSON.stringify({ message: `${sent} enviados, ${failed} fallidos`, results }),
+      JSON.stringify({ message: `${sent} enviados, ${failed} fallidos${skippedNote}`, results }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

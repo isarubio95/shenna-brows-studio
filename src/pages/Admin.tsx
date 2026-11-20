@@ -14,8 +14,7 @@ import ProductEditDialog from "@/components/admin/ProductEditDialog";
 import AdminContentEditor from "@/components/admin/AdminContentEditor";
 import { TESTIMONIALS_BANNER_CONTENT_KEY } from "@/lib/testimonials-banner-content";
 import { PROMO_CODE_BANNER_CONTENT_KEY } from "@/lib/promo-code-banner-content";
-import AdminEmailSender from "@/components/admin/AdminEmailSender";
-import AdminNewsletterSubscribers from "@/components/admin/AdminNewsletterSubscribers";
+import AdminNewsletter from "@/components/admin/AdminNewsletter";
 import AdminDiscountCodes from "@/components/admin/AdminDiscountCodes";
 import AdminCustomerEmails from "@/components/admin/AdminCustomerEmails";
 import AdminAutomaticEmails from "@/components/admin/AdminAutomaticEmails";
@@ -2043,9 +2042,12 @@ const Admin = () => {
         {activeSection === "newsletter" && (
           <AnimatedSection delay={0.05}>
             <h2 className="font-playfair text-xl font-semibold text-carbon mb-4">Newsletter</h2>
-            <p className="text-carbon/40 text-sm mb-4">Envía campañas solo a suscriptores con consentimiento activo.</p>
-            <AdminEmailSender />
-            <AdminNewsletterSubscribers />
+            <p className="text-carbon/40 text-sm mb-4">
+              Marca a quién enviar: una persona, varias o una tanda de 100 (máximo por envío). Solo
+              aparecen las suscriptoras con consentimiento activo. El texto del email se conserva entre
+              tandas.
+            </p>
+            <AdminNewsletter />
           </AnimatedSection>
         )}
 

@@ -43,6 +43,8 @@ type AdminEmailComposeDialogProps = {
   title: string;
   recipientHint?: string;
   sendButtonLabel?: string;
+  /** Conserva asunto, texto y adjuntos al cerrar (envíos de newsletter por tandas). */
+  preserveDraft?: boolean;
   onSend: (payload: AdminEmailSendPayload) => Promise<{ ok: boolean; message?: string; error?: string; status?: number }>;
 };
 
@@ -52,6 +54,7 @@ const AdminEmailComposeDialog = ({
   title,
   recipientHint,
   sendButtonLabel = "Enviar",
+  preserveDraft = false,
   onSend,
 }: AdminEmailComposeDialogProps) => {
   const { toast } = useToast();
@@ -138,7 +141,7 @@ const AdminEmailComposeDialog = ({
   }, [editor]);
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) resetForm();
+    if (!next && !preserveDraft) resetForm();
     onOpenChange(next);
   };
 
